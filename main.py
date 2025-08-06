@@ -443,10 +443,7 @@ with tabs[0]:
         )
 
         # ---------- NEW SUB HEAD DISTRIBUTION CHART ----------
-                # ---------- NEW SUB HEAD DISTRIBUTION PIE CHART ----------
-                # ---------- NEW SUB HEAD DISTRIBUTION PIE CHART ----------
-               # ---------- NEW SUB HEAD DISTRIBUTION PIE CHART ----------
-                # ---------- SUB HEAD DISTRIBUTION ----------
+
         if st.session_state.view_head_filter:  # Show only if head selected
             st.markdown("### 📊 Sub Head Distribution")
 
@@ -458,23 +455,36 @@ with tabs[0]:
             )
             total_subs = subhead_summary["Count"].sum()
 
-            # Match height (5) but smaller width (6 instead of 12)
-            fig2, ax2 = plt.subplots(figsize=(6, 5))
+            # Compact size, shorter height
+            fig2, ax2 = plt.subplots(figsize=(6, 4))  
+
             wedges, texts, autotexts = ax2.pie(
                 subhead_summary["Count"],
-                labels=subhead_summary["Sub Head"],
-                autopct=lambda pct: f"{pct:.1f}%\n({int(round(pct/100*total_subs))})",
                 startangle=90,
-                textprops={'fontsize': 8},
-                colors=plt.cm.Pastel2.colors
+                colors=plt.cm.Set3.colors,
+                autopct=lambda pct: f"{pct:.1f}%" if pct > 5 else "",
+                pctdistance=0.75,
+                labeldistance=1.2  # push labels out for arrows
             )
+
+            # Add arrows for labels
+            for text, wedge in zip(texts, wedges):
+                x, y = wedge.get_center()
+                ang = (wedge.theta2 + wedge.theta1) / 2.
+                x = wedge.r * 1.2 * np.cos(np.deg2rad(ang))
+                y = wedge.r * 1.2 * np.sin(np.deg2rad(ang))
+                text.set_position((x, y))
+                text.set_fontsize(8)
+                text.set_ha('center')
+                text.set_va('center')
+
             ax2.set_title("Sub Head Distribution", fontsize=12, fontweight="bold")
 
             buf2 = BytesIO()
-            plt.savefig(buf2, format="png", dpi=200)
+            plt.savefig(buf2, format="png", dpi=200, bbox_inches="tight")
             buf2.seek(0)
             plt.close()
-            st.image(buf2, use_column_width=True)  # same scaling as main chart
+            st.image(buf2, use_column_width=True)
 
             st.download_button(
                 "📥 Download Sub Head Distribution (PNG)",
@@ -482,6 +492,7 @@ with tabs[0]:
                 file_name="subhead_distribution.png",
                 mime="image/png"
             )
+
 
 
 
@@ -584,6 +595,7 @@ if not editable_filtered.empty:
             st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
         else:
             st.info("ℹ️ No changes detected to save.")
+
 
 
 
