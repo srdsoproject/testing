@@ -492,7 +492,26 @@ st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 if "df" not in st.session_state:
     st.session_state.df = load_data()
 
-filtered = st.session_state.df.copy()
+df = st.session_state.df
+
+# Apply the same filters you used earlier
+filtered = df[
+    (df["Date of Inspection"] >= pd.to_datetime(start_date)) &
+    (df["Date of Inspection"] <= pd.to_datetime(end_date))
+]
+
+if st.session_state.view_type_filter:
+    filtered = filtered[filtered["Type of Inspection"].isin(st.session_state.view_type_filter)]
+if st.session_state.view_location_filter:
+    filtered = filtered[filtered["Location"] == st.session_state.view_location_filter]
+if st.session_state.view_head_filter:
+    filtered = filtered[filtered["Head"].isin(st.session_state.view_head_filter)]
+if st.session_state.view_sub_filter:
+    filtered = filtered[filtered["Sub Head"] == st.session_state.view_sub_filter]
+if selected_status != "All":
+    filtered = filtered[filtered["Status"] == selected_status]
+
+filtered = apply_common_filters(filtered, prefix="view_")
 
 if not filtered.empty:
     if "_sheet_row" not in filtered.columns:
@@ -505,11 +524,11 @@ if not filtered.empty:
     ]
     editable_df = filtered[display_cols].copy()
 
-    # store user edits in session without triggering rerun each keystroke
-    if "feedback_buffer" not in st.session_state:
+    # Keep user edits in session
+    if "feedback_buffer" not in st.session_state or st.session_state.feedback_buffer.shape != editable_df.shape:
         st.session_state.feedback_buffer = editable_df.copy()
 
-    # render as form to avoid live reruns
+    # Use form so typing doesn't trigger rerun
     with st.form("feedback_form", clear_on_submit=False):
         edited_df = st.data_editor(
             st.session_state.feedback_buffer,
@@ -539,6 +558,8 @@ if not filtered.empty:
             st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
         else:
             st.info("ℹ️ No changes detected to save.")
+
+
 
 
 
