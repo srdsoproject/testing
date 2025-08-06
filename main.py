@@ -452,7 +452,6 @@ with tabs[0]:
     # --------------------------------------------
     # ✍️ Edit User Feedback/Remarks in Table
     # --------------------------------------------
-# Load once and keep in session
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
 # Reuse the already filtered DataFrame from above
@@ -467,14 +466,7 @@ if not editable_filtered.empty:
         "Deficiencies Noted", "Inspection By", "Action By", "Feedback",
         "User Feedback/Remark"
     ]
-
-    # Format date
-    if "Date of Inspection" in editable_filtered.columns:
-        editable_filtered["Date of Inspection"] = pd.to_datetime(
-            editable_filtered["Date of Inspection"], errors="coerce"
-        ).dt.strftime("%Y-%m-%d").fillna("")
-
-    editable_df = editable_filtered[display_cols].reset_index(drop=True)
+    editable_df = editable_filtered[display_cols].copy()
 
     # Keep user edits in session
     if (
@@ -502,25 +494,27 @@ if not editable_filtered.empty:
         submitted = st.form_submit_button("✅ Submit Feedback")
 
     if submitted:
-        # Reset index to ensure alignment
-        edited_df = edited_df.reset_index(drop=True)
-        original_df = editable_df.reset_index(drop=True)
-
+        # Align both DataFrames by index
+        common_index = edited_df.index.intersection(editable_filtered.index)
+    
         diffs_mask = (
-            original_df["User Feedback/Remark"] != edited_df["User Feedback/Remark"]
+            editable_filtered.loc[common_index, "User Feedback/Remark"]
+            != edited_df.loc[common_index, "User Feedback/Remark"]
         )
-
+    
         if diffs_mask.any():
-            diffs = edited_df.loc[diffs_mask].copy()
+            diffs = edited_df.loc[common_index[diffs_mask]].copy()
             diffs["_sheet_row"] = editable_filtered.loc[diffs.index, "_sheet_row"].values
-
+    
+            # Replace NaN with empty string
             diffs["User Feedback/Remark"] = diffs["User Feedback/Remark"].fillna("")
-
+    
             update_feedback_column(diffs)
             st.session_state.df.update(diffs)
             st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
         else:
             st.info("ℹ️ No changes detected to save.")
+
 
 
 
