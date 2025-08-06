@@ -486,24 +486,26 @@ with tabs[0]:
     # --------------------------------------------
     # ✍️ Edit User Feedback/Remarks in Table
     # --------------------------------------------
+# Load once and keep in session
+if "df" not in st.session_state:
+    st.session_state.df = load_data()
+
+df = st.session_state.df
+
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
 if not filtered.empty:
-    # Make sure each row has a Google Sheet row number
     if "_sheet_row" not in filtered.columns:
-        filtered["_sheet_row"] = filtered.index + 2  # header + 1-based index
+        filtered["_sheet_row"] = filtered.index + 2  
 
-    # Columns shown to user (exclude _sheet_row)
     display_cols = [
         "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
         "Deficiencies Noted", "Inspection By", "Action By", "Feedback",
         "User Feedback/Remark"
     ]
 
-    # Editable copy (user doesn't see _sheet_row)
     editable_df = filtered[display_cols].copy()
 
-    # Editor for user
     edited_df = st.data_editor(
         editable_df,
         use_container_width=True,
@@ -518,12 +520,13 @@ if not filtered.empty:
         ]
     )
 
-    # Add back the hidden _sheet_row column
     edited_df["_sheet_row"] = filtered["_sheet_row"]
 
-    # Submit button
     if st.button("✅ Submit Feedback"):
         update_feedback_column(edited_df)
+        st.session_state.df.update(edited_df)  # update local cache
         st.success(f"✅ Feedback updated for {len(edited_df)} rows in Google Sheet")
+
+
 
 
