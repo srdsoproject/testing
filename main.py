@@ -443,7 +443,8 @@ with tabs[0]:
         )
 
         # ---------- NEW SUB HEAD DISTRIBUTION CHART ----------
-        if st.session_state.view_head_filter:  # Only show if head is selected
+                # ---------- NEW SUB HEAD DISTRIBUTION PIE CHART ----------
+        if st.session_state.view_head_filter:  # Only show if a head is selected
             st.markdown("### 📊 Sub Head Distribution")
 
             subhead_summary = (
@@ -453,12 +454,17 @@ with tabs[0]:
                 .sort_values(by="Count", ascending=False)
             )
 
-            plt.figure(figsize=(10, 5))
-            plt.bar(subhead_summary["Sub Head"], subhead_summary["Count"], color="#7fc97f")  # light green
-            plt.xticks(rotation=45, ha="right")
-            plt.ylabel("Count")
-            plt.title("Sub Head Distribution")
-            plt.tight_layout()
+            total_subs = subhead_summary["Count"].sum()
+
+            fig2, ax2 = plt.subplots(figsize=(6, 6))
+            wedges, texts, autotexts = ax2.pie(
+                subhead_summary["Count"],
+                labels=subhead_summary["Sub Head"],
+                autopct=lambda pct: f"{pct:.1f}%\n({int(round(pct/100*total_subs))})",
+                startangle=90,
+                colors=plt.cm.Paired.colors  # automatic distinct colors
+            )
+            ax2.set_title("Distribution of Sub Heads", fontsize=14, fontweight="bold")
 
             buf2 = BytesIO()
             plt.savefig(buf2, format="png", dpi=200)
@@ -472,6 +478,7 @@ with tabs[0]:
                 file_name="subhead_distribution.png",
                 mime="image/png"
             )
+
 
         export_df = filtered[[
             "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
@@ -572,6 +579,7 @@ if not editable_filtered.empty:
             st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
         else:
             st.info("ℹ️ No changes detected to save.")
+
 
 
 
