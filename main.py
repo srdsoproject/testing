@@ -511,7 +511,8 @@ if st.session_state.view_sub_filter:
 if selected_status != "All":
     filtered = filtered[filtered["Status"] == selected_status]
 
-filtered = apply_common_filters(filtered, prefix="view_")
+filtered = apply_common_filters(filtered, prefix="edit_")
+
 
 if not filtered.empty:
     if "_sheet_row" not in filtered.columns:
@@ -558,6 +559,7 @@ if not filtered.empty:
             st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
         else:
             st.info("ℹ️ No changes detected to save.")
+
 
 
 
