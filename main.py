@@ -458,8 +458,8 @@ with tabs[0]:
             )
             total_subs = subhead_summary["Count"].sum()
         
-            # Use same size as Pending vs Resolved chart
-            fig2, ax2 = plt.subplots(figsize=(6, 4))  # consistent small size
+            # Match Pending vs Resolved size
+            fig2, ax2 = plt.subplots(figsize=(4, 3))  
         
             wedges, texts, autotexts = ax2.pie(
                 subhead_summary["Count"],
@@ -488,7 +488,8 @@ with tabs[0]:
             plt.savefig(buf2, format="png", dpi=200, bbox_inches="tight")
             buf2.seek(0)
             plt.close()
-            st.image(buf2, use_column_width=True)
+        
+            st.image(buf2, width=400)  # fixed neat size
         
             st.download_button(
                 "📥 Download Sub Head Distribution (PNG)",
@@ -600,6 +601,7 @@ if not editable_filtered.empty:
             st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
         else:
             st.info("ℹ️ No changes detected to save.")
+
 
 
 
