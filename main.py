@@ -44,28 +44,24 @@ if not st.session_state.logged_in:
     st.stop()
 
 # ---------- GOOGLE SHEETS CONNECTION ----------
-SCOPES = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive",
-]
-
-try:
+@st.cache_resource
+def connect_to_gsheet():
+    SCOPES = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive",
+    ]
     service_account_info = dict(st.secrets["gcp_service_account"])
     if "private_key" in service_account_info:
         service_account_info["private_key"] = service_account_info["private_key"].replace("\\n", "\n")
 
     creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPES)
     gc = gspread.authorize(creds)
-
     SHEET_ID = "1_WQyJCtdXuAIQn3IpFTI4KfkrveOHosNsvsZn42jAvw"
     SHEET_NAME = "Sheet1"
-    sheet = gc.open_by_key(SHEET_ID).worksheet(SHEET_NAME)
+    return gc.open_by_key(SHEET_ID).worksheet(SHEET_NAME)
 
-    st.sidebar.success("✅ Connected to Google Sheets!")
-
-except Exception as e:
-    st.sidebar.error(f"❌ Failed to connect: {e}")
-    st.stop()
+sheet = connect_to_gsheet()
+st.sidebar.success("✅ Connected to Google Sheets!")
 
 # ---------- SIDEBAR ----------
 st.sidebar.markdown(f"👤 Logged in as: **{st.session_state.user['name']}**")
@@ -173,7 +169,7 @@ def classify_feedback(feedback):
         return "Pending"
     return "Pending"
 
-
+@st.cache_data(ttl=300)  # cache for 5 minutes (adjust as needed)
 def load_data():
     """Loads all records from the Google Sheet and returns a cleaned DataFrame."""
 
@@ -197,7 +193,7 @@ def load_data():
         "Inspection By",
         "Action By",
         "Feedback",
-        "User Feedback/Remark"
+        "User Feedback/Remark",
     ]
 
     try:
@@ -205,19 +201,18 @@ def load_data():
         if not data or not data[0] or len(data) < 2:
             return pd.DataFrame(columns=REQUIRED_COLS)
 
-        # Normalize headers to avoid space/case issues
+        # Normalize headers
         headers = [c.strip() for c in data[0]]
         df = pd.DataFrame(data[1:], columns=headers)
 
-        # Force "User Feedback/Remark" column to exist
+        # Force "User Feedback/Remark" column to exist (handle typos/hidden spaces)
         if "User Feedback/Remark" not in df.columns:
-            # Try fuzzy matches in case of hidden space or typo
             for col in df.columns:
                 if col.replace(" ", "").lower() == "userfeedback/remark":
                     df.rename(columns={col: "User Feedback/Remark"}, inplace=True)
                     break
 
-        # Ensure all required columns are present
+        # Ensure all required columns exist
         for col in REQUIRED_COLS:
             if col not in df.columns:
                 df[col] = ""
@@ -236,6 +231,9 @@ def load_data():
             lambda x: x if x in [loc.upper() for loc in footplate_list] else ""
         )
 
+        # Add sheet row number (for updates later)
+        df["_sheet_row"] = df.index + 2  # account for header row
+
         return df
 
     except Exception as e:
@@ -243,7 +241,8 @@ def load_data():
         return pd.DataFrame(columns=REQUIRED_COLS)
 
 
-
+df = st.session_state.df
+st.dataframe(df)
 def match_exact(value_list, cell_value):
     """Checks if any value in value_list exactly matches a comma-separated item in cell_value."""
     if not isinstance(cell_value, str):
@@ -598,6 +597,7 @@ if st.button("✅ Submit Feedback"):
     st.success(f"✅ Feedback updated for {len(edited_df)} rows in Google Sheet")
 
                
+
 
 
 
