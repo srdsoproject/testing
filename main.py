@@ -489,47 +489,28 @@ with tabs[0]:
 # Load once and keep in session
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
-if "df" not in st.session_state:
-    st.session_state.df = load_data()
+# Reuse the already filtered DataFrame from above
+editable_filtered = filtered.copy()
 
-df = st.session_state.df
-
-# Apply the same filters you used earlier
-filtered = df[
-    (df["Date of Inspection"] >= pd.to_datetime(start_date)) &
-    (df["Date of Inspection"] <= pd.to_datetime(end_date))
-]
-
-if st.session_state.view_type_filter:
-    filtered = filtered[filtered["Type of Inspection"].isin(st.session_state.view_type_filter)]
-if st.session_state.view_location_filter:
-    filtered = filtered[filtered["Location"] == st.session_state.view_location_filter]
-if st.session_state.view_head_filter:
-    filtered = filtered[filtered["Head"].isin(st.session_state.view_head_filter)]
-if st.session_state.view_sub_filter:
-    filtered = filtered[filtered["Sub Head"] == st.session_state.view_sub_filter]
-if selected_status != "All":
-    filtered = filtered[filtered["Status"] == selected_status]
-
-filtered = apply_common_filters(filtered, prefix="edit_")
-
-
-if not filtered.empty:
-    if "_sheet_row" not in filtered.columns:
-        filtered["_sheet_row"] = filtered.index + 2  
+if not editable_filtered.empty:
+    if "_sheet_row" not in editable_filtered.columns:
+        editable_filtered["_sheet_row"] = editable_filtered.index + 2  
 
     display_cols = [
         "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
         "Deficiencies Noted", "Inspection By", "Action By", "Feedback",
         "User Feedback/Remark"
     ]
-    editable_df = filtered[display_cols].copy()
+    editable_df = editable_filtered[display_cols].copy()
 
     # Keep user edits in session
-    if "feedback_buffer" not in st.session_state or st.session_state.feedback_buffer.shape != editable_df.shape:
+    if (
+        "feedback_buffer" not in st.session_state
+        or st.session_state.feedback_buffer.shape != editable_df.shape
+    ):
         st.session_state.feedback_buffer = editable_df.copy()
 
-    # Use form so typing doesn't trigger rerun
+    # Use a form so typing doesn't trigger rerun
     with st.form("feedback_form", clear_on_submit=False):
         edited_df = st.data_editor(
             st.session_state.feedback_buffer,
@@ -548,22 +529,15 @@ if not filtered.empty:
         submitted = st.form_submit_button("✅ Submit Feedback")
 
     if submitted:
+        # Find only rows where User Feedback/Remark has changed
         diffs = edited_df.loc[
-            edited_df["User Feedback/Remark"] != filtered["User Feedback/Remark"]
+            edited_df["User Feedback/Remark"] != editable_filtered["User Feedback/Remark"]
         ].copy()
 
         if not diffs.empty:
-            diffs["_sheet_row"] = filtered.loc[diffs.index, "_sheet_row"]
+            diffs["_sheet_row"] = editable_filtered.loc[diffs.index, "_sheet_row"]
             update_feedback_column(diffs)
             st.session_state.df.update(diffs)
             st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
         else:
             st.info("ℹ️ No changes detected to save.")
-
-
-
-
-
-
-
-
