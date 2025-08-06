@@ -506,11 +506,10 @@ if not filtered.empty:
 
     editable_df = filtered[display_cols].copy()
 
-    # Use session buffer to avoid reruns while typing
+    # Buffer in session state to avoid reloads while typing
     if "edited_feedback" not in st.session_state:
         st.session_state.edited_feedback = editable_df.copy()
 
-    # Show table but changes are stored in session only
     edited_df = st.data_editor(
         st.session_state.edited_feedback,
         use_container_width=True,
@@ -526,14 +525,24 @@ if not filtered.empty:
         key="feedback_editor"
     )
 
-    # Save edits in session state (no rerun triggered)
     st.session_state.edited_feedback = edited_df
 
-    # On submit → update Google Sheet and the cache
+    # Save only edited rows
     if st.button("✅ Submit Feedback"):
-        edited_df["_sheet_row"] = filtered["_sheet_row"].values
-        update_feedback_column(edited_df)
-        st.session_state.df.update(edited_df)
-        st.success(f"✅ Feedback updated for {len(edited_df)} rows in Google Sheet")
+        diffs = edited_df.loc[
+            edited_df["User Feedback/Remark"] != filtered["User Feedback/Remark"]
+        ].copy()
+
+        if not diffs.empty:
+            diffs["_sheet_row"] = filtered.loc[diffs.index, "_sheet_row"]
+
+            update_feedback_column(diffs)  # pass only changed rows
+
+            # Update local cache
+            st.session_state.df.update(diffs)
+            st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
+        else:
+            st.info("ℹ️ No changes detected to save.")
+
 
 
