@@ -200,8 +200,6 @@ if "df" not in st.session_state:
     st.session_state.df = load_data()
 
 df = st.session_state.df
-st.subheader("Inspection Data")
-st.dataframe(df)
 
 # ---------- UPDATE FEEDBACK ----------
 def update_feedback_column(edited_df):
@@ -227,9 +225,6 @@ def update_feedback_column(edited_df):
         sheet.spreadsheet.values_batch_update(body)
         st.success(f"✅ Updated {len(updates)} row(s)!")
 
-# Example Save Button
-if st.button("💾 Save Feedback"):
-    update_feedback_column(df)
 
 def apply_common_filters(df, prefix=""):
     """Applies common filters (Inspection By, Action By, Date Range) to a DataFrame.
@@ -549,6 +544,7 @@ if not editable_filtered.empty:
             st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
         else:
             st.info("ℹ️ No changes detected to save.")
+
 
 
 
