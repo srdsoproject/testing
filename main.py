@@ -402,7 +402,7 @@ with tabs[0]:
             labels=summary.loc[summary["Status"] != "Total", "Status"],
             autopct=lambda pct: f"{pct:.1f}%\n({int(round(pct / 100 * total_count))})",
             startangle=90,
-            colors = ["#f28b82", "#81c995", "#b00020", "#137333"]
+            colors = ["#b00020", "#137333"]
 
         )
         axes[0].set_title("", fontsize=12)
@@ -545,6 +545,7 @@ if not editable_filtered.empty:
             st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
         else:
             st.info("ℹ️ No changes detected to save.")
+
 
 
 
