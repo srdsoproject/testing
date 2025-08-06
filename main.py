@@ -444,6 +444,7 @@ with tabs[0]:
 
         # ---------- NEW SUB HEAD DISTRIBUTION CHART ----------
                 # ---------- NEW SUB HEAD DISTRIBUTION PIE CHART ----------
+                # ---------- NEW SUB HEAD DISTRIBUTION PIE CHART ----------
         if st.session_state.view_head_filter:  # Only show if a head is selected
             st.markdown("### 📊 Sub Head Distribution")
 
@@ -456,21 +457,24 @@ with tabs[0]:
 
             total_subs = subhead_summary["Count"].sum()
 
-            fig2, ax2 = plt.subplots(figsize=(6, 6))
+            fig2, ax2 = plt.subplots(figsize=(5, 4))  # compact size
             wedges, texts, autotexts = ax2.pie(
                 subhead_summary["Count"],
                 labels=subhead_summary["Sub Head"],
                 autopct=lambda pct: f"{pct:.1f}%\n({int(round(pct/100*total_subs))})",
                 startangle=90,
-                colors=plt.cm.Paired.colors  # automatic distinct colors
+                textprops={'fontsize': 8},   # smaller text for compactness
+                colors=plt.cm.Pastel1.colors  # soft pastel palette
             )
-            ax2.set_title("Distribution of Sub Heads", fontsize=14, fontweight="bold")
+            ax2.set_title("Sub Head Distribution", fontsize=12, fontweight="bold")
+
+            plt.tight_layout()
 
             buf2 = BytesIO()
-            plt.savefig(buf2, format="png", dpi=200)
+            plt.savefig(buf2, format="png", dpi=200, bbox_inches="tight")
             buf2.seek(0)
             plt.close()
-            st.image(buf2, use_column_width=True)
+            st.image(buf2, use_column_width=False)
 
             st.download_button(
                 "📥 Download Sub Head Distribution (PNG)",
@@ -579,6 +583,7 @@ if not editable_filtered.empty:
             st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
         else:
             st.info("ℹ️ No changes detected to save.")
+
 
 
 
