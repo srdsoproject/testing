@@ -444,9 +444,12 @@ with tabs[0]:
 
         # ---------- NEW SUB HEAD DISTRIBUTION CHART ----------
 
+        import numpy as np
+        
+        # ---------- SUB HEAD DISTRIBUTION ----------
         if st.session_state.view_head_filter:  # Show only if head selected
             st.markdown("### 📊 Sub Head Distribution")
-
+        
             subhead_summary = (
                 filtered.groupby("Sub Head")["Sub Head"]
                 .count()
@@ -454,44 +457,46 @@ with tabs[0]:
                 .sort_values(by="Count", ascending=False)
             )
             total_subs = subhead_summary["Count"].sum()
-
-            # Compact size, shorter height
-            fig2, ax2 = plt.subplots(figsize=(6, 4))  
-
+        
+            # Compact size
+            fig2, ax2 = plt.subplots(figsize=(6, 4))
+        
             wedges, texts, autotexts = ax2.pie(
                 subhead_summary["Count"],
                 startangle=90,
                 colors=plt.cm.Set3.colors,
                 autopct=lambda pct: f"{pct:.1f}%" if pct > 5 else "",
-                pctdistance=0.75,
-                labeldistance=1.2  # push labels out for arrows
+                pctdistance=0.7,
+                labeldistance=1.2
             )
-
-            # Add arrows for labels
+        
+            # Adjust labels with arrows
             for text, wedge in zip(texts, wedges):
-                x, y = wedge.get_center()
-                ang = (wedge.theta2 + wedge.theta1) / 2.
-                x = wedge.r * 1.2 * np.cos(np.deg2rad(ang))
-                y = wedge.r * 1.2 * np.sin(np.deg2rad(ang))
-                text.set_position((x, y))
+                ang = (wedge.theta2 + wedge.theta1) / 2.0
+                x = np.cos(np.deg2rad(ang))
+                y = np.sin(np.deg2rad(ang))
+                text.set_position((1.4 * x, 1.4 * y))  # move label outwards
                 text.set_fontsize(8)
-                text.set_ha('center')
-                text.set_va('center')
-
+                ax2.annotate(
+                    "", xy=(x, y), xytext=(1.3 * x, 1.3 * y),
+                    arrowprops=dict(arrowstyle="-", color="black")
+                )
+        
             ax2.set_title("Sub Head Distribution", fontsize=12, fontweight="bold")
-
+        
             buf2 = BytesIO()
             plt.savefig(buf2, format="png", dpi=200, bbox_inches="tight")
             buf2.seek(0)
             plt.close()
             st.image(buf2, use_column_width=True)
-
+        
             st.download_button(
                 "📥 Download Sub Head Distribution (PNG)",
                 data=buf2,
                 file_name="subhead_distribution.png",
                 mime="image/png"
             )
+
 
 
 
@@ -595,6 +600,7 @@ if not editable_filtered.empty:
             st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
         else:
             st.info("ℹ️ No changes detected to save.")
+
 
 
 
