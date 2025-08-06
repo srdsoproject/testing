@@ -503,46 +503,44 @@ if not filtered.empty:
         "Deficiencies Noted", "Inspection By", "Action By", "Feedback",
         "User Feedback/Remark"
     ]
-
     editable_df = filtered[display_cols].copy()
 
-    # Buffer in session state to avoid reloads while typing
-    if "edited_feedback" not in st.session_state:
-        st.session_state.edited_feedback = editable_df.copy()
+    # store user edits in session without triggering rerun each keystroke
+    if "feedback_buffer" not in st.session_state:
+        st.session_state.feedback_buffer = editable_df.copy()
 
-    edited_df = st.data_editor(
-        st.session_state.edited_feedback,
-        use_container_width=True,
-        hide_index=True,
-        num_rows="fixed",
-        column_config={
-            "User Feedback/Remark": st.column_config.TextColumn("User Feedback/Remark")
-        },
-        disabled=[
-            "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
-            "Deficiencies Noted", "Inspection By", "Action By", "Feedback"
-        ],
-        key="feedback_editor"
-    )
+    # render as form to avoid live reruns
+    with st.form("feedback_form", clear_on_submit=False):
+        edited_df = st.data_editor(
+            st.session_state.feedback_buffer,
+            use_container_width=True,
+            hide_index=True,
+            num_rows="fixed",
+            column_config={
+                "User Feedback/Remark": st.column_config.TextColumn("User Feedback/Remark")
+            },
+            disabled=[
+                "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
+                "Deficiencies Noted", "Inspection By", "Action By", "Feedback"
+            ],
+            key="feedback_editor"
+        )
+        submitted = st.form_submit_button("✅ Submit Feedback")
 
-    st.session_state.edited_feedback = edited_df
-
-    # Save only edited rows
-    if st.button("✅ Submit Feedback"):
+    if submitted:
         diffs = edited_df.loc[
             edited_df["User Feedback/Remark"] != filtered["User Feedback/Remark"]
         ].copy()
 
         if not diffs.empty:
             diffs["_sheet_row"] = filtered.loc[diffs.index, "_sheet_row"]
-
-            update_feedback_column(diffs)  # pass only changed rows
-
-            # Update local cache
+            update_feedback_column(diffs)
             st.session_state.df.update(diffs)
             st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
         else:
             st.info("ℹ️ No changes detected to save.")
+
+
 
 
 
