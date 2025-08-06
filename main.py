@@ -461,12 +461,13 @@ with tabs[0]:
             fig2, axes2 = plt.subplots(1, 2, figsize=(12, 5))
             axes2 = np.atleast_1d(axes2)  # ensure it's an array
         
-            wedges, _, _ = axes2[0].pie(
-                subhead_summary["Count"],
-                startangle=90,
-                colors=plt.cm.Paired.colors,
-                radius=0.9
-            )
+            wedges, texts, autotexts = axes2[0].pie(
+            subhead_summary["Count"],
+            startangle=90,
+            colors=plt.cm.Paired.colors,
+            radius=0.9,
+            autopct=lambda pct: f"{pct:.1f}%"        )
+
         
             for i, (wedge, row) in enumerate(zip(wedges, subhead_summary.itertuples())):
                 ang = (wedge.theta2 + wedge.theta1) / 2.0
@@ -617,6 +618,7 @@ if not editable_filtered.empty:
             st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
         else:
             st.info("ℹ️ No changes detected to save.")
+
 
 
 
