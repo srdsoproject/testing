@@ -501,10 +501,10 @@ if not editable_filtered.empty:
 
     # Keep user edits in session
     if (
-        "feedback_buffer" not in st.session_state
-        or st.session_state.feedback_buffer.shape != editable_df.shape
-    ):
-        st.session_state.feedback_buffer = editable_df.copy()
+    "feedback_buffer" not in st.session_state
+    or not st.session_state.feedback_buffer.equals(editable_df)):
+    st.session_state.feedback_buffer = editable_df.copy()
+
 
     # Use a form so typing doesn't trigger rerun
     with st.form("feedback_form", clear_on_submit=False):
@@ -550,6 +550,7 @@ if not editable_filtered.empty:
             st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
         else:
             st.info("ℹ️ No changes detected to save.")
+
 
 
 
