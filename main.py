@@ -136,7 +136,7 @@ def classify_feedback(feedback):
 
     pending_keywords = [
         "will be", "needful", "to be", "pending", "not done", "awaiting",
-        "waiting", "yet to", "next time", "follow up", "tdc", "t d c",
+        "waiting", "yet to", "next time", "follow up", "tdc", "t d c", "tdc ",
         "will attend", "will be attended", "scheduled", "reminder",
         "to inform", "to counsel", "to submit", "to do", "to replace",
         "remains", "still", "under process", "not yet", "to be done",
@@ -545,4 +545,5 @@ if not editable_filtered.empty:
             st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
         else:
             st.info("ℹ️ No changes detected to save.")
+
 
