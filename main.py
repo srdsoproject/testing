@@ -44,6 +44,13 @@ if not st.session_state.logged_in:
     st.stop()
 
 # ---------- GOOGLE SHEETS CONNECTION ----------
+import streamlit as st
+import pandas as pd
+import gspread
+import re
+from google.oauth2.service_account import Credentials
+
+# ---------- STEP 1: CONNECT TO GOOGLE SHEETS ----------
 @st.cache_resource
 def connect_to_gsheet():
     SCOPES = [
@@ -71,7 +78,7 @@ if st.sidebar.button("🚪 Logout"):
     st.session_state.user = {}
     st.rerun()
 
-# ---------- HELPER FUNCTIONS & CONSTANTS ----------
+# ---------- CONSTANT LISTS ----------
 station_list = ['BRB', 'MLM', 'BGVN', 'JNTR', 'PRWD', 'WSB', 'PPJ', 'JEUR', 'KEM', 'BLNI', 'DHS', 'KWV', 'WDS',
                 'MA', 'AAG', 'MKPT', 'MO', 'MVE', 'PK', 'BALE', "SUR", 'TKWD', 'HG', 'TLT', 'AKOR', 'NGS', 'BOT', 'DUD',
                 'KUI', 'GDGN', 'GUR', 'HHD', 'SVG', 'BBD', 'TJSP', 'KLBG', 'HQR', 'MR', 'SDB', 'WADI', 'ARAG',
@@ -88,39 +95,13 @@ gate_list = ['LC-19', 'LC-22A', 'LC-25', 'LC-26', 'LC-27C', 'LC-28', 'LC-30', 'L
              'LC-61']
 HEAD_LIST = ["", "ELECT/TRD", "ELECT/G", "ELECT/TRO", "SIGNAL & TELECOM", "OPTG",
              "ENGINEERING", "COMMERCIAL", "C&W"]
-SUBHEAD_LIST = {
-    "ELECT/TRD": ["T/W WAGON", "TSS/SP/SSP", "OHE SECTION", "OHE STATION", "MISC"],
-    "ELECT/G": ["TL/AC COACH", "POWER/PANTRY CAR", "WIRING/EQUIPMENT", "UPS", "AC", "DG", "SOLAR LIGHT", "MISC"],
-    "ELECT/TRO": ["LOCO DEFECTS", "RUNNING ROOM DEFICIENCIES", "LOBBY DEFICIENCIES", "LRD RELATED", "PERSONAL STORE", "PR RELATED",
-                  "CMS", "MISC"],
-    
-    "SIGNAL & TELECOM": [ "SIGNAL PUTBACK/BLANK", "OTHER SIGNAL FAILURE", "BPAC", "GATE", "RELAY ROOM",
-                         "STATION(VDU/BLOCK INSTRUMENT)", "MISC", "CCTV", "DISPLAY BOARDS"],
-    "OPTG": [ "SWR/CSR/CSL/TWRD", "COMPETENCY RELATED", "STATION RECORDS", "STATION DEFICIENCIES",
-             "SM OFFICE DEFICIENCIES", "MISC"],
-    "ENGINEERING": [ "ROUGH RIDING", "TRACK NEEDS ATTENTION", "MISC"],
-    "COMMERCIAL": [ "TICKETING RELATED/MACHINE", "IRCTC", "MISC"],
-    "C&W": [ "BRAKE BINDING", 'WHEEL DEFECT', 'TRAIN PARTING', 'PASSENGER AMENITIES', 'AIR PRESSURE LEAKAGE',
-            'DAMAGED UNDER GEAR PARTS', 'MISC'],
-}
-INSPECTION_BY_LIST = [""] + ['DRM/SUR', 'ADRM', 'Sr.DSO', 'Sr.DOM', 'Sr.DEN/S', 'Sr.DEN/C', 'Sr.DEN/Co', 'Sr.DSTE',
-                             'Sr.DEE/TRD', 'Sr.DEE/G', 'Sr.DME', 'Sr.DCM', 'Sr.DPO', 'Sr.DFM', 'Sr.DMM', 'DSC',
-                             'DME,DEE/TRD', 'DFM', 'DSTE/HQ', 'DSTE/KLBG', 'ADEN/T/SUR', 'ADEN/W/SUR', 'ADEN/KWV',
-                             'ADEN/PVR', 'ADEN/LUR', 'ADEN/KLBG', 'ADSTE/SUR', 'ADSTE/I/KWV', 'ADSTE/II/KWV',
-                             'ADME/SUR', 'AOM/GD', 'AOM/GEN', 'ACM/Cog', 'ACM/TC', 'ACM/GD', 'APO/GEN', 'APO/WEL',
-                             'ADFM/I', 'ADFMII', 'ASC', 'ADSO']
-ACTION_BY_LIST = [""] + ['DRM/SUR', 'ADRM', 'Sr.DSO', 'Sr.DOM', 'Sr.DEN/S', 'Sr.DEN/C', 'Sr.DEN/Co', 'Sr.DSTE',
-                         'Sr.DEE/TRD', 'Sr.DEE/G', 'Sr.DME', 'Sr.DCM', 'Sr.DPO', 'Sr.DFM', 'Sr.DMM', 'DSC']
-# -------------------- CONSTANT LISTS --------------------
-# Station, Footplate & Gate Lists
-import re
 
+# ---------- HELPER FUNCTIONS ----------
 def normalize(text):
-    """Convert feedback text to a clean lowercase string."""
     if not isinstance(text, str):
         return ""
     text = text.lower()
-    text = re.sub(r'\s+', ' ', text)  # collapse multiple spaces
+    text = re.sub(r'\s+', ' ', text)
     return text.strip()
 
 def classify_feedback(feedback):
@@ -128,152 +109,69 @@ def classify_feedback(feedback):
         return "Pending"
 
     feedback_normalized = normalize(feedback)
-
-    # Make sure it's a string
-    if not isinstance(feedback_normalized, str):
-        feedback_normalized = ""
-
     date_found = bool(re.search(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', feedback_normalized))
 
-    pending_keywords = [
-        "will be", "needful", "to be", "pending", "not done", "awaiting",
-        "waiting", "yet to", "next time", "follow up", "tdc", "t d c",
-        "will attend", "will be attended", "scheduled", "reminder",
-        "to inform", "to counsel", "to submit", "to do", "to replace",
-        "remains", "still", "under process", "not yet", "to be done",
-        "will be ensure", "during next", "action will be taken", "Will be supplied shortly."
-    ]
+    pending_keywords = ["pending", "to be", "awaiting", "scheduled", "not yet", "remains"]
+    resolved_keywords = ["done", "completed", "attended", "resolved", "work completed", "found working", "replaced"]
 
-    resolved_keywords = [
-        "attended", "solved", "submitted", "done", "completed", "informed", "Confirmed by","confirmed by", "message given",
-        "tdc work completed", "replaced", "message given", "msg given", "msg sent", "counseled", "informed to", "Counseled ",
-        "info shared", "informed to", "communicated", "counseled", "counselled", "Gate will be closed soon", "attending at the time", "Attending at time",
-        "handled", "resolved", "action taken", "spoken to", "talked to", "warned", "counselling", "HUBLI", "working normal", "Working Normal",
-        "met", "discussion held", "report sent", "notified", "explained", "NIL","nil", "na","NA", 'TLC', 'tlc',
-        "work completed", "acknowledged", "visited", "briefed", "guided", "DG sets handover to KLBG", "handover",
-        "message", "msg", "on ", "working properly", "checked found working", "Supply restored", 
-        "noted please", "noted", "updated by", "adv to", "counselled the staff", "complied",
-        "counselled the", "checked and found", "maintained", "for needful action", "Advised to ETL/CTO/UBL",
-        "provided at", "in working condition", "is working", "found working", "INFORMED ",
-        "equipment is working", "item is working", "As per plan", "Advised to ETL/",
-        "noted it will be attended during the next primary maintenance", "Putright", "putright", "put right", "Put right",
-        "operational feasibility", "will be provided", "will be supplied shortly", "advised to ubl"
-    ]
-
-    found_resolved = any(kw in feedback_normalized for kw in resolved_keywords)
-    found_pending = any(kw in feedback_normalized for kw in pending_keywords)
-
-    if found_resolved or date_found:
+    if any(kw in feedback_normalized for kw in resolved_keywords) or date_found:
         return "Resolved"
-    if found_pending:
+    if any(kw in feedback_normalized for kw in pending_keywords):
         return "Pending"
     return "Pending"
 
-@st.cache_data(ttl=300)  # cache for 5 minutes (adjust as needed)
+# ---------- LOAD DATA ----------
+@st.cache_data(ttl=300)
 def load_data():
-    """Loads all records from the Google Sheet and returns a cleaned DataFrame."""
-
-    VALID_INSPECTIONS = [
-        "FOOTPLATE INSPECTION",
-        "STATION INSPECTION",
-        "LC GATE INSPECTION",
-        "MISC",
-        "COACHING DEPOT",
-        "ON TRAIN",
-        "SURPRISE/AMBUSH INSPECTION",
-    ]
-
     REQUIRED_COLS = [
-        "Date of Inspection",
-        "Type of Inspection",
-        "Location",
-        "Head",
-        "Sub Head",
-        "Deficiencies Noted",
-        "Inspection By",
-        "Action By",
-        "Feedback",
-        "User Feedback/Remark",
+        "Date of Inspection", "Type of Inspection", "Location",
+        "Head", "Sub Head", "Deficiencies Noted",
+        "Inspection By", "Action By", "Feedback",
+        "User Feedback/Remark"
     ]
-
     try:
         data = sheet.get_all_values()
-        if not data or not data[0] or len(data) < 2:
+        if not data or len(data) < 2:
             return pd.DataFrame(columns=REQUIRED_COLS)
 
-        # Normalize headers
         headers = [c.strip() for c in data[0]]
         df = pd.DataFrame(data[1:], columns=headers)
 
-        # Force "User Feedback/Remark" column to exist (handle typos/hidden spaces)
-        if "User Feedback/Remark" not in df.columns:
-            for col in df.columns:
-                if col.replace(" ", "").lower() == "userfeedback/remark":
-                    df.rename(columns={col: "User Feedback/Remark"}, inplace=True)
-                    break
-
-        # Ensure all required columns exist
         for col in REQUIRED_COLS:
             if col not in df.columns:
                 df[col] = ""
 
-        # Clean date
         df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
-
-        # Validate inspection type
-        df["Type of Inspection"] = df["Type of Inspection"].apply(
-            lambda x: x if x in VALID_INSPECTIONS else ""
-        )
-
-        # Clean location
         df["Location"] = df["Location"].astype(str).str.strip().str.upper()
-        df["Location"] = df["Location"].apply(
-            lambda x: x if x in [loc.upper() for loc in footplate_list] else ""
-        )
-
-        # Add sheet row number (for updates later)
-        df["_sheet_row"] = df.index + 2  # account for header row
+        df["_sheet_row"] = df.index + 2
 
         return df
-
     except Exception as e:
         st.error(f"❌ Error loading Google Sheet: {e}")
         return pd.DataFrame(columns=REQUIRED_COLS)
 
+# ---------- SESSION STATE ----------
+if "df" not in st.session_state:
+    st.session_state.df = load_data()
 
 df = st.session_state.df
+st.subheader("Inspection Data")
 st.dataframe(df)
-def match_exact(value_list, cell_value):
-    """Checks if any value in value_list exactly matches a comma-separated item in cell_value."""
-    if not isinstance(cell_value, str):
-        return False
-    cell_items = [item.strip() for item in cell_value.split(',')]
-    return any(val == item for val in value_list for item in cell_items)
-# ---------- Update Feedback Column Only ----------
+
+if st.button("🔄 Refresh Data"):
+    st.session_state.df = load_data()
+    df = st.session_state.df
+    st.success("✅ Data refreshed!")
+
+# ---------- UPDATE FEEDBACK ----------
 def update_feedback_column(edited_df):
     header = sheet.row_values(1)
     try:
-        feedback_col = header.index("User Feedback/Remark") + 1  # gspread is 1-based
+        feedback_col = header.index("User Feedback/Remark") + 1
     except ValueError:
-        st.error("⚠️ 'User Feedback/Remark' column not found in Google Sheet")
+        st.error("⚠️ 'User Feedback/Remark' column not found")
         return
 
-    updates = 0
-    for _, row in edited_df.iterrows():
-        sheet_row = int(row["_sheet_row"])
-        new_value = row["User Feedback/Remark"]
-
-        # Get the current value from Google Sheet (optional optimization)
-        current_value = sheet.cell(sheet_row, feedback_col).value
-
-        # Only update if the value actually changed
-        if str(new_value).strip() != str(current_value).strip():
-            sheet.update_cell(sheet_row, feedback_col, new_value)
-            updates += 1
-
-    st.success(f"✅ Feedback updated for {updates} row(s) in Google Sheet")
-
-    # Build a list of ranges and values for batch update
     updates = []
     for _, row in edited_df.iterrows():
         row_number = int(row["_sheet_row"])
@@ -281,10 +179,17 @@ def update_feedback_column(edited_df):
         cell_range = gspread.utils.rowcol_to_a1(row_number, feedback_col)
         updates.append({"range": cell_range, "values": [[new_value]]})
 
+        # Update locally without reload
+        st.session_state.df.loc[st.session_state.df["_sheet_row"] == row_number, "User Feedback/Remark"] = new_value
+
     if updates:
-        # Execute batch update in a single request
         body = {"valueInputOption": "USER_ENTERED", "data": updates}
         sheet.spreadsheet.values_batch_update(body)
+        st.success(f"✅ Updated {len(updates)} row(s)!")
+
+# Example Save Button
+if st.button("💾 Save Feedback"):
+    update_feedback_column(df)
 
 
 
@@ -597,6 +502,7 @@ if st.button("✅ Submit Feedback"):
     st.success(f"✅ Feedback updated for {len(edited_df)} rows in Google Sheet")
 
                
+
 
 
 
