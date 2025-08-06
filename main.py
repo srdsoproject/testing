@@ -381,31 +381,31 @@ with tabs[0]:
     resolved_count = (filtered["Status"] == "Resolved").sum()
     total_count = len(filtered)
     
-    col_a, col_b, col_c = st.columns(3)
+     col_a, col_b, col_c = st.columns(3)
     col_a.metric("🟨 Pending", pending_count)
     col_b.metric("🟩 Resolved", resolved_count)
     col_c.metric("📊 Total Records", total_count)
-    
+
     if not filtered.empty:
+        # ---------- EXISTING PENDING vs RESOLVED CHART ----------
         summary = filtered["Status"].value_counts().reindex(["Pending", "Resolved"], fill_value=0).reset_index()
         summary.columns = ["Status", "Count"]
-        # Add total row
         total_count = summary["Count"].sum()
         summary.loc[len(summary.index)] = ["Total", total_count]
-        # Title Info
+
         dr = f"{start_date.strftime('%d-%m-%Y')} to {end_date.strftime('%d-%m-%Y')}"
         heads = ", ".join(st.session_state.view_head_filter) if st.session_state.view_head_filter else "All Heads"
-        # Matplotlib chart + table
+
         fig, axes = plt.subplots(1, 2, figsize=(12, 5))
         wedges, texts, autotexts = axes[0].pie(
             summary.loc[summary["Status"] != "Total", "Count"],
             labels=summary.loc[summary["Status"] != "Total", "Status"],
             autopct=lambda pct: f"{pct:.1f}%\n({int(round(pct / 100 * total_count))})",
             startangle=90,
-            colors = ["#b00020", "#137333"]
-
+            colors=["#b00020", "#137333"]  # Dark red & green
         )
         axes[0].set_title("", fontsize=12)
+
         # Table data
         table_data = [["Status", "Count"]] + summary.values.tolist()
         table_data.append(["Date Range", dr])
@@ -424,15 +424,8 @@ with tabs[0]:
         tbl.auto_set_font_size(False)
         tbl.set_fontsize(10)
         tbl.scale(1, 1.6)
-        # Bold the "Type of Inspection" row
-        for (row, col), cell in tbl.get_celld().items():
-            if row > 0:  # skip header
-                if tbl[row, 0].get_text().get_text() == "Type of Inspection":
-                    tbl[row, 0].get_text().set_weight("bold")
-                    tbl[row, 1].get_text().set_weight("bold")
-    
+
         plt.tight_layout(rect=[0, 0.05, 1, 0.90])
-        # Add title & context
         fig.text(0.5, 0.96, "📈 Pending vs Resolved Records", ha='center', fontsize=14, fontweight='bold')
         fig.text(0.5, 0.03, f"Date Range: {dr}   |   Department: {heads}", ha='center', fontsize=10, color='gray')
 
@@ -440,13 +433,45 @@ with tabs[0]:
         plt.savefig(buf, format="png", dpi=200)
         buf.seek(0)
         plt.close()
-        st.image(buf, caption=None, use_column_width=True)
+        st.image(buf, use_column_width=True)
+
         st.download_button(
             "📥 Download Graph + Table (PNG)",
             data=buf,
             file_name="status_summary.png",
             mime="image/png"
         )
+
+        # ---------- NEW SUB HEAD DISTRIBUTION CHART ----------
+        if st.session_state.view_head_filter:  # Only show if head is selected
+            st.markdown("### 📊 Sub Head Distribution")
+
+            subhead_summary = (
+                filtered.groupby("Sub Head")["Sub Head"]
+                .count()
+                .reset_index(name="Count")
+                .sort_values(by="Count", ascending=False)
+            )
+
+            plt.figure(figsize=(10, 5))
+            plt.bar(subhead_summary["Sub Head"], subhead_summary["Count"], color="#7fc97f")  # light green
+            plt.xticks(rotation=45, ha="right")
+            plt.ylabel("Count")
+            plt.title("Sub Head Distribution")
+            plt.tight_layout()
+
+            buf2 = BytesIO()
+            plt.savefig(buf2, format="png", dpi=200)
+            buf2.seek(0)
+            plt.close()
+            st.image(buf2, use_column_width=True)
+
+            st.download_button(
+                "📥 Download Sub Head Distribution (PNG)",
+                data=buf2,
+                file_name="subhead_distribution.png",
+                mime="image/png"
+            )
 
         export_df = filtered[[
             "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
@@ -478,10 +503,7 @@ with tabs[0]:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
         st.markdown("### 📄 Preview of Filtered Records")
-# Add hidden column with actual Google Sheet row numbers
-    # --------------------------------------------
-    # ✍️ Edit User Feedback/Remarks in Table
-    # --------------------------------------------
+
 # Load once and keep in session
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
@@ -550,6 +572,7 @@ if not editable_filtered.empty:
             st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
         else:
             st.info("ℹ️ No changes detected to save.")
+
 
 
 
