@@ -529,15 +529,20 @@ if not editable_filtered.empty:
         submitted = st.form_submit_button("✅ Submit Feedback")
 
     if submitted:
-        # Find only rows where User Feedback/Remark has changed
-        diffs = edited_df.loc[
-            edited_df["User Feedback/Remark"] != editable_filtered["User Feedback/Remark"]
-        ].copy()
+    # Ensure indices are aligned
+    base_feedback = editable_filtered["User Feedback/Remark"].reset_index(drop=True)
+    new_feedback = edited_df["User Feedback/Remark"].reset_index(drop=True)
 
-        if not diffs.empty:
-            diffs["_sheet_row"] = editable_filtered.loc[diffs.index, "_sheet_row"]
-            update_feedback_column(diffs)
-            st.session_state.df.update(diffs)
-            st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
-        else:
-            st.info("ℹ️ No changes detected to save.")
+    # Compare values safely
+    diffs_mask = base_feedback != new_feedback
+    diffs = edited_df.loc[diffs_mask].copy()
+
+    if not diffs.empty:
+        diffs["_sheet_row"] = editable_filtered.loc[diffs.index, "_sheet_row"].values
+        update_feedback_column(diffs)
+        st.session_state.df.update(diffs)
+        st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
+    else:
+        st.info("ℹ️ No changes detected to save.")
+
+
