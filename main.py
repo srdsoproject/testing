@@ -460,7 +460,7 @@ with tabs[0]:
             subhead_summary.loc[len(subhead_summary.index)] = ["Total", total_subs]
         
             # Two columns: Pie chart + Table
-            fig2, axes2 = plt.subplots(1, 2, figsize=(10, 4))
+            fig2, axes2 = plt.subplots(1, 2, figsize=(12, 5))
         
             wedges, texts, autotexts = axes2[0].pie(
                 subhead_summary.loc[subhead_summary["Sub Head"] != "Total", "Count"],
@@ -613,6 +613,7 @@ if not editable_filtered.empty:
             st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
         else:
             st.info("ℹ️ No changes detected to save.")
+
 
 
 
