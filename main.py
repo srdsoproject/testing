@@ -456,11 +456,17 @@ with tabs[0]:
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
 # Reuse the already filtered DataFrame from above
+st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
+
+# Reuse the already filtered DataFrame from above
 editable_filtered = filtered.copy()
 
 if not editable_filtered.empty:
     if "_sheet_row" not in editable_filtered.columns:
         editable_filtered["_sheet_row"] = editable_filtered.index + 2  
+
+    # 🔹 Format Date before creating editable_df
+    editable_filtered["Date of Inspection"] = editable_filtered["Date of Inspection"].dt.strftime("%Y-%m-%d")
 
     display_cols = [
         "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
@@ -515,6 +521,7 @@ if not editable_filtered.empty:
             st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
         else:
             st.info("ℹ️ No changes detected to save.")
+
 
 
 
