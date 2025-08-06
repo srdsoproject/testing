@@ -459,6 +459,7 @@ with tabs[0]:
             total_subs = subhead_summary["Count"].sum()
         
             fig2, axes2 = plt.subplots(1, 2, figsize=(12, 5))
+            axes2 = np.atleast_1d(axes2)  # ensure it's an array
         
             wedges, _, _ = axes2[0].pie(
                 subhead_summary["Count"],
@@ -467,13 +468,11 @@ with tabs[0]:
                 radius=0.9
             )
         
-            # Place labels outside dynamically
             for i, (wedge, row) in enumerate(zip(wedges, subhead_summary.itertuples())):
                 ang = (wedge.theta2 + wedge.theta1) / 2.0
                 x = np.cos(np.deg2rad(ang))
                 y = np.sin(np.deg2rad(ang))
         
-                # Position text further outside the pie
                 label_x = 1.3 * np.sign(x)
                 label_y = 1.1 * y
         
@@ -486,7 +485,6 @@ with tabs[0]:
                     bbox=dict(facecolor="white", edgecolor="none", alpha=0.7, pad=1)
                 )
         
-                # Draw arrow from label to wedge
                 axes2[0].annotate(
                     "", xy=(0.9 * x, 0.9 * y), xytext=(label_x, label_y),
                     arrowprops=dict(arrowstyle="-", lw=0.8, color="black")
@@ -494,7 +492,6 @@ with tabs[0]:
         
             axes2[0].set_title("📈 Sub Head Distribution", fontsize=12, fontweight="bold")
         
-            # Table data with Total
             table_data = [["Sub Head", "Count"]] + subhead_summary.values.tolist()
             table_data.append(["Total", total_subs])
         
@@ -518,6 +515,7 @@ with tabs[0]:
                 file_name="subhead_distribution.png",
                 mime="image/png"
             )
+
 
 
         export_df = filtered[[
@@ -619,6 +617,7 @@ if not editable_filtered.empty:
             st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
         else:
             st.info("ℹ️ No changes detected to save.")
+
 
 
 
