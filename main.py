@@ -110,7 +110,7 @@ SUBHEAD_LIST = {
     "C&W": [ "BRAKE BINDING", 'WHEEL DEFECT', 'TRAIN PARTING', 'PASSENGER AMENITIES', 'AIR PRESSURE LEAKAGE',
             'DAMAGED UNDER GEAR PARTS', 'MISC'],
 }
-INSPECTION_BY_LIST = [""] + ['HQ OFFICERS','DRM/SUR', 'ADRM', 'Sr.DSO', 'Sr.DOM', 'Sr.DEN/S', 'Sr.DEN/C', 'Sr.DEN/Co', 'Sr.DSTE',
+INSPECTION_BY_LIST = [""] + ['DRM/SUR', 'ADRM', 'Sr.DSO', 'Sr.DOM', 'Sr.DEN/S', 'Sr.DEN/C', 'Sr.DEN/Co', 'Sr.DSTE',
                              'Sr.DEE/TRD', 'Sr.DEE/G', 'Sr.DME', 'Sr.DCM', 'Sr.DPO', 'Sr.DFM', 'Sr.DMM', 'DSC',
                              'DME,DEE/TRD', 'DFM', 'DSTE/HQ', 'DSTE/KLBG', 'ADEN/T/SUR', 'ADEN/W/SUR', 'ADEN/KWV',
                              'ADEN/PVR', 'ADEN/LUR', 'ADEN/KLBG', 'ADSTE/SUR', 'ADSTE/I/KWV', 'ADSTE/II/KWV',
@@ -402,8 +402,7 @@ with tabs[0]:
             labels=summary.loc[summary["Status"] != "Total", "Status"],
             autopct=lambda pct: f"{pct:.1f}%\n({int(round(pct / 100 * total_count))})",
             startangle=90,
-            colors = ["#b00020", "#81c995"]
-
+            colors = ["#b00020", "#137333"]
 
         )
         axes[0].set_title("", fontsize=12)
@@ -546,18 +545,4 @@ if not editable_filtered.empty:
             st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
         else:
             st.info("ℹ️ No changes detected to save.")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
