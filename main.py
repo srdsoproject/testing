@@ -203,10 +203,6 @@ df = st.session_state.df
 st.subheader("Inspection Data")
 st.dataframe(df)
 
-if st.button("🔄 Refresh Data"):
-    st.session_state.df = load_data()
-    df = st.session_state.df
-    st.success("✅ Data refreshed!")
 
 # ---------- UPDATE FEEDBACK ----------
 def update_feedback_column(edited_df):
@@ -567,6 +563,7 @@ if st.button("✅ Submit Feedback"):
     st.success(f"✅ Feedback updated for {len(edited_df)} rows in Google Sheet")
 
                
+
 
 
 
