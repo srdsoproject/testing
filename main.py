@@ -466,12 +466,12 @@ if not editable_filtered.empty:
         "Deficiencies Noted", "Inspection By", "Action By", "Feedback",
         "User Feedback/Remark"
     ]
-    editable_df = editable_filtered[display_cols].copy()
+    editable_df = editable_filtered[display_cols].reset_index(drop=True).copy()
 
-    # Keep user edits in session
+    # Keep user edits in session safely
     if (
         "feedback_buffer" not in st.session_state
-        or st.session_state.feedback_buffer.shape != editable_df.shape
+        or not st.session_state.feedback_buffer.equals(editable_df)
     ):
         st.session_state.feedback_buffer = editable_df.copy()
 
@@ -495,25 +495,26 @@ if not editable_filtered.empty:
 
     if submitted:
         # Align both DataFrames by index
-        common_index = edited_df.index.intersection(editable_filtered.index)
-    
+        edited_df = edited_df.reset_index(drop=True)
+        original_df = editable_df.reset_index(drop=True)
+
         diffs_mask = (
-            editable_filtered.loc[common_index, "User Feedback/Remark"]
-            != edited_df.loc[common_index, "User Feedback/Remark"]
+            original_df["User Feedback/Remark"] != edited_df["User Feedback/Remark"]
         )
-    
+
         if diffs_mask.any():
-            diffs = edited_df.loc[common_index[diffs_mask]].copy()
+            diffs = edited_df.loc[diffs_mask].copy()
             diffs["_sheet_row"] = editable_filtered.loc[diffs.index, "_sheet_row"].values
-    
+
             # Replace NaN with empty string
             diffs["User Feedback/Remark"] = diffs["User Feedback/Remark"].fillna("")
-    
+
             update_feedback_column(diffs)
             st.session_state.df.update(diffs)
             st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
         else:
             st.info("ℹ️ No changes detected to save.")
+
 
 
 
