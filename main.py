@@ -489,31 +489,10 @@ with tabs[0]:
 # Load once and keep in session
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
-# Load data once
 if "df" not in st.session_state:
     st.session_state.df = load_data()
 
-# Apply filters only if not already cached
-if "filtered_df" not in st.session_state or st.session_state.get("filters_changed", False):
-    st.session_state.filtered_df = st.session_state.df.copy()
-
-    # Apply your filters
-    filtered = st.session_state.filtered_df
-    if st.session_state.view_type_filter:
-        filtered = filtered[filtered["Type of Inspection"].isin(st.session_state.view_type_filter)]
-    if st.session_state.view_location_filter:
-        filtered = filtered[filtered["Location"] == st.session_state.view_location_filter]
-    if st.session_state.view_head_filter:
-        filtered = filtered[filtered["Head"].isin(st.session_state.view_head_filter)]
-    if st.session_state.view_sub_filter:
-        filtered = filtered[filtered["Sub Head"] == st.session_state.view_sub_filter]
-    if st.session_state.view_status_filter != "All":
-        filtered = filtered[filtered["Status"] == st.session_state.view_status_filter]
-
-    st.session_state.filtered_df = filtered
-    st.session_state.filters_changed = False
-
-filtered = st.session_state.filtered_df
+filtered = st.session_state.df.copy()
 
 if not filtered.empty:
     if "_sheet_row" not in filtered.columns:
@@ -527,8 +506,13 @@ if not filtered.empty:
 
     editable_df = filtered[display_cols].copy()
 
+    # Use session buffer to avoid reruns while typing
+    if "edited_feedback" not in st.session_state:
+        st.session_state.edited_feedback = editable_df.copy()
+
+    # Show table but changes are stored in session only
     edited_df = st.data_editor(
-        editable_df,
+        st.session_state.edited_feedback,
         use_container_width=True,
         hide_index=True,
         num_rows="fixed",
@@ -538,13 +522,18 @@ if not filtered.empty:
         disabled=[
             "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
             "Deficiencies Noted", "Inspection By", "Action By", "Feedback"
-        ]
+        ],
+        key="feedback_editor"
     )
 
-    edited_df["_sheet_row"] = filtered["_sheet_row"]
+    # Save edits in session state (no rerun triggered)
+    st.session_state.edited_feedback = edited_df
 
+    # On submit → update Google Sheet and the cache
     if st.button("✅ Submit Feedback"):
+        edited_df["_sheet_row"] = filtered["_sheet_row"].values
         update_feedback_column(edited_df)
-        st.session_state.df.update(edited_df)  # update cached data
-        st.session_state.filtered_df.update(edited_df)  # update filtered cache
+        st.session_state.df.update(edited_df)
         st.success(f"✅ Feedback updated for {len(edited_df)} rows in Google Sheet")
+
+
