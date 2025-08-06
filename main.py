@@ -457,14 +457,16 @@ with tabs[0]:
                 .sort_values(by="Count", ascending=False)
             )
             total_subs = subhead_summary["Count"].sum()
+            subhead_summary.loc[len(subhead_summary.index)] = ["Total", total_subs]
         
-            # Match Pending vs Resolved size
-            fig2, ax2 = plt.subplots(figsize=(4, 3))  
+            # Two columns: Pie chart + Table
+            fig2, axes2 = plt.subplots(1, 2, figsize=(10, 4))
         
-            wedges, texts, autotexts = ax2.pie(
-                subhead_summary["Count"],
+            wedges, texts, autotexts = axes2[0].pie(
+                subhead_summary.loc[subhead_summary["Sub Head"] != "Total", "Count"],
+                labels=subhead_summary.loc[subhead_summary["Sub Head"] != "Total", "Sub Head"],
                 startangle=90,
-                colors=plt.cm.Paired.colors,  # consistent readable colors
+                colors=plt.cm.Paired.colors,
                 autopct=lambda pct: f"{pct:.1f}%\n({int(round(pct/100*total_subs))})" if pct > 5 else "",
                 pctdistance=0.7,
                 labeldistance=1.2
@@ -477,19 +479,29 @@ with tabs[0]:
                 y = np.sin(np.deg2rad(ang))
                 text.set_position((1.4 * x, 1.4 * y))
                 text.set_fontsize(8)
-                ax2.annotate(
+                axes2[0].annotate(
                     "", xy=(x, y), xytext=(1.3 * x, 1.3 * y),
                     arrowprops=dict(arrowstyle="-", color="black", lw=0.8)
                 )
         
-            ax2.set_title("📈 Sub Head Distribution", fontsize=12, fontweight="bold")
+            axes2[0].set_title("📈 Sub Head Distribution", fontsize=12, fontweight="bold")
+        
+            # Add Table
+            table_data = [["Sub Head", "Count"]] + subhead_summary.values.tolist()
+            axes2[1].axis("off")
+            tbl = axes2[1].table(cellText=table_data, loc="center")
+            tbl.auto_set_font_size(False)
+            tbl.set_fontsize(9)
+            tbl.scale(1, 1.4)
+        
+            plt.tight_layout(rect=[0, 0.05, 1, 0.95])
         
             buf2 = BytesIO()
             plt.savefig(buf2, format="png", dpi=200, bbox_inches="tight")
             buf2.seek(0)
             plt.close()
         
-            st.image(buf2, width=400)  # fixed neat size
+            st.image(buf2, width=550)  # consistent neat size
         
             st.download_button(
                 "📥 Download Sub Head Distribution (PNG)",
@@ -601,6 +613,7 @@ if not editable_filtered.empty:
             st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
         else:
             st.info("ℹ️ No changes detected to save.")
+
 
 
 
