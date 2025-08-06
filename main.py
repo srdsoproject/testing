@@ -508,6 +508,10 @@ if not editable_filtered.empty:
 
     # Use a form so typing doesn't trigger rerun
     with st.form("feedback_form", clear_on_submit=False):
+        # Debug: check how many rows and columns are being sent to data_editor
+        st.write("Rows:", st.session_state.feedback_buffer.shape[0], 
+                 " | Columns:", st.session_state.feedback_buffer.shape[1])
+    
         edited_df = st.data_editor(
             st.session_state.feedback_buffer,
             use_container_width=True,
@@ -523,6 +527,7 @@ if not editable_filtered.empty:
             key="feedback_editor"
         )
         submitted = st.form_submit_button("✅ Submit Feedback")
+
 
     if submitted:
         # Align both DataFrames by index
@@ -545,6 +550,7 @@ if not editable_filtered.empty:
             st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
         else:
             st.info("ℹ️ No changes detected to save.")
+
 
 
 
