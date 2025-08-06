@@ -468,8 +468,8 @@ if not filtered.empty:
             tbl[row, 0].get_text().set_weight("bold")
             tbl[row, 1].get_text().set_weight("bold")
 
-    plt.tight_layout(rect=[0, 0.05, 1, 0.90])
-    st.pyplot(fig)
+        plt.tight_layout(rect=[0, 0.05, 1, 0.90])
+        st.pyplot(fig)
 
 
         # Add title & context
@@ -567,6 +567,7 @@ if st.button("✅ Submit Feedback"):
     st.success(f"✅ Feedback updated for {len(edited_df)} rows in Google Sheet")
 
                
+
 
 
 
