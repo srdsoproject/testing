@@ -326,8 +326,12 @@ with tabs[0]:
 
 
 
-    df = load_data()
-       
+      # Load data only once per session or when cache expires
+    if "df" not in st.session_state:
+        st.session_state.df = load_data()
+    
+    df = st.session_state.df
+    
     if df.empty:
         st.warning("No records found")
     else:
@@ -359,7 +363,7 @@ with tabs[0]:
     
     selected_status = st.selectbox("🔘 Status", ["All", "Pending", "Resolved"], key="view_status_filter")
     
-    # Apply Filters
+    # Apply Filters (no reload of Google Sheet here)
     filtered = df[
         (df["Date of Inspection"] >= pd.to_datetime(start_date)) &
         (df["Date of Inspection"] <= pd.to_datetime(end_date))
@@ -449,6 +453,7 @@ with tabs[0]:
                     tbl[row, 1].get_text().set_weight("bold")
     
         plt.tight_layout(rect=[0, 0.05, 1, 0.90])
+
 
 
 
@@ -547,6 +552,7 @@ if st.button("✅ Submit Feedback"):
     st.success(f"✅ Feedback updated for {len(edited_df)} rows in Google Sheet")
 
                
+
 
 
 
