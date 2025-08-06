@@ -458,29 +458,38 @@ with tabs[0]:
             )
             total_subs = subhead_summary["Count"].sum()
         
-            # Create chart + table side by side like above pie chart
             fig2, axes2 = plt.subplots(1, 2, figsize=(12, 5))
         
-            wedges, texts, autotexts = axes2[0].pie(
+            wedges, _, _ = axes2[0].pie(
                 subhead_summary["Count"],
-                labels=subhead_summary["Sub Head"],
                 startangle=90,
                 colors=plt.cm.Paired.colors,
-                autopct=lambda pct: f"{pct:.1f}%\n({int(round(pct/100*total_subs))})" if pct > 5 else "",
-                pctdistance=0.65,   # pull % closer to the center
-                labeldistance=1.3   # push labels outward
+                radius=0.9
             )
         
-            # Fix font size & add arrows
-            for text, wedge in zip(texts, wedges):
+            # Place labels outside dynamically
+            for i, (wedge, row) in enumerate(zip(wedges, subhead_summary.itertuples())):
                 ang = (wedge.theta2 + wedge.theta1) / 2.0
                 x = np.cos(np.deg2rad(ang))
                 y = np.sin(np.deg2rad(ang))
-                text.set_position((1.4 * x, 1.4 * y))
-                text.set_fontsize(8)
+        
+                # Position text further outside the pie
+                label_x = 1.3 * np.sign(x)
+                label_y = 1.1 * y
+        
+                label = f"{row._1} ({row.Count})"
+                axes2[0].text(
+                    label_x, label_y, label,
+                    ha="left" if x > 0 else "right",
+                    va="center",
+                    fontsize=8,
+                    bbox=dict(facecolor="white", edgecolor="none", alpha=0.7, pad=1)
+                )
+        
+                # Draw arrow from label to wedge
                 axes2[0].annotate(
-                    "", xy=(x, y), xytext=(1.25 * x, 1.25 * y),
-                    arrowprops=dict(arrowstyle="-", color="black", lw=0.8)
+                    "", xy=(0.9 * x, 0.9 * y), xytext=(label_x, label_y),
+                    arrowprops=dict(arrowstyle="-", lw=0.8, color="black")
                 )
         
             axes2[0].set_title("📈 Sub Head Distribution", fontsize=12, fontweight="bold")
@@ -498,7 +507,7 @@ with tabs[0]:
             plt.tight_layout(rect=[0, 0.05, 1, 0.95])
         
             buf2 = BytesIO()
-            plt.savefig(buf2, format="png", dpi=200)
+            plt.savefig(buf2, format="png", dpi=200, bbox_inches="tight")
             buf2.seek(0)
             plt.close()
             st.image(buf2, use_column_width=True)
@@ -610,6 +619,7 @@ if not editable_filtered.empty:
             st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
         else:
             st.info("ℹ️ No changes detected to save.")
+
 
 
 
