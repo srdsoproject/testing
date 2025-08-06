@@ -459,7 +459,7 @@ with tabs[0]:
             total_subs = subhead_summary["Count"].sum()
             subhead_summary.loc[len(subhead_summary.index)] = ["Total", total_subs]
         
-            # Two columns: Pie chart + Table
+            # Match size with previous pie chart
             fig2, axes2 = plt.subplots(1, 2, figsize=(12, 5))
         
             wedges, texts, autotexts = axes2[0].pie(
@@ -472,27 +472,34 @@ with tabs[0]:
                 labeldistance=1.2
             )
         
-            # Adjust labels with arrows
+            # Add arrows for labels
             for text, wedge in zip(texts, wedges):
                 ang = (wedge.theta2 + wedge.theta1) / 2.0
                 x = np.cos(np.deg2rad(ang))
                 y = np.sin(np.deg2rad(ang))
                 text.set_position((1.4 * x, 1.4 * y))
-                text.set_fontsize(8)
+                text.set_fontsize(9)
                 axes2[0].annotate(
-                    "", xy=(x, y), xytext=(1.3 * x, 1.3 * y),
+                    "", xy=(x, y), xytext=(1.25 * x, 1.25 * y),
                     arrowprops=dict(arrowstyle="-", color="black", lw=0.8)
                 )
         
             axes2[0].set_title("📈 Sub Head Distribution", fontsize=12, fontweight="bold")
         
-            # Add Table
+            # Add Table on right
             table_data = [["Sub Head", "Count"]] + subhead_summary.values.tolist()
             axes2[1].axis("off")
             tbl = axes2[1].table(cellText=table_data, loc="center")
             tbl.auto_set_font_size(False)
             tbl.set_fontsize(9)
-            tbl.scale(1, 1.4)
+            tbl.scale(1, 1.6)
+        
+            # Highlight Total row
+            for (row, col), cell in tbl.get_celld().items():
+                if row > 0 and tbl[row, 0].get_text().get_text() == "Total":
+                    cell.set_facecolor("#f2f2f2")
+                    tbl[row, 0].get_text().set_weight("bold")
+                    tbl[row, 1].get_text().set_weight("bold")
         
             plt.tight_layout(rect=[0, 0.05, 1, 0.95])
         
@@ -501,7 +508,7 @@ with tabs[0]:
             buf2.seek(0)
             plt.close()
         
-            st.image(buf2, width=550)  # consistent neat size
+            st.image(buf2, use_column_width=True)
         
             st.download_button(
                 "📥 Download Sub Head Distribution (PNG)",
@@ -509,6 +516,7 @@ with tabs[0]:
                 file_name="subhead_distribution.png",
                 mime="image/png"
             )
+
 
 
 
@@ -613,6 +621,7 @@ if not editable_filtered.empty:
             st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
         else:
             st.info("ℹ️ No changes detected to save.")
+
 
 
 
