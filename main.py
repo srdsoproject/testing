@@ -203,7 +203,6 @@ df = st.session_state.df
 st.subheader("Inspection Data")
 st.dataframe(df)
 
-
 # ---------- UPDATE FEEDBACK ----------
 def update_feedback_column(edited_df):
     header = sheet.row_values(1)
@@ -231,9 +230,6 @@ def update_feedback_column(edited_df):
 # Example Save Button
 if st.button("💾 Save Feedback"):
     update_feedback_column(df)
-
-
-
 
 def apply_common_filters(df, prefix=""):
     """Applies common filters (Inspection By, Action By, Date Range) to a DataFrame.
@@ -267,7 +263,6 @@ def apply_common_filters(df, prefix=""):
         )
 
     df_filtered = df.copy()
-
     # Apply filters based on session state values
     if st.session_state.get(prefix + "insp"):
         df_filtered = df_filtered[
@@ -294,43 +289,43 @@ def apply_common_filters(df, prefix=""):
 # ---------- MAIN APP ----------
 st.title("📋 Safety Inspection Viewer")
 tabs = st.tabs(["📊 View Records"])
-
 with tabs[0]:
-    st.subheader("📊 View & Filter Records")
+# ---------- GLOBAL CONSTANTS ----------
     VALID_INSPECTIONS = [
-        "FOOTPLATE INSPECTION",
-        "STATION INSPECTION",
-        "LC GATE INSPECTION",
-        "MISC",
-        "COACHING DEPOT",
-        "ON TRAIN",
-        "SURPRISE/AMBUSH INSPECTION", "WORKSITE INSPECTION",
-        # add more as needed
+        "FOOTPLATE INSPECTION", "STATION INSPECTION", "LC GATE INSPECTION",
+        "MISC", "COACHING DEPOT", "ON TRAIN", "SURPRISE/AMBUSH INSPECTION", "WORKSITE INSPECTION"
     ]
-    station_list = ['BRB', 'MLM', 'BGVN', 'JNTR', 'PRWD', 'WSB', 'PPJ', 'JEUR', 'KEM', 'BLNI', 'DHS', 'KWV', 'WDS',
-                'MA', 'AAG', 'MKPT', 'MO', 'MVE', 'PK', 'BALE', "SUR", 'TKWD', 'HG', 'TLT', 'AKOR', 'NGS', 'BOT', 'DUD',
-                'KUI', 'GDGN', 'GUR', 'HHD', 'SVG', 'BBD', 'TJSP', 'KLBG', 'HQR', 'MR', 'SDB', 'WADI', 'ARAG',
-                'BLNK', 'SGRE', 'KVK', 'LNP', 'DLGN', 'JTRD', 'MSDG', 'JVA', 'WSD', 'SGLA', 'PVR', 'MLB', 'SEI', 'BTW',
-                'PJR', 'DRSV', 'YSI', 'KMRD', 'DKY', 'MRX', 'OSA', 'HGL', 'LUR', 'NTPC', 'MRJ', 'BHLI', 'NTPC' ]
-
-    footplate_list = station_list + gate_list +["SUR-DD", "SUR-WADI", "LUR-KWV", "KWV-MRJ", "DD-SUR", "WADI-SUR", "KWV-LUR", "MRJ-KWV"]
-
-    gate_list = ['LC-19', 'LC-22A', 'LC-25', 'LC-26', 'LC-27C', 'LC-28', 'LC-30', 'LC-31', 'LC-35', 'LC-37', 'LC-40',
-             'LC-41', 'LC-43', 'LC-44', 'LC-45', 'LC-46C', 'LC-54', 'LC-61', 'LC-66', 'LC-74', 'LC-76', 'LC-78',
-             'LC-82', 'LC-1', 'LC-60A', 'LC-1 TLT ZCL', 'LC-1 ACC', 'LC-2 ACC', 'LC-91', 'LC-22', 'LC-24', 'LC-31',
-             'LC-32', 'LC-49', 'LC-70', 'LC-10', 'LC-34', 'LC-36', 'LC-44', 'LC-47', 'LC-55', 'LC-59', 'LC-2', 
-             'LC-4', 'LC-42', 'LC-02', 'LC-31', 'LC-128', 'LC-63', 'LC-04', 'LC-67', 'LC-77','LC-75', 'LC-64','LC-65',
-             'LC-5', 'LC-6', 'LC-57', 'LC-62', 'LC-66', 'LC-70', 'LC-39', 'LC-2/C', 'LC-6/C', 'LC-10', 'LC-11', 'LC-03',
-             'LC-15/C', 'LC-21', 'LC-26-A', 'LC-34', 'LC-36', 'LC-44', 'LC-47', 'LC-55', 'LC-57', 'LC-59', 'LC-60',
-             'LC-61']
-
-
-
-      # Load data only once per session or when cache expires
-    if "df" not in st.session_state:
-        st.session_state.df = load_data()
     
-    df = st.session_state.df
+    station_list = [
+        'BRB','MLM','BGVN','JNTR','PRWD','WSB','PPJ','JEUR','KEM','BLNI','DHS','KWV','WDS','MA','AAG',
+        'MKPT','MO','MVE','PK','BALE',"SUR",'TKWD','HG','TLT','AKOR','NGS','BOT','DUD','KUI','GDGN','GUR',
+        'HHD','SVG','BBD','TJSP','KLBG','HQR','MR','SDB','WADI','ARAG','BLNK','SGRE','KVK','LNP','DLGN',
+        'JTRD','MSDG','JVA','WSD','SGLA','PVR','MLB','SEI','BTW','PJR','DRSV','YSI','KMRD','DKY','MRX',
+        'OSA','HGL','LUR','NTPC','MRJ','BHLI','NTPC'
+    ]
+    
+    gate_list = [
+        'LC-19','LC-22A','LC-25','LC-26','LC-27C','LC-28','LC-30','LC-31','LC-35','LC-37','LC-40','LC-41',
+        'LC-43','LC-44','LC-45','LC-46C','LC-54','LC-61','LC-66','LC-74','LC-76','LC-78','LC-82','LC-1',
+        'LC-60A','LC-1 TLT ZCL','LC-1 ACC','LC-2 ACC','LC-91','LC-22','LC-24','LC-32','LC-49','LC-70',
+        'LC-10','LC-34','LC-36','LC-47','LC-55','LC-59','LC-2','LC-4','LC-42','LC-02','LC-128','LC-63',
+        'LC-04','LC-67','LC-77','LC-75','LC-64','LC-65','LC-5','LC-6','LC-57','LC-62','LC-39','LC-2/C',
+        'LC-6/C','LC-11','LC-03','LC-15/C','LC-21','LC-26-A','LC-60','LC-61'
+    ]
+    
+    footplate_list = station_list + gate_list + [
+        "SUR-DD","SUR-WADI","LUR-KWV","KWV-MRJ","DD-SUR","WADI-SUR","KWV-LUR","MRJ-KWV"
+    ]
+    
+    # ---------- DATA LOAD ----------
+    @st.cache_data(show_spinner="Loading data...", persist="disk")
+    def get_data():
+        return load_data()
+    
+    if "df" not in st.session_state:
+        st.session_state.df = get_data()
+    
+    df = st.session_state.df.copy()
     
     if df.empty:
         st.warning("No records found")
@@ -345,7 +340,7 @@ with tabs[0]:
     
     df["Status"] = df["Feedback"].apply(classify_feedback)
     
-    # Filters
+    # ---------- FILTERS ----------
     start_date, end_date = st.date_input(
         "📅 Select Date Range",
         [df["Date of Inspection"].min(), df["Date of Inspection"].max()],
@@ -363,7 +358,7 @@ with tabs[0]:
     
     selected_status = st.selectbox("🔘 Status", ["All", "Pending", "Resolved"], key="view_status_filter")
     
-    # Apply Filters (no reload of Google Sheet here)
+    # ---------- APPLY FILTERS ----------
     filtered = df[
         (df["Date of Inspection"] >= pd.to_datetime(start_date)) &
         (df["Date of Inspection"] <= pd.to_datetime(end_date))
@@ -383,10 +378,9 @@ with tabs[0]:
     filtered = apply_common_filters(filtered, prefix="view_")
     filtered = filtered.applymap(lambda x: x.replace("\n", " ") if isinstance(x, str) else x)
     filtered = filtered.sort_values("Date of Inspection")
-    
+
     st.write(f"🔹 Showing {len(filtered)} record(s) from **{start_date.strftime('%d.%m.%Y')}** "
              f"to **{end_date.strftime('%d.%m.%Y')}**")
-    
     # Summary Counts Display
     pending_count = (filtered["Status"] == "Pending").sum()
     resolved_count = (filtered["Status"] == "Resolved").sum()
@@ -400,18 +394,14 @@ with tabs[0]:
     if not filtered.empty:
         summary = filtered["Status"].value_counts().reindex(["Pending", "Resolved"], fill_value=0).reset_index()
         summary.columns = ["Status", "Count"]
-    
         # Add total row
         total_count = summary["Count"].sum()
         summary.loc[len(summary.index)] = ["Total", total_count]
-    
         # Title Info
         dr = f"{start_date.strftime('%d-%m-%Y')} to {end_date.strftime('%d-%m-%Y')}"
         heads = ", ".join(st.session_state.view_head_filter) if st.session_state.view_head_filter else "All Heads"
-    
         # Matplotlib chart + table
         fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-    
         wedges, texts, autotexts = axes[0].pie(
             summary.loc[summary["Status"] != "Total", "Count"],
             labels=summary.loc[summary["Status"] != "Total", "Status"],
@@ -420,31 +410,24 @@ with tabs[0]:
             colors=["#1f77b4", "#7fc6f2"]
         )
         axes[0].set_title("", fontsize=12)
-    
         # Table data
         table_data = [["Status", "Count"]] + summary.values.tolist()
         table_data.append(["Date Range", dr])
-    
         type_filter = st.session_state.view_type_filter
         type_display = ", ".join(type_filter) if type_filter else "All Types"
         table_data.append(["Type of Inspection", type_display])
-    
         location_display = st.session_state.view_location_filter or "All Locations"
         table_data.append(["Location", location_display])
-    
         table_data.append(["Heads", heads])
-    
         if st.session_state.view_sub_filter:
             table_data.append(["Sub Head", st.session_state.view_sub_filter])
         if selected_status != "All":
             table_data.append(["Filtered Status", selected_status])
-    
         axes[1].axis('off')
         tbl = axes[1].table(cellText=table_data, loc='center')
         tbl.auto_set_font_size(False)
         tbl.set_fontsize(10)
         tbl.scale(1, 1.6)
-    
         # Bold the "Type of Inspection" row
         for (row, col), cell in tbl.get_celld().items():
             if row > 0:  # skip header
@@ -453,10 +436,6 @@ with tabs[0]:
                     tbl[row, 1].get_text().set_weight("bold")
     
         plt.tight_layout(rect=[0, 0.05, 1, 0.90])
-
-
-
-
         # Add title & context
         fig.text(0.5, 0.96, "📈 Pending vs Resolved Records", ha='center', fontsize=14, fontweight='bold')
         fig.text(0.5, 0.03, f"Date Range: {dr}   |   Department: {heads}", ha='center', fontsize=10, color='gray')
@@ -465,9 +444,7 @@ with tabs[0]:
         plt.savefig(buf, format="png", dpi=200)
         buf.seek(0)
         plt.close()
-
         st.image(buf, caption=None, use_column_width=True)
-
         st.download_button(
             "📥 Download Graph + Table (PNG)",
             data=buf,
@@ -479,11 +456,9 @@ with tabs[0]:
             "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
             "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "User Feedback/Remark"
         ]].copy()
-
         export_df["Date of Inspection"] = export_df["Date of Inspection"].dt.strftime('%d-%m-%Y')
         from io import BytesIO
-        from openpyxl.styles import Alignment
-            
+        from openpyxl.styles import Alignment    
         towb = BytesIO()
         with pd.ExcelWriter(towb, engine="openpyxl") as writer:
             export_df.to_excel(writer, index=False, sheet_name="Filtered Records")
@@ -500,8 +475,6 @@ with tabs[0]:
                     cell.alignment = Alignment(wrap_text=True, vertical="top")
         
         towb.seek(0)
-
-
         st.download_button(
             "📥 Export Filtered Records to Excel",
             data=towb,
@@ -509,25 +482,19 @@ with tabs[0]:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
         st.markdown("### 📄 Preview of Filtered Records")
-           
-
 # Add hidden column with actual Google Sheet row numbers
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
-
 # Make sure each row has a Google Sheet row number
 if "_sheet_row" not in filtered.columns:
     filtered["_sheet_row"] = filtered.index + 2  # 2 = header + 1-based index
-
 # Columns shown to user (exclude _sheet_row)
 display_cols = [
     "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
     "Deficiencies Noted", "Inspection By", "Action By", "Feedback",
     "User Feedback/Remark"
 ]
-
 # Editable copy (user doesn't see _sheet_row)
 editable_df = filtered[display_cols].copy()
-
 # Editor for user
 edited_df = st.data_editor(
     editable_df,
@@ -542,68 +509,9 @@ edited_df = st.data_editor(
         "Deficiencies Noted", "Inspection By", "Action By", "Feedback"
     ]
 )
-
 # Add back the hidden _sheet_row column
 edited_df["_sheet_row"] = filtered["_sheet_row"]
-
 # Submit button
 if st.button("✅ Submit Feedback"):
     update_feedback_column(edited_df)
     st.success(f"✅ Feedback updated for {len(edited_df)} rows in Google Sheet")
-
-               
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
