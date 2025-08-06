@@ -446,7 +446,8 @@ with tabs[0]:
                 # ---------- NEW SUB HEAD DISTRIBUTION PIE CHART ----------
                 # ---------- NEW SUB HEAD DISTRIBUTION PIE CHART ----------
                # ---------- NEW SUB HEAD DISTRIBUTION PIE CHART ----------
-        if st.session_state.view_head_filter:  # Only show if a head is selected
+                # ---------- SUB HEAD DISTRIBUTION ----------
+        if st.session_state.view_head_filter:  # Show only if head selected
             st.markdown("### 📊 Sub Head Distribution")
 
             subhead_summary = (
@@ -455,28 +456,25 @@ with tabs[0]:
                 .reset_index(name="Count")
                 .sort_values(by="Count", ascending=False)
             )
-
             total_subs = subhead_summary["Count"].sum()
 
-            fig2, ax2 = plt.subplots(figsize=(4, 3))  # much smaller chart
+            # Match height (5) but smaller width (6 instead of 12)
+            fig2, ax2 = plt.subplots(figsize=(6, 5))
             wedges, texts, autotexts = ax2.pie(
                 subhead_summary["Count"],
                 labels=subhead_summary["Sub Head"],
                 autopct=lambda pct: f"{pct:.1f}%\n({int(round(pct/100*total_subs))})",
                 startangle=90,
-                textprops={'fontsize': 7},   # smaller font
+                textprops={'fontsize': 8},
                 colors=plt.cm.Pastel2.colors
             )
-            ax2.set_title("Sub Head Distribution", fontsize=10, fontweight="bold")
-
-            # Shrink pie within canvas (makes it even more compact)
-            plt.subplots_adjust(left=0.2, right=0.8, top=0.8, bottom=0.2)
+            ax2.set_title("Sub Head Distribution", fontsize=12, fontweight="bold")
 
             buf2 = BytesIO()
-            plt.savefig(buf2, format="png", dpi=200, bbox_inches="tight")
+            plt.savefig(buf2, format="png", dpi=200)
             buf2.seek(0)
             plt.close()
-            st.image(buf2, use_column_width=False, width=300)  # force smaller display width
+            st.image(buf2, use_column_width=True)  # same scaling as main chart
 
             st.download_button(
                 "📥 Download Sub Head Distribution (PNG)",
@@ -484,6 +482,7 @@ with tabs[0]:
                 file_name="subhead_distribution.png",
                 mime="image/png"
             )
+
 
 
         export_df = filtered[[
@@ -585,6 +584,7 @@ if not editable_filtered.empty:
             st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
         else:
             st.info("ℹ️ No changes detected to save.")
+
 
 
 
