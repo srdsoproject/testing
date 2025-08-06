@@ -445,9 +445,9 @@ with tabs[0]:
         # ---------- NEW SUB HEAD DISTRIBUTION CHART ----------
 
         import numpy as np
+        from io import BytesIO
         
-        # ---------- SUB HEAD DISTRIBUTION ----------
-        if st.session_state.view_head_filter:  # Show only if head selected
+        if st.session_state.view_head_filter:  # Show only if head is selected
             st.markdown("### 📊 Sub Head Distribution")
         
             subhead_summary = (
@@ -458,14 +458,14 @@ with tabs[0]:
             )
             total_subs = subhead_summary["Count"].sum()
         
-            # Compact size
-            fig2, ax2 = plt.subplots(figsize=(6, 4))
+            # Use same size as Pending vs Resolved chart
+            fig2, ax2 = plt.subplots(figsize=(6, 4))  # consistent small size
         
             wedges, texts, autotexts = ax2.pie(
                 subhead_summary["Count"],
                 startangle=90,
-                colors=plt.cm.Set3.colors,
-                autopct=lambda pct: f"{pct:.1f}%" if pct > 5 else "",
+                colors=plt.cm.Paired.colors,  # consistent readable colors
+                autopct=lambda pct: f"{pct:.1f}%\n({int(round(pct/100*total_subs))})" if pct > 5 else "",
                 pctdistance=0.7,
                 labeldistance=1.2
             )
@@ -475,14 +475,14 @@ with tabs[0]:
                 ang = (wedge.theta2 + wedge.theta1) / 2.0
                 x = np.cos(np.deg2rad(ang))
                 y = np.sin(np.deg2rad(ang))
-                text.set_position((1.4 * x, 1.4 * y))  # move label outwards
+                text.set_position((1.4 * x, 1.4 * y))
                 text.set_fontsize(8)
                 ax2.annotate(
                     "", xy=(x, y), xytext=(1.3 * x, 1.3 * y),
-                    arrowprops=dict(arrowstyle="-", color="black")
+                    arrowprops=dict(arrowstyle="-", color="black", lw=0.8)
                 )
         
-            ax2.set_title("Sub Head Distribution", fontsize=12, fontweight="bold")
+            ax2.set_title("📈 Sub Head Distribution", fontsize=12, fontweight="bold")
         
             buf2 = BytesIO()
             plt.savefig(buf2, format="png", dpi=200, bbox_inches="tight")
@@ -600,6 +600,7 @@ if not editable_filtered.empty:
             st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
         else:
             st.info("ℹ️ No changes detected to save.")
+
 
 
 
