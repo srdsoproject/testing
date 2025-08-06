@@ -381,7 +381,7 @@ with tabs[0]:
     resolved_count = (filtered["Status"] == "Resolved").sum()
     total_count = len(filtered)
     
-     col_a, col_b, col_c = st.columns(3)
+    col_a, col_b, col_c = st.columns(3)
     col_a.metric("🟨 Pending", pending_count)
     col_b.metric("🟩 Resolved", resolved_count)
     col_c.metric("📊 Total Records", total_count)
@@ -572,6 +572,7 @@ if not editable_filtered.empty:
             st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
         else:
             st.info("ℹ️ No changes detected to save.")
+
 
 
 
