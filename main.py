@@ -330,127 +330,147 @@ with tabs[0]:
 
 
 
-    df = load_data()
-   
-    if df.empty:
-        st.warning("No records found")
-    else:
-        df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], format="%d.%m.%y", errors="coerce")
-        df["_original_sheet_index"] = df.index
+  # ✅ Load data only once per session
+if "df" not in st.session_state:
+    st.session_state.df = load_data()
 
-    for col in ["Type of Inspection", "Location", "Head", "Sub Head", "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "User Feedback/Remark"]:
-        if col not in df.columns:
-            df[col] = ""
+df = st.session_state.df
 
-    df["Status"] = df["Feedback"].apply(classify_feedback)
+# 🔄 Manual refresh button
+if st.button("🔄 Refresh Data"):
+    st.session_state.df = load_data()
+    df = st.session_state.df
+    st.success("Data refreshed from Google Sheets!")
 
-    # Filters
-    start_date, end_date = st.date_input(
-        "📅 Select Date Range",
-        [df["Date of Inspection"].min(), df["Date of Inspection"].max()],
-        key="view_date_range"
+if df.empty:
+    st.warning("No records found")
+else:
+    df["Date of Inspection"] = pd.to_datetime(
+        df["Date of Inspection"], format="%d.%m.%y", errors="coerce"
     )
+    df["_original_sheet_index"] = df.index
 
-    col1, col2 = st.columns(2)
-    col1.multiselect("Type of Inspection", VALID_INSPECTIONS, key="view_type_filter")
-    col2.selectbox("Location", [""] + footplate_list, key="view_location_filter")
+for col in [
+    "Type of Inspection", "Location", "Head", "Sub Head",
+    "Deficiencies Noted", "Inspection By", "Action By",
+    "Feedback", "User Feedback/Remark"
+]:
+    if col not in df.columns:
+        df[col] = ""
 
-    col3, col4 = st.columns(2)
-    col3.multiselect("Head", HEAD_LIST[1:], key="view_head_filter")
-    sub_opts = sorted({s for h in st.session_state.view_head_filter for s in SUBHEAD_LIST.get(h, [])})
-    col4.selectbox("Sub Head", [""] + sub_opts, key="view_sub_filter")
+df["Status"] = df["Feedback"].apply(classify_feedback)
 
-    selected_status = st.selectbox("🔘 Status", ["All", "Pending", "Resolved"], key="view_status_filter")
+# 📅 Filters
+start_date, end_date = st.date_input(
+    "📅 Select Date Range",
+    [df["Date of Inspection"].min(), df["Date of Inspection"].max()],
+    key="view_date_range"
+)
 
-    # Apply Filters
-    filtered = df[
-        (df["Date of Inspection"] >= pd.to_datetime(start_date)) &
-        (df["Date of Inspection"] <= pd.to_datetime(end_date))
-    ]
+col1, col2 = st.columns(2)
+col1.multiselect("Type of Inspection", VALID_INSPECTIONS, key="view_type_filter")
+col2.selectbox("Location", [""] + footplate_list, key="view_location_filter")
 
-    if st.session_state.view_type_filter:
-        filtered = filtered[filtered["Type of Inspection"].isin(st.session_state.view_type_filter)]
-    if st.session_state.view_location_filter:
-        filtered = filtered[filtered["Location"] == st.session_state.view_location_filter]
-    if st.session_state.view_head_filter:
-        filtered = filtered[filtered["Head"].isin(st.session_state.view_head_filter)]
+col3, col4 = st.columns(2)
+col3.multiselect("Head", HEAD_LIST[1:], key="view_head_filter")
+sub_opts = sorted({s for h in st.session_state.view_head_filter 
+                   for s in SUBHEAD_LIST.get(h, [])})
+col4.selectbox("Sub Head", [""] + sub_opts, key="view_sub_filter")
+
+selected_status = st.selectbox("🔘 Status", ["All", "Pending", "Resolved"], key="view_status_filter")
+
+# ✅ Apply Filters on cached df
+filtered = df[
+    (df["Date of Inspection"] >= pd.to_datetime(start_date)) &
+    (df["Date of Inspection"] <= pd.to_datetime(end_date))
+]
+
+if st.session_state.view_type_filter:
+    filtered = filtered[filtered["Type of Inspection"].isin(st.session_state.view_type_filter)]
+if st.session_state.view_location_filter:
+    filtered = filtered[filtered["Location"] == st.session_state.view_location_filter]
+if st.session_state.view_head_filter:
+    filtered = filtered[filtered["Head"].isin(st.session_state.view_head_filter)]
+if st.session_state.view_sub_filter:
+    filtered = filtered[filtered["Sub Head"] == st.session_state.view_sub_filter]
+if selected_status != "All":
+    filtered = filtered[filtered["Status"] == selected_status]
+
+# Common filters
+filtered = apply_common_filters(filtered, prefix="view_")
+
+filtered = filtered.applymap(lambda x: x.replace("\n", " ") if isinstance(x, str) else x)
+filtered = filtered.sort_values("Date of Inspection")
+
+st.write(f"🔹 Showing {len(filtered)} record(s) from **{start_date.strftime('%d.%m.%Y')}** "
+         f"to **{end_date.strftime('%d.%m.%Y')}**")
+
+# 📊 Summary Counts
+pending_count = (filtered["Status"] == "Pending").sum()
+resolved_count = (filtered["Status"] == "Resolved").sum()
+total_count = len(filtered)
+
+col_a, col_b, col_c = st.columns(3)
+col_a.metric("🟨 Pending", pending_count)
+col_b.metric("🟩 Resolved", resolved_count)
+col_c.metric("📊 Total Records", total_count)
+
+# 🥧 Pie Chart & Table Summary
+if not filtered.empty:
+    summary = (filtered["Status"]
+               .value_counts()
+               .reindex(["Pending", "Resolved"], fill_value=0)
+               .reset_index())
+    summary.columns = ["Status", "Count"]
+
+    total_count = summary["Count"].sum()
+    summary.loc[len(summary.index)] = ["Total", total_count]
+
+    dr = f"{start_date.strftime('%d-%m-%Y')} to {end_date.strftime('%d-%m-%Y')}"
+    heads = ", ".join(st.session_state.view_head_filter) if st.session_state.view_head_filter else "All Heads"
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+    wedges, texts, autotexts = axes[0].pie(
+        summary.loc[summary["Status"] != "Total", "Count"],
+        labels=summary.loc[summary["Status"] != "Total", "Status"],
+        autopct=lambda pct: f"{pct:.1f}%\n({int(round(pct / 100 * total_count))})",
+        startangle=90,
+        colors=["#1f77b4", "#7fc6f2"]
+    )
+    axes[0].set_title("", fontsize=12)
+
+    table_data = [["Status", "Count"]] + summary.values.tolist()
+    table_data.append(["Date Range", dr])
+
+    type_filter = st.session_state.view_type_filter
+    type_display = ", ".join(type_filter) if type_filter else "All Types"
+    table_data.append(["Type of Inspection", type_display])
+
+    location_display = st.session_state.view_location_filter or "All Locations"
+    table_data.append(["Location", location_display])
+
+    table_data.append(["Heads", heads])
+
     if st.session_state.view_sub_filter:
-        filtered = filtered[filtered["Sub Head"] == st.session_state.view_sub_filter]
+        table_data.append(["Sub Head", st.session_state.view_sub_filter])
     if selected_status != "All":
-        filtered = filtered[filtered["Status"] == selected_status]
+        table_data.append(["Filtered Status", selected_status])
 
-    filtered = apply_common_filters(filtered, prefix="view_")
-    filtered = filtered.applymap(lambda x: x.replace("\n", " ") if isinstance(x, str) else x)
-    filtered = filtered.sort_values("Date of Inspection")
+    axes[1].axis('off')
+    tbl = axes[1].table(cellText=table_data, loc='center')
+    tbl.auto_set_font_size(False)
+    tbl.set_fontsize(10)
+    tbl.scale(1, 1.6)
 
-    st.write(f"🔹 Showing {len(filtered)} record(s) from **{start_date.strftime('%d.%m.%Y')}** to **{end_date.strftime('%d.%m.%Y')}**")
+    for (row, col), cell in tbl.get_celld().items():
+        if row > 0 and tbl[row, 0].get_text().get_text() == "Type of Inspection":
+            tbl[row, 0].get_text().set_weight("bold")
+            tbl[row, 1].get_text().set_weight("bold")
 
-    # Summary Counts Display
-    pending_count = (filtered["Status"] == "Pending").sum()
-    resolved_count = (filtered["Status"] == "Resolved").sum()
-    total_count = len(filtered)
+    plt.tight_layout(rect=[0, 0.05, 1, 0.90])
+    st.pyplot(fig)
 
-    col_a, col_b, col_c = st.columns(3)
-    col_a.metric("🟨 Pending", pending_count)
-    col_b.metric("🟩 Resolved", resolved_count)
-    col_c.metric("📊 Total Records", total_count)
-
-    if not filtered.empty:
-        summary = filtered["Status"].value_counts().reindex(["Pending", "Resolved"], fill_value=0).reset_index()
-        summary.columns = ["Status", "Count"]
-
-        # Add total row
-        total_count = summary["Count"].sum()
-        summary.loc[len(summary.index)] = ["Total", total_count]
-
-        # Title Info
-        dr = f"{start_date.strftime('%d-%m-%Y')} to {end_date.strftime('%d-%m-%Y')}"
-        heads = ", ".join(st.session_state.view_head_filter) if st.session_state.view_head_filter else "All Heads"
-
-        # Matplotlib chart + table
-        fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-
-        wedges, texts, autotexts = axes[0].pie(
-            summary.loc[summary["Status"] != "Total", "Count"],
-            labels=summary.loc[summary["Status"] != "Total", "Status"],
-            autopct=lambda pct: f"{pct:.1f}%\n({int(round(pct / 100 * total_count))})",
-            startangle=90,
-            colors=["#1f77b4", "#7fc6f2"]
-        )
-        axes[0].set_title("", fontsize=12)
-
-        # Table data
-        table_data = [["Status", "Count"]] + summary.values.tolist()
-        table_data.append(["Date Range", dr])
-
-        type_filter = st.session_state.view_type_filter
-        type_display = ", ".join(type_filter) if type_filter else "All Types"
-        table_data.append(["Type of Inspection", type_display])
-
-        location_display = st.session_state.view_location_filter or "All Locations"
-        table_data.append(["Location", location_display])
-
-        table_data.append(["Heads", heads])
-
-        if st.session_state.view_sub_filter:
-            table_data.append(["Sub Head", st.session_state.view_sub_filter])
-        if selected_status != "All":
-            table_data.append(["Filtered Status", selected_status])
-
-        axes[1].axis('off')
-        tbl = axes[1].table(cellText=table_data, loc='center')
-        tbl.auto_set_font_size(False)
-        tbl.set_fontsize(10)
-        tbl.scale(1, 1.6)
-
-        # Bold the "Type of Inspection" row
-        for (row, col), cell in tbl.get_celld().items():
-            if row > 0:  # skip header
-                if tbl[row, 0].get_text().get_text() == "Type of Inspection":
-                    tbl[row, 0].get_text().set_weight("bold")
-                    tbl[row, 1].get_text().set_weight("bold")
-
-        plt.tight_layout(rect=[0, 0.05, 1, 0.90])
 
         # Add title & context
         fig.text(0.5, 0.96, "📈 Pending vs Resolved Records", ha='center', fontsize=14, fontweight='bold')
@@ -547,6 +567,7 @@ if st.button("✅ Submit Feedback"):
     st.success(f"✅ Feedback updated for {len(edited_df)} rows in Google Sheet")
 
                
+
 
 
 
