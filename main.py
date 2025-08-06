@@ -529,14 +529,16 @@ if not editable_filtered.empty:
         submitted = st.form_submit_button("✅ Submit Feedback")
 
     if submitted:
-        # Build diff mask with aligned indices
-        diffs_mask = editable_filtered["User Feedback/Remark"] != edited_df["User Feedback/Remark"]
+        # Align both DataFrames by index
+        common_index = edited_df.index.intersection(editable_filtered.index)
     
-        # Initialize diffs to empty DataFrame
-        diffs = pd.DataFrame()
+        diffs_mask = (
+            editable_filtered.loc[common_index, "User Feedback/Remark"]
+            != edited_df.loc[common_index, "User Feedback/Remark"]
+        )
     
         if diffs_mask.any():
-            diffs = edited_df.loc[diffs_mask].copy()
+            diffs = edited_df.loc[common_index[diffs_mask]].copy()
             diffs["_sheet_row"] = editable_filtered.loc[diffs.index, "_sheet_row"].values
     
             # Replace NaN with empty string
@@ -547,6 +549,7 @@ if not editable_filtered.empty:
             st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
         else:
             st.info("ℹ️ No changes detected to save.")
+
 
 
 
