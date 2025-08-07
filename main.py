@@ -574,17 +574,7 @@ with tabs[0]:
         st.markdown("### 📄 Preview of Filtered Records")
         # 👇 Place this after `st.markdown("### 📄 Preview of Filtered Records")`
 
-        def highlight_pending_text(val):
-            if isinstance(val, str) and "pending" in val.lower():
-                return "color: red;"
-            return ""
         
-        # Apply styling only to the 'Feedback' column
-        styled_df = export_df.style.applymap(highlight_pending_text, subset=["Feedback"])
-        
-        # Show styled dataframe
-        st.dataframe(styled_df, use_container_width=True)
-
            
 # Load once and keep in session
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
@@ -684,6 +674,7 @@ if not editable_filtered.empty:
                         st.info("ℹ️ No changes detected to save.")
                 else:
                     st.warning("⚠️ No rows matched for update.")
+
 
 
 
