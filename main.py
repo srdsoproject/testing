@@ -216,43 +216,37 @@ df = st.session_state.df
 def update_feedback_column(edited_df):
     header = sheet.row_values(1)
 
-    # Get column index for both "User Feedback/Remark" and "Feedback Status"
     try:
-        feedback_col = header.index("User Feedback/Remark") + 1
+        feedback_col = header.index("Feedback") + 1
+    except ValueError:
+        st.error("⚠️ 'Feedback' column not found")
+        return
+
+    try:
+        remark_col = header.index("User Feedback/Remark") + 1
     except ValueError:
         st.error("⚠️ 'User Feedback/Remark' column not found")
         return
 
-    try:
-        status_col = header.index("Feedback Status") + 1
-    except ValueError:
-        st.error("⚠️ 'Feedback Status' column not found")
-        return
-
     updates = []
-
     for _, row in edited_df.iterrows():
         row_number = int(row["_sheet_row"])
+        feedback_value = row["Feedback"] if pd.notna(row["Feedback"]) else ""
+        remark_value = row["User Feedback/Remark"] if pd.notna(row["User Feedback/Remark"]) else ""
 
-        # Extract values, fallback to empty string if NaN
-        feedback_value = row["User Feedback/Remark"] if pd.notna(row["User Feedback/Remark"]) else ""
-        status_value = row["Feedback Status"] if pd.notna(row["Feedback Status"]) else ""
-
-        # Convert to A1 notation
         feedback_cell = gspread.utils.rowcol_to_a1(row_number, feedback_col)
-        status_cell = gspread.utils.rowcol_to_a1(row_number, status_col)
+        remark_cell = gspread.utils.rowcol_to_a1(row_number, remark_col)
 
         updates.append({"range": feedback_cell, "values": [[feedback_value]]})
-        updates.append({"range": status_cell, "values": [[status_value]]})
+        updates.append({"range": remark_cell, "values": [[remark_value]]})
 
-        # Update session state DataFrame
-        st.session_state.df.loc[st.session_state.df["_sheet_row"] == row_number, "User Feedback/Remark"] = feedback_value
-        st.session_state.df.loc[st.session_state.df["_sheet_row"] == row_number, "Feedback Status"] = status_value
+        # Update session state again just to be safe
+        st.session_state.df.loc[st.session_state.df["_sheet_row"] == row_number, "Feedback"] = feedback_value
+        st.session_state.df.loc[st.session_state.df["_sheet_row"] == row_number, "User Feedback/Remark"] = remark_value
 
     if updates:
         body = {"valueInputOption": "USER_ENTERED", "data": updates}
         sheet.spreadsheet.values_batch_update(body)
-        st.success(f"✅ Updated {len(edited_df)} row(s) in Google Sheet!")
 
 
 def apply_common_filters(df, prefix=""):
@@ -621,7 +615,7 @@ if not editable_filtered.empty:
         )
         submitted = st.form_submit_button("✅ Submit Feedback")
 
-    if submitted:
+        if submitted:
         common_index = edited_df.index.intersection(editable_filtered.index)
     
         diffs_mask = (
@@ -633,27 +627,36 @@ if not editable_filtered.empty:
             diffs = edited_df.loc[common_index[diffs_mask]].copy()
             diffs["_sheet_row"] = editable_filtered.loc[diffs.index, "_sheet_row"].values
             diffs["User Feedback/Remark"] = diffs["User Feedback/Remark"].fillna("")
-
-            # ✅ Classify based on Feedback + User Feedback/Remark
-            diffs["Feedback Status"] = diffs.apply(
-                lambda row: classify_feedback(
-                    editable_filtered.loc[row.name, "Feedback"],
-                    row["User Feedback/Remark"]
-                ),
-                axis=1
-            )
-
-            # ✅ Update session state with new feedback and status
-            st.session_state.df.loc[diffs.index, "User Feedback/Remark"] = diffs["User Feedback/Remark"]
-            st.session_state.df.loc[diffs.index, "Feedback Status"] = diffs["Feedback Status"]
-
-            # ✅ Show confirmation
-            st.dataframe(diffs[["User Feedback/Remark", "Feedback Status"]])
-
-            # 🔁 Write to Google Sheet (if implemented)
-            update_feedback_column(diffs)  # You can modify this to update both fields
-
-            st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
+    
+            updated_feedbacks = []
+            for idx, row in diffs.iterrows():
+                original_feedback = editable_filtered.loc[idx, "Feedback"]
+                user_remark = row["User Feedback/Remark"]
+    
+                if not user_remark.strip():
+                    # Skip blank remarks
+                    continue
+    
+                if pd.notna(original_feedback) and str(original_feedback).strip() != "":
+                    combined = f"{original_feedback.strip().rstrip('.')}."  # Ensure single full stop
+                    combined += f" {user_remark.strip()}"
+                else:
+                    combined = user_remark.strip()
+    
+                # Update Feedback column with combined result
+                diffs.at[idx, "Feedback"] = combined
+    
+                # Clear User Feedback/Remark after use
+                diffs.at[idx, "User Feedback/Remark"] = ""
+    
+                # Also update session state DataFrame
+                st.session_state.df.loc[idx, "Feedback"] = combined
+                st.session_state.df.loc[idx, "User Feedback/Remark"] = ""
+    
+            # Push changes to Google Sheet
+            update_feedback_column(diffs)
+    
+            st.success(f"✅ Updated {len(diffs)} Feedback row(s) with appended remarks.")
         else:
             st.info("ℹ️ No changes detected to save.")
 
