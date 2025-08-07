@@ -614,7 +614,14 @@ if not editable_filtered.empty:
             key="feedback_editor"
         )
         submitted = st.form_submit_button("✅ Submit Feedback")
+    col1, col2 = st.columns([1, 1])
 
+    with col1:
+        if st.button("🔄 Refresh Data"):
+            st.experimental_rerun()
+    
+    with col2:
+        st.caption("← Click here to reload from source")
         if submitted:
     # Make sure both edited_df and editable_filtered exist and have the expected column
             if "User Feedback/Remark" not in edited_df.columns or "Feedback" not in editable_filtered.columns:
@@ -668,5 +675,6 @@ if not editable_filtered.empty:
     
     
     
+
 
 
