@@ -570,8 +570,21 @@ with tabs[0]:
             data=towb,
             file_name="filtered_records.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+        )        
         st.markdown("### 📄 Preview of Filtered Records")
+        def highlight_pending(feedback_series):
+            def color_text(val):
+                if isinstance(val, str) and "pending" in val.lower():
+                    return "color: red;"
+                return ""
+            return feedback_series.apply(color_text)
+        
+        # Apply styling only to Feedback column
+        styled_df = export_df.style.apply(lambda df: highlight_pending(df["Feedback"]), subset=["Feedback"])
+        
+        # Display in Streamlit
+        st.dataframe(styled_df, use_container_width=True)
+
 
 # Load once and keep in session
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
@@ -671,11 +684,5 @@ if not editable_filtered.empty:
                         st.info("ℹ️ No changes detected to save.")
                 else:
                     st.warning("⚠️ No rows matched for update.")
-
-    
-    
-    
-
-
 
 
