@@ -617,55 +617,56 @@ if not editable_filtered.empty:
 
         if submitted:
     # Make sure both edited_df and editable_filtered exist and have the expected column
-    if "User Feedback/Remark" not in edited_df.columns or "Feedback" not in editable_filtered.columns:
-        st.error("⚠️ Required columns are missing from the data.")
-    else:
-        # Calculate the common index
-        common_index = edited_df.index.intersection(editable_filtered.index)
-
-        if len(common_index) > 0:
-            # Check which rows actually changed
-            diffs_mask = (
-                editable_filtered.loc[common_index, "User Feedback/Remark"]
-                != edited_df.loc[common_index, "User Feedback/Remark"]
-            )
-
-            if diffs_mask.any():
-                diffs = edited_df.loc[common_index[diffs_mask]].copy()
-                diffs["_sheet_row"] = editable_filtered.loc[diffs.index, "_sheet_row"].values
-                diffs["User Feedback/Remark"] = diffs["User Feedback/Remark"].fillna("")
-
-                for idx, row in diffs.iterrows():
-                    original_feedback = editable_filtered.loc[idx, "Feedback"]
-                    user_remark = row["User Feedback/Remark"]
-
-                    if not user_remark.strip():
-                        continue  # Skip empty remarks
-
-                    if pd.notna(original_feedback) and str(original_feedback).strip() != "":
-                        combined = f"{original_feedback.strip().rstrip('.')}."
-                        combined += f" {user_remark.strip()}"
-                    else:
-                        combined = user_remark.strip()
-
-                    # Update in diffs
-                    diffs.at[idx, "Feedback"] = combined
-                    diffs.at[idx, "User Feedback/Remark"] = ""
-
-                    # Update in session state
-                    st.session_state.df.loc[idx, "Feedback"] = combined
-                    st.session_state.df.loc[idx, "User Feedback/Remark"] = ""
-
-                # Update Google Sheet
-                update_feedback_column(diffs)
-
-                st.success(f"✅ Updated {len(diffs)} Feedback row(s) with appended remarks.")
+            if "User Feedback/Remark" not in edited_df.columns or "Feedback" not in editable_filtered.columns:
+                st.error("⚠️ Required columns are missing from the data.")
             else:
-                st.info("ℹ️ No changes detected to save.")
-        else:
-            st.warning("⚠️ No rows matched for update.")
+                # Calculate the common index
+                common_index = edited_df.index.intersection(editable_filtered.index)
+        
+                if len(common_index) > 0:
+                    # Check which rows actually changed
+                    diffs_mask = (
+                        editable_filtered.loc[common_index, "User Feedback/Remark"]
+                        != edited_df.loc[common_index, "User Feedback/Remark"]
+                    )
+        
+                    if diffs_mask.any():
+                        diffs = edited_df.loc[common_index[diffs_mask]].copy()
+                        diffs["_sheet_row"] = editable_filtered.loc[diffs.index, "_sheet_row"].values
+                        diffs["User Feedback/Remark"] = diffs["User Feedback/Remark"].fillna("")
+        
+                        for idx, row in diffs.iterrows():
+                            original_feedback = editable_filtered.loc[idx, "Feedback"]
+                            user_remark = row["User Feedback/Remark"]
+        
+                            if not user_remark.strip():
+                                continue  # Skip empty remarks
+        
+                            if pd.notna(original_feedback) and str(original_feedback).strip() != "":
+                                combined = f"{original_feedback.strip().rstrip('.')}."
+                                combined += f" {user_remark.strip()}"
+                            else:
+                                combined = user_remark.strip()
+        
+                            # Update in diffs
+                            diffs.at[idx, "Feedback"] = combined
+                            diffs.at[idx, "User Feedback/Remark"] = ""
+        
+                            # Update in session state
+                            st.session_state.df.loc[idx, "Feedback"] = combined
+                            st.session_state.df.loc[idx, "User Feedback/Remark"] = ""
+        
+                        # Update Google Sheet
+                        update_feedback_column(diffs)
+        
+                        st.success(f"✅ Updated {len(diffs)} Feedback row(s) with appended remarks.")
+                    else:
+                        st.info("ℹ️ No changes detected to save.")
+                else:
+                    st.warning("⚠️ No rows matched for update.")
 
     
     
     
+
 
