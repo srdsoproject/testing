@@ -215,26 +215,44 @@ df = st.session_state.df
 # ---------- UPDATE FEEDBACK ----------
 def update_feedback_column(edited_df):
     header = sheet.row_values(1)
+
+    # Get column index for both "User Feedback/Remark" and "Feedback Status"
     try:
         feedback_col = header.index("User Feedback/Remark") + 1
     except ValueError:
         st.error("⚠️ 'User Feedback/Remark' column not found")
         return
 
+    try:
+        status_col = header.index("Feedback Status") + 1
+    except ValueError:
+        st.error("⚠️ 'Feedback Status' column not found")
+        return
+
     updates = []
+
     for _, row in edited_df.iterrows():
         row_number = int(row["_sheet_row"])
-        new_value = row["User Feedback/Remark"] if pd.notna(row["User Feedback/Remark"]) else ""
-        cell_range = gspread.utils.rowcol_to_a1(row_number, feedback_col)
-        updates.append({"range": cell_range, "values": [[new_value]]})
 
-        # Update locally without reload
-        st.session_state.df.loc[st.session_state.df["_sheet_row"] == row_number, "User Feedback/Remark"] = new_value
+        # Extract values, fallback to empty string if NaN
+        feedback_value = row["User Feedback/Remark"] if pd.notna(row["User Feedback/Remark"]) else ""
+        status_value = row["Feedback Status"] if pd.notna(row["Feedback Status"]) else ""
+
+        # Convert to A1 notation
+        feedback_cell = gspread.utils.rowcol_to_a1(row_number, feedback_col)
+        status_cell = gspread.utils.rowcol_to_a1(row_number, status_col)
+
+        updates.append({"range": feedback_cell, "values": [[feedback_value]]})
+        updates.append({"range": status_cell, "values": [[status_value]]})
+
+        # Update session state DataFrame
+        st.session_state.df.loc[st.session_state.df["_sheet_row"] == row_number, "User Feedback/Remark"] = feedback_value
+        st.session_state.df.loc[st.session_state.df["_sheet_row"] == row_number, "Feedback Status"] = status_value
 
     if updates:
         body = {"valueInputOption": "USER_ENTERED", "data": updates}
         sheet.spreadsheet.values_batch_update(body)
-        st.success(f"✅ Updated {len(updates)} row(s)!")
+        st.success(f"✅ Updated {len(edited_df)} row(s) in Google Sheet!")
 
 
 def apply_common_filters(df, prefix=""):
@@ -638,3 +656,4 @@ if not editable_filtered.empty:
             st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
         else:
             st.info("ℹ️ No changes detected to save.")
+
