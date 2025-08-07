@@ -127,13 +127,15 @@ def normalize(text):
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
 
+import re
+
 def classify_feedback(feedback, user_remark=""):
     def normalize(text):
         return text.lower().strip()
 
     def classify_single(text):
         if not isinstance(text, str) or text.strip() == "":
-            return None  # Don't classify empty text
+            return None  # Skip empty strings
 
         text_normalized = normalize(text)
         date_found = bool(re.search(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', text_normalized))
@@ -172,7 +174,7 @@ def classify_feedback(feedback, user_remark=""):
     if feedback_result == "Pending" or user_remark_result == "Pending":
         return "Pending"
 
-    return "Pending"
+    return "Pending"  # Default fallback
 
 # ---------- LOAD DATA ----------
 @st.cache_data(ttl=300)
@@ -614,7 +616,7 @@ if not editable_filtered.empty:
             diffs["_sheet_row"] = editable_filtered.loc[diffs.index, "_sheet_row"].values
             diffs["User Feedback/Remark"] = diffs["User Feedback/Remark"].fillna("")
 
-            # ✅ Classify using Feedback and User Feedback/Remark
+            # ✅ Classify based on Feedback + User Feedback/Remark
             diffs["Feedback Status"] = diffs.apply(
                 lambda row: classify_feedback(
                     editable_filtered.loc[row.name, "Feedback"],
@@ -623,12 +625,15 @@ if not editable_filtered.empty:
                 axis=1
             )
 
-            # ⬇️ Example: print or log status
+            # ✅ Update session state with new feedback and status
+            st.session_state.df.loc[diffs.index, "User Feedback/Remark"] = diffs["User Feedback/Remark"]
+            st.session_state.df.loc[diffs.index, "Feedback Status"] = diffs["Feedback Status"]
+
+            # ✅ Show confirmation
             st.dataframe(diffs[["User Feedback/Remark", "Feedback Status"]])
 
-            # 🔄 Update your sheet and session data (implement this function to update both columns if needed)
-            update_feedback_column(diffs)
-            st.session_state.df.update(diffs)
+            # 🔁 Write to Google Sheet (if implemented)
+            update_feedback_column(diffs)  # You can modify this to update both fields
 
             st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
         else:
