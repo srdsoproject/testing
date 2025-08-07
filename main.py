@@ -540,49 +540,37 @@ with tabs[0]:
                 mime="image/png"
             )
         #starts from here
-        export_df = filtered[[
-    "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
-    "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "User Feedback/Remark"
-]].copy()
-
+                export_df = filtered[[
+            "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
+            "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "User Feedback/Remark"
+        ]].copy()
         export_df["Date of Inspection"] = export_df["Date of Inspection"].dt.strftime('%d-%m-%Y')
-        
         from io import BytesIO
         from openpyxl.styles import Alignment    
         towb = BytesIO()
-        
         with pd.ExcelWriter(towb, engine="openpyxl") as writer:
             export_df.to_excel(writer, index=False, sheet_name="Filtered Records")
         
             # Access workbook & worksheet
             worksheet = writer.sheets["Filtered Records"]
             
-            # Wrap text in 'Deficiencies Noted' and 'Feedback' columns
-            wrap_columns = ["Deficiencies Noted", "Feedback"]
-            for col_name in wrap_columns:
-                col_idx = export_df.columns.get_loc(col_name) + 1  # Excel is 1-indexed
-                for row in worksheet.iter_rows(min_row=2, min_col=col_idx, max_col=col_idx, max_row=len(export_df)+1):
-                    for cell in row:
-                        cell.alignment = Alignment(wrap_text=True, vertical="top")
+            # Find "Deficiencies Noted" column index
+            col_idx = export_df.columns.get_loc("Deficiencies Noted") + 1  # +1 because Excel is 1-indexed
+        
+            # Apply text wrap to all cells in that column
+            for row in worksheet.iter_rows(min_row=2, min_col=col_idx, max_col=col_idx, max_row=len(export_df)+1):
+                for cell in row:
+                    cell.alignment = Alignment(wrap_text=True, vertical="top")
         
         towb.seek(0)
-        
         st.download_button(
             "📥 Export Filtered Records to Excel",
             data=towb,
             file_name="filtered_records.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-        
+        )        
         st.markdown("### 📄 Preview of Filtered Records")
-
-# Text wrapping for Streamlit preview (Feedback and Deficiencies Noted)
-styled_df = export_df.style.set_properties(
-    subset=["Feedback", "Deficiencies Noted"],
-    **{"white-space": "pre-wrap", "word-wrap": "break-word"}
-)
-st.dataframe(styled_df, use_container_width=True)
-
+        # 👇 Place this after st.markdown("### 📄 Preview of Filtered Records")
         
            
 # Load once and keep in session
@@ -683,6 +671,7 @@ if not editable_filtered.empty:
                         st.info("ℹ️ No changes detected to save.")
                 else:
                     st.warning("⚠️ No rows matched for update.")
+
 
 
 
