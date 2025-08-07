@@ -127,54 +127,43 @@ def normalize(text):
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
 
-import re
-
-def classify_feedback(feedback, user_remark=""):
-    def normalize(text):
-        return text.lower().strip()
-
-    def classify_single(text):
-        if not isinstance(text, str) or text.strip() == "":
-            return None  # Skip empty strings
-
-        text_normalized = normalize(text)
-        date_found = bool(re.search(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', text_normalized))
-
-        resolved_keywords = [
-            "attended", "solved", "submitted", "done", "completed", "informed", "confirmed by", "message given",
-            "tdc work completed", "replaced", "msg given", "msg sent", "counseled", "info shared", "communicated",
-            "counselled", "gate will be closed soon", "attending at the time", "handled", "resolved", "action taken",
-            "spoken to", "warned", "counselling", "hubli", "working normal", "met", "discussion held", "report sent",
-            "notified", "explained", "nil", "na", "tlc", "work completed", "acknowledged", "visited", "briefed",
-            "guided", "handover", "working properly", "checked found working", "supply restored", "noted please",
-            "updated by", "adv to", "counselled the staff", "complied", "checked and found", "maintained",
-            "for needful action", "provided at", "in working condition", "is working", "found working", "informed",
-            "equipment is working", "item is working", "as per plan", "putright", "put right", "operational feasibility",
-            "will be provided", "will be supplied shortly", "advised to ubl"
-        ]
-
-        pending_keywords = [
-            "will be", "needful", "to be", "pending", "not done", "awaiting", "waiting", "yet to", "next time",
-            "follow up", "tdc", "t d c", "will attend", "will be attended", "scheduled", "reminder", "to inform",
-            "to counsel", "to submit", "to do", "to replace", "prior", "remains", "still", "under process", "not yet",
-            "to be done", "will be ensure", "during next", "action will be taken", "will be supplied shortly"
-        ]
-
-        if any(kw in text_normalized for kw in resolved_keywords) or date_found:
-            return "Resolved"
-        if any(kw in text_normalized for kw in pending_keywords):
-            return "Pending"
-        return None
-
-    feedback_result = classify_single(feedback)
-    user_remark_result = classify_single(user_remark) if user_remark and user_remark.strip() else None
-
-    if feedback_result == "Resolved" or user_remark_result == "Resolved":
-        return "Resolved"
-    if feedback_result == "Pending" or user_remark_result == "Pending":
+def classify_feedback(feedback):
+    if not isinstance(feedback, str) or feedback.strip() == "":
         return "Pending"
 
-    return "Pending"  # Default fallback
+    feedback_normalized = normalize(feedback)
+    date_found = bool(re.search(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', feedback_normalized))
+
+    pending_keywords = [
+        "will be", "needful", "to be", "pending", "not done", "awaiting",
+        "waiting", "yet to", "next time", "follow up", "tdc", "t d c", "tdc ",
+        "will attend", "will be attended", "scheduled", "reminder",
+        "to inform", "to counsel", "to submit", "to do", "to replace", "prior", 
+        "remains", "still", "under process", "not yet", "to be done",
+        "will be ensure", "during next", "action will be taken", "Will be supplied shortly."
+    ]
+
+    resolved_keywords = [
+        "attended", "solved", "submitted", "done", "completed", "informed", "Confirmed by","confirmed by", "message given",
+        "tdc work completed", "replaced", "message given", "msg given", "msg sent", "counseled", "informed to", "Counseled ",
+        "info shared", "informed to", "communicated", "counseled", "counselled", "Gate will be closed soon", "attending at the time", "Attending at time",
+        "handled", "resolved", "action taken", "spoken to", "talked to", "warned", "counselling", "HUBLI", "working normal", "Working Normal",
+        "met", "discussion held", "report sent", "notified", "explained", "NIL","nil", "na","NA", 'TLC', 'tlc',
+        "work completed", "acknowledged", "visited", "briefed", "guided", "DG sets handover to KLBG", "handover",
+        "message", "msg", "on ", "working properly", "checked found working", "Supply restored", 
+        "noted please", "noted", "updated by", "adv to", "counselled the staff", "complied",
+        "counselled the", "checked and found", "maintained", "for needful action", "Advised to ETL/CTO/UBL",
+        "provided at", "in working condition", "is working", "found working", "INFORMED ",
+        "equipment is working", "item is working", "As per plan", "Advised to ETL/",
+        "noted it will be attended during the next primary maintenance", "Putright", "putright", "put right", "Put right",
+        "operational feasibility", "will be provided", "will be supplied shortly", "advised to ubl"
+    ]
+
+    if any(kw in feedback_normalized for kw in resolved_keywords) or date_found:
+        return "Resolved"
+    if any(kw in feedback_normalized for kw in pending_keywords):
+        return "Pending"
+    return "Pending"
 
 # ---------- LOAD DATA ----------
 @st.cache_data(ttl=300)
@@ -215,15 +204,8 @@ df = st.session_state.df
 # ---------- UPDATE FEEDBACK ----------
 def update_feedback_column(edited_df):
     header = sheet.row_values(1)
-
     try:
-        feedback_col = header.index("Feedback") + 1
-    except ValueError:
-        st.error("⚠️ 'Feedback' column not found")
-        return
-
-    try:
-        remark_col = header.index("User Feedback/Remark") + 1
+        feedback_col = header.index("User Feedback/Remark") + 1
     except ValueError:
         st.error("⚠️ 'User Feedback/Remark' column not found")
         return
@@ -231,22 +213,17 @@ def update_feedback_column(edited_df):
     updates = []
     for _, row in edited_df.iterrows():
         row_number = int(row["_sheet_row"])
-        feedback_value = row["Feedback"] if pd.notna(row["Feedback"]) else ""
-        remark_value = row["User Feedback/Remark"] if pd.notna(row["User Feedback/Remark"]) else ""
+        new_value = row["User Feedback/Remark"] if pd.notna(row["User Feedback/Remark"]) else ""
+        cell_range = gspread.utils.rowcol_to_a1(row_number, feedback_col)
+        updates.append({"range": cell_range, "values": [[new_value]]})
 
-        feedback_cell = gspread.utils.rowcol_to_a1(row_number, feedback_col)
-        remark_cell = gspread.utils.rowcol_to_a1(row_number, remark_col)
-
-        updates.append({"range": feedback_cell, "values": [[feedback_value]]})
-        updates.append({"range": remark_cell, "values": [[remark_value]]})
-
-        # Update session state again just to be safe
-        st.session_state.df.loc[st.session_state.df["_sheet_row"] == row_number, "Feedback"] = feedback_value
-        st.session_state.df.loc[st.session_state.df["_sheet_row"] == row_number, "User Feedback/Remark"] = remark_value
+        # Update locally without reload
+        st.session_state.df.loc[st.session_state.df["_sheet_row"] == row_number, "User Feedback/Remark"] = new_value
 
     if updates:
         body = {"valueInputOption": "USER_ENTERED", "data": updates}
         sheet.spreadsheet.values_batch_update(body)
+        st.success(f"✅ Updated {len(updates)} row(s)!")
 
 
 def apply_common_filters(df, prefix=""):
@@ -576,6 +553,7 @@ with tabs[0]:
 # Load once and keep in session
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
+# Reuse the already filtered DataFrame from above
 editable_filtered = filtered.copy()
 
 if not editable_filtered.empty:
@@ -589,13 +567,16 @@ if not editable_filtered.empty:
     ]
     editable_df = editable_filtered[display_cols].copy()
 
+    # Keep user edits in session
     if (
-        "feedback_buffer" not in st.session_state
-        or not st.session_state.feedback_buffer.equals(editable_df)
-    ):
+    "feedback_buffer" not in st.session_state
+    or not st.session_state.feedback_buffer.equals(editable_df)):
         st.session_state.feedback_buffer = editable_df.copy()
 
+
+    # Use a form so typing doesn't trigger rerun
     with st.form("feedback_form", clear_on_submit=False):
+        # Debug: check how many rows and columns are being sent to data_editor
         st.write("Rows:", st.session_state.feedback_buffer.shape[0], 
                  " | Columns:", st.session_state.feedback_buffer.shape[1])
     
@@ -615,59 +596,25 @@ if not editable_filtered.empty:
         )
         submitted = st.form_submit_button("✅ Submit Feedback")
 
-        if submitted:
-    # Make sure both edited_df and editable_filtered exist and have the expected column
-            if "User Feedback/Remark" not in edited_df.columns or "Feedback" not in editable_filtered.columns:
-                st.error("⚠️ Required columns are missing from the data.")
-            else:
-                # Calculate the common index
-                common_index = edited_df.index.intersection(editable_filtered.index)
-        
-                if len(common_index) > 0:
-                    # Check which rows actually changed
-                    diffs_mask = (
-                        editable_filtered.loc[common_index, "User Feedback/Remark"]
-                        != edited_df.loc[common_index, "User Feedback/Remark"]
-                    )
-        
-                    if diffs_mask.any():
-                        diffs = edited_df.loc[common_index[diffs_mask]].copy()
-                        diffs["_sheet_row"] = editable_filtered.loc[diffs.index, "_sheet_row"].values
-                        diffs["User Feedback/Remark"] = diffs["User Feedback/Remark"].fillna("")
-        
-                        for idx, row in diffs.iterrows():
-                            original_feedback = editable_filtered.loc[idx, "Feedback"]
-                            user_remark = row["User Feedback/Remark"]
-        
-                            if not user_remark.strip():
-                                continue  # Skip empty remarks
-        
-                            if pd.notna(original_feedback) and str(original_feedback).strip() != "":
-                                combined = f"{original_feedback.strip().rstrip('.')}."
-                                combined += f" {user_remark.strip()}"
-                            else:
-                                combined = user_remark.strip()
-        
-                            # Update in diffs
-                            diffs.at[idx, "Feedback"] = combined
-                            diffs.at[idx, "User Feedback/Remark"] = ""
-        
-                            # Update in session state
-                            st.session_state.df.loc[idx, "Feedback"] = combined
-                            st.session_state.df.loc[idx, "User Feedback/Remark"] = ""
-        
-                        # Update Google Sheet
-                        update_feedback_column(diffs)
-        
-                        st.success(f"✅ Updated {len(diffs)} Feedback row(s) with appended remarks.")
-                    else:
-                        st.info("ℹ️ No changes detected to save.")
-                else:
-                    st.warning("⚠️ No rows matched for update.")
 
+    if submitted:
+        # Align both DataFrames by index
+        common_index = edited_df.index.intersection(editable_filtered.index)
     
+        diffs_mask = (
+            editable_filtered.loc[common_index, "User Feedback/Remark"]
+            != edited_df.loc[common_index, "User Feedback/Remark"]
+        )
     
+        if diffs_mask.any():
+            diffs = edited_df.loc[common_index[diffs_mask]].copy()
+            diffs["_sheet_row"] = editable_filtered.loc[diffs.index, "_sheet_row"].values
     
-
-
-
+            # Replace NaN with empty string
+            diffs["User Feedback/Remark"] = diffs["User Feedback/Remark"].fillna("")
+    
+            update_feedback_column(diffs)
+            st.session_state.df.update(diffs)
+            st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
+        else:
+            st.info("ℹ️ No changes detected to save.")
