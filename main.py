@@ -540,7 +540,7 @@ with tabs[0]:
                 mime="image/png"
             )
         #starts from here
-                export_df = filtered[[
+        export_df = filtered[[
             "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
             "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "User Feedback/Remark"
         ]].copy()
@@ -671,6 +671,7 @@ if not editable_filtered.empty:
                         st.info("ℹ️ No changes detected to save.")
                 else:
                     st.warning("⚠️ No rows matched for update.")
+
 
 
 
