@@ -618,7 +618,7 @@ if not editable_filtered.empty:
 
     with col1:
         if st.button("🔄 Refresh Data"):
-            st.experimental_rerun()
+            st.rerun()
     
     with col2:
         st.caption("← Click here to reload from source")
@@ -675,6 +675,7 @@ if not editable_filtered.empty:
     
     
     
+
 
 
 
