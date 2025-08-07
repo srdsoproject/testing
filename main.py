@@ -127,42 +127,51 @@ def normalize(text):
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
 
-def classify_feedback(feedback):
-    if not isinstance(feedback, str) or feedback.strip() == "":
-        return "Pending"
+def classify_feedback(feedback, user_remark=""):
+    def normalize(text):
+        return text.lower().strip()
 
-    feedback_normalized = normalize(feedback)
-    date_found = bool(re.search(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', feedback_normalized))
+    def classify_single(text):
+        if not isinstance(text, str) or text.strip() == "":
+            return None  # Don't classify empty text
 
-    pending_keywords = [
-        "will be", "needful", "to be", "pending", "not done", "awaiting",
-        "waiting", "yet to", "next time", "follow up", "tdc", "t d c", "tdc ",
-        "will attend", "will be attended", "scheduled", "reminder",
-        "to inform", "to counsel", "to submit", "to do", "to replace", "prior", 
-        "remains", "still", "under process", "not yet", "to be done",
-        "will be ensure", "during next", "action will be taken", "Will be supplied shortly."
-    ]
+        text_normalized = normalize(text)
+        date_found = bool(re.search(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', text_normalized))
 
-    resolved_keywords = [
-        "attended", "solved", "submitted", "done", "completed", "informed", "Confirmed by","confirmed by", "message given",
-        "tdc work completed", "replaced", "message given", "msg given", "msg sent", "counseled", "informed to", "Counseled ",
-        "info shared", "informed to", "communicated", "counseled", "counselled", "Gate will be closed soon", "attending at the time", "Attending at time",
-        "handled", "resolved", "action taken", "spoken to", "talked to", "warned", "counselling", "HUBLI", "working normal", "Working Normal",
-        "met", "discussion held", "report sent", "notified", "explained", "NIL","nil", "na","NA", 'TLC', 'tlc',
-        "work completed", "acknowledged", "visited", "briefed", "guided", "DG sets handover to KLBG", "handover",
-        "message", "msg", "on ", "working properly", "checked found working", "Supply restored", 
-        "noted please", "noted", "updated by", "adv to", "counselled the staff", "complied",
-        "counselled the", "checked and found", "maintained", "for needful action", "Advised to ETL/CTO/UBL",
-        "provided at", "in working condition", "is working", "found working", "INFORMED ",
-        "equipment is working", "item is working", "As per plan", "Advised to ETL/",
-        "noted it will be attended during the next primary maintenance", "Putright", "putright", "put right", "Put right",
-        "operational feasibility", "will be provided", "will be supplied shortly", "advised to ubl"
-    ]
+        resolved_keywords = [
+            "attended", "solved", "submitted", "done", "completed", "informed", "confirmed by", "message given",
+            "tdc work completed", "replaced", "msg given", "msg sent", "counseled", "info shared", "communicated",
+            "counselled", "gate will be closed soon", "attending at the time", "handled", "resolved", "action taken",
+            "spoken to", "warned", "counselling", "hubli", "working normal", "met", "discussion held", "report sent",
+            "notified", "explained", "nil", "na", "tlc", "work completed", "acknowledged", "visited", "briefed",
+            "guided", "handover", "working properly", "checked found working", "supply restored", "noted please",
+            "updated by", "adv to", "counselled the staff", "complied", "checked and found", "maintained",
+            "for needful action", "provided at", "in working condition", "is working", "found working", "informed",
+            "equipment is working", "item is working", "as per plan", "putright", "put right", "operational feasibility",
+            "will be provided", "will be supplied shortly", "advised to ubl"
+        ]
 
-    if any(kw in feedback_normalized for kw in resolved_keywords) or date_found:
+        pending_keywords = [
+            "will be", "needful", "to be", "pending", "not done", "awaiting", "waiting", "yet to", "next time",
+            "follow up", "tdc", "t d c", "will attend", "will be attended", "scheduled", "reminder", "to inform",
+            "to counsel", "to submit", "to do", "to replace", "prior", "remains", "still", "under process", "not yet",
+            "to be done", "will be ensure", "during next", "action will be taken", "will be supplied shortly"
+        ]
+
+        if any(kw in text_normalized for kw in resolved_keywords) or date_found:
+            return "Resolved"
+        if any(kw in text_normalized for kw in pending_keywords):
+            return "Pending"
+        return None
+
+    feedback_result = classify_single(feedback)
+    user_remark_result = classify_single(user_remark) if user_remark and user_remark.strip() else None
+
+    if feedback_result == "Resolved" or user_remark_result == "Resolved":
         return "Resolved"
-    if any(kw in feedback_normalized for kw in pending_keywords):
+    if feedback_result == "Pending" or user_remark_result == "Pending":
         return "Pending"
+
     return "Pending"
 
 # ---------- LOAD DATA ----------
@@ -553,7 +562,6 @@ with tabs[0]:
 # Load once and keep in session
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
-# Reuse the already filtered DataFrame from above
 editable_filtered = filtered.copy()
 
 if not editable_filtered.empty:
@@ -567,16 +575,13 @@ if not editable_filtered.empty:
     ]
     editable_df = editable_filtered[display_cols].copy()
 
-    # Keep user edits in session
     if (
-    "feedback_buffer" not in st.session_state
-    or not st.session_state.feedback_buffer.equals(editable_df)):
+        "feedback_buffer" not in st.session_state
+        or not st.session_state.feedback_buffer.equals(editable_df)
+    ):
         st.session_state.feedback_buffer = editable_df.copy()
 
-
-    # Use a form so typing doesn't trigger rerun
     with st.form("feedback_form", clear_on_submit=False):
-        # Debug: check how many rows and columns are being sent to data_editor
         st.write("Rows:", st.session_state.feedback_buffer.shape[0], 
                  " | Columns:", st.session_state.feedback_buffer.shape[1])
     
@@ -596,9 +601,7 @@ if not editable_filtered.empty:
         )
         submitted = st.form_submit_button("✅ Submit Feedback")
 
-
     if submitted:
-        # Align both DataFrames by index
         common_index = edited_df.index.intersection(editable_filtered.index)
     
         diffs_mask = (
@@ -609,36 +612,24 @@ if not editable_filtered.empty:
         if diffs_mask.any():
             diffs = edited_df.loc[common_index[diffs_mask]].copy()
             diffs["_sheet_row"] = editable_filtered.loc[diffs.index, "_sheet_row"].values
-    
-            # Replace NaN with empty string
             diffs["User Feedback/Remark"] = diffs["User Feedback/Remark"].fillna("")
-    
+
+            # ✅ Classify using Feedback and User Feedback/Remark
+            diffs["Feedback Status"] = diffs.apply(
+                lambda row: classify_feedback(
+                    editable_filtered.loc[row.name, "Feedback"],
+                    row["User Feedback/Remark"]
+                ),
+                axis=1
+            )
+
+            # ⬇️ Example: print or log status
+            st.dataframe(diffs[["User Feedback/Remark", "Feedback Status"]])
+
+            # 🔄 Update your sheet and session data (implement this function to update both columns if needed)
             update_feedback_column(diffs)
             st.session_state.df.update(diffs)
+
             st.success(f"✅ Updated {len(diffs)} row(s) in Google Sheet")
         else:
             st.info("ℹ️ No changes detected to save.")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
