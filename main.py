@@ -616,12 +616,11 @@ if not editable_filtered.empty:
         submitted = st.form_submit_button("✅ Submit Feedback")
 
         if submitted:
-        common_index = edited_df.index.intersection(editable_filtered.index)
+            common_index = edited_df.index.intersection(editable_filtered.index)
     
-        diffs_mask = (
+            diffs_mask = (
             editable_filtered.loc[common_index, "User Feedback/Remark"]
-            != edited_df.loc[common_index, "User Feedback/Remark"]
-        )
+            != edited_df.loc[common_index, "User Feedback/Remark"]        )
     
         if diffs_mask.any():
             diffs = edited_df.loc[common_index[diffs_mask]].copy()
@@ -659,4 +658,5 @@ if not editable_filtered.empty:
             st.success(f"✅ Updated {len(diffs)} Feedback row(s) with appended remarks.")
         else:
             st.info("ℹ️ No changes detected to save.")
+
 
