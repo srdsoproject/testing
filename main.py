@@ -539,7 +539,9 @@ with tabs[0]:
                 file_name="subhead_distribution.png",
                 mime="image/png"
             )
-        #starts from here
+
+
+
         export_df = filtered[[
             "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
             "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "User Feedback/Remark"
@@ -568,11 +570,9 @@ with tabs[0]:
             data=towb,
             file_name="filtered_records.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )        
+        )
         st.markdown("### 📄 Preview of Filtered Records")
-        # 👇 Place this after st.markdown("### 📄 Preview of Filtered Records")
-        
-           
+
 # Load once and keep in session
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
@@ -614,14 +614,7 @@ if not editable_filtered.empty:
             key="feedback_editor"
         )
         submitted = st.form_submit_button("✅ Submit Feedback")
-    col1, col2 = st.columns([1, 1])
 
-    with col1:
-        if st.button("🔄 Refresh Data"):
-            st.rerun()
-    
-    with col2:
-        st.caption("← Click here to reload from source")
         if submitted:
     # Make sure both edited_df and editable_filtered exist and have the expected column
             if "User Feedback/Remark" not in edited_df.columns or "Feedback" not in editable_filtered.columns:
@@ -672,9 +665,9 @@ if not editable_filtered.empty:
                 else:
                     st.warning("⚠️ No rows matched for update.")
 
-
-
-
+    
+    
+    
 
 
 
