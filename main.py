@@ -617,46 +617,47 @@ if not editable_filtered.empty:
 
         if submitted:
             common_index = edited_df.index.intersection(editable_filtered.index)
-    
+
+        if not common_index.empty:
             diffs_mask = (
-            editable_filtered.loc[common_index, "User Feedback/Remark"]
-            != edited_df.loc[common_index, "User Feedback/Remark"]        )
+                editable_filtered.loc[common_index, "User Feedback/Remark"]
+                != edited_df.loc[common_index, "User Feedback/Remark"]
+            )
     
-        if diffs_mask.any():
-            diffs = edited_df.loc[common_index[diffs_mask]].copy()
-            diffs["_sheet_row"] = editable_filtered.loc[diffs.index, "_sheet_row"].values
-            diffs["User Feedback/Remark"] = diffs["User Feedback/Remark"].fillna("")
+            if diffs_mask.any():
+                diffs = edited_df.loc[common_index[diffs_mask]].copy()
+                diffs["_sheet_row"] = editable_filtered.loc[diffs.index, "_sheet_row"].values
+                diffs["User Feedback/Remark"] = diffs["User Feedback/Remark"].fillna("")
     
-            updated_feedbacks = []
-            for idx, row in diffs.iterrows():
-                original_feedback = editable_filtered.loc[idx, "Feedback"]
-                user_remark = row["User Feedback/Remark"]
+                for idx, row in diffs.iterrows():
+                    original_feedback = editable_filtered.loc[idx, "Feedback"]
+                    user_remark = row["User Feedback/Remark"]
     
-                if not user_remark.strip():
-                    # Skip blank remarks
-                    continue
+                    if not user_remark.strip():
+                        continue  # Skip empty remark
     
-                if pd.notna(original_feedback) and str(original_feedback).strip() != "":
-                    combined = f"{original_feedback.strip().rstrip('.')}."  # Ensure single full stop
-                    combined += f" {user_remark.strip()}"
-                else:
-                    combined = user_remark.strip()
+                    if pd.notna(original_feedback) and str(original_feedback).strip() != "":
+                        combined = f"{original_feedback.strip().rstrip('.')}."
+                        combined += f" {user_remark.strip()}"
+                    else:
+                        combined = user_remark.strip()
     
-                # Update Feedback column with combined result
-                diffs.at[idx, "Feedback"] = combined
+                    # Update diffs DataFrame
+                    diffs.at[idx, "Feedback"] = combined
+                    diffs.at[idx, "User Feedback/Remark"] = ""
     
-                # Clear User Feedback/Remark after use
-                diffs.at[idx, "User Feedback/Remark"] = ""
+                    # Update session state
+                    st.session_state.df.loc[idx, "Feedback"] = combined
+                    st.session_state.df.loc[idx, "User Feedback/Remark"] = ""
     
-                # Also update session state DataFrame
-                st.session_state.df.loc[idx, "Feedback"] = combined
-                st.session_state.df.loc[idx, "User Feedback/Remark"] = ""
+                # ✅ Push updated feedback to Google Sheet
+                update_feedback_column(diffs)
     
-            # Push changes to Google Sheet
-            update_feedback_column(diffs)
-    
-            st.success(f"✅ Updated {len(diffs)} Feedback row(s) with appended remarks.")
+                st.success(f"✅ Updated {len(diffs)} Feedback row(s) with appended remarks.")
+            else:
+                st.info("ℹ️ No changes detected to save.")
         else:
-            st.info("ℹ️ No changes detected to save.")
-
-
+            st.warning("⚠️ No matching rows found for editing.")
+    
+    
+    
