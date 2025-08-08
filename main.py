@@ -622,13 +622,20 @@ st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 # -- Apply status from admin approval
 admin_mode = st.checkbox("👑 Admin Mode")
 def derive_final_status(row):
+    feedback = str(row.get("Feedback", "")).strip().lower()
     approval = str(row.get("Admin Approval", "")).strip().lower()
-    if approval == "satisfactory":
-        return "Resolved"
-    elif approval == "pending":
+
+    if feedback == "pending":
         return "Pending"
+    elif approval == "unsatisfactory":
+        return "Pending"
+    elif approval == "satisfactory":
+        return "Resolved"
+    elif feedback == "resolved":
+        return "Resolved"
     else:
         return ""
+
 
 # -- Start admin mode view
 if admin_mode:
@@ -657,7 +664,7 @@ if admin_mode:
         admin_df_preview = editable_admin_df[admin_display_cols].copy()
 
         st.markdown("### 👑 Admin Mode")
-
+        
         with st.form("admin_feedback_form", clear_on_submit=False):
             edited_admin_df = st.data_editor(
                 admin_df_preview,
@@ -667,7 +674,7 @@ if admin_mode:
                 column_config={
                     "Admin Approval": st.column_config.SelectboxColumn(
                         label="Admin Approval",
-                        options=["", "Satisfactory", "Pending"],
+                        options=["", "Satisfactory", "Unsatisfactory"],  # 🔁 Updated here
                         required=False
                     )
                 },
@@ -676,7 +683,7 @@ if admin_mode:
                 ],
                 key="admin_feedback_editor"
             )
-
+        
             col1, col2 = st.columns([1, 1])
             with col1:
                 admin_submit = st.form_submit_button("✅ Submit Feedback")
@@ -685,17 +692,18 @@ if admin_mode:
                 if admin_refresh:
                     st.session_state.df = load_data()
                     st.success("✅ Data refreshed successfully!")
-
+        
         if admin_submit:
             diffs = edited_admin_df[edited_admin_df["Admin Approval"] != editable_admin_df["Admin Approval"]]
             diffs["_sheet_row"] = editable_admin_df.loc[diffs.index, "_sheet_row"].values
-
+        
             for idx, row in diffs.iterrows():
                 approval = row["Admin Approval"]
                 st.session_state.df.loc[idx, "Admin Approval"] = approval
-
-            update_admin_approval_column(diffs)  # 🛠️ Create this function like update_feedback_column
+        
+            update_admin_approval_column(diffs)
             st.success(f"✅ Updated {len(diffs)} Admin Approval(s).")
+
 
 
 
