@@ -211,6 +211,10 @@ if "df" not in st.session_state:
     st.session_state.df = load_data()
 
 df = st.session_state.df
+# ---------- REFRESH BUTTON ----------
+if st.button("🔄 Refresh Data"):
+    st.session_state.df = load_data()
+    st.success("✅ Data refreshed successfully!")
 
 # ---------- UPDATE FEEDBACK ----------
 def update_feedback_column(edited_df):
@@ -659,4 +663,5 @@ if not editable_filtered.empty:
                         st.info("ℹ️ No changes detected to save.")
                 else:
                     st.warning("⚠️ No rows matched for update.")
+
 
