@@ -618,44 +618,39 @@ with tabs[0]:
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
 # 👑 Admin toggle
+# 👑 Admin toggle
 is_admin = st.checkbox("👑 Admin Mode", value=False)
 
 editable_filtered = filtered.copy()
 
 if not editable_filtered.empty:
     if "_sheet_row" not in editable_filtered.columns:
-        editable_filtered["_sheet_row"] = editable_filtered.index + 2  
+        editable_filtered["_sheet_row"] = editable_filtered.index + 2
 
-    # 🆕 Ensure 'Admin Approval' column exists
+    # Add 'Admin Approval' column if not present
     if "Admin Approval" not in editable_filtered.columns:
-        editable_filtered["Admin Approval"] = ""  # Default blank
+        editable_filtered["Admin Approval"] = ""
 
-    # 🆕 Derived 'Final Status' column
-    def compute_final_status(row):
-        feedback = str(row.get("Feedback", "")).strip().lower()
-        approval = str(row.get("Admin Approval", "")).strip().lower()
-        if feedback == "resolved":
-            return "Resolved" if approval == "satisfactory" else "Pending"
-        return "Pending"
-    
-    editable_filtered["Final Status"] = editable_filtered.apply(compute_final_status, axis=1)
-
+    # Displayed columns
     display_cols = [
         "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
         "Deficiencies Noted", "Inspection By", "Action By", "Feedback",
-        "User Feedback/Remark", "Admin Approval", "Final Status"
+        "User Feedback/Remark", "Admin Approval"
     ]
     editable_df = editable_filtered[display_cols].copy()
 
-    # 🔴 Highlight 'Final Status' if Pending
-    def highlight_pending(val):
-        return "color: red; font-weight: bold" if str(val).strip().lower() == "pending" else ""
-    
-    styled_df = editable_df.style.applymap(highlight_pending, subset=["Final Status"])
-    st.markdown("#### 🧾 Preview with Final Status Logic (Pending = 🔴 Red)")
-    st.write(styled_df)
+    # Final Status derived column
+    def derive_final_status(row):
+        if row["Feedback"].strip() == "":
+            return "Pending"
+        elif row["Admin Approval"].strip().lower() == "unsatisfactory":
+            return "Pending"
+        else:
+            return "Resolved"
 
-    # ⏺️ Store editable copy in session
+    editable_df["Final Status"] = editable_df.apply(derive_final_status, axis=1)
+
+    # Store for edit session
     if (
         "feedback_buffer" not in st.session_state
         or not st.session_state.feedback_buffer.equals(editable_df)
@@ -663,26 +658,28 @@ if not editable_filtered.empty:
         st.session_state.feedback_buffer = editable_df.copy()
 
     with st.form("feedback_form", clear_on_submit=False):
-        st.write("Rows:", st.session_state.feedback_buffer.shape[0], 
+        st.write("Rows:", st.session_state.feedback_buffer.shape[0],
                  " | Columns:", st.session_state.feedback_buffer.shape[1])
+
+        column_config = {
+            "User Feedback/Remark": st.column_config.TextColumn("User Feedback/Remark", disabled=not is_admin),
+            "Admin Approval": st.column_config.SelectboxColumn(
+                "Admin Approval",
+                options=["", "Satisfactory", "Unsatisfactory"],
+                disabled=not is_admin
+            )
+        }
 
         edited_df = st.data_editor(
             st.session_state.feedback_buffer,
             use_container_width=True,
             hide_index=True,
             num_rows="fixed",
-            column_config={
-                "User Feedback/Remark": st.column_config.TextColumn("User Feedback/Remark"),
-                "Admin Approval": st.column_config.SelectboxColumn(
-                    label="Admin Approval",
-                    options=["", "Satisfactory", "Unsatisfactory"]
-                )
-            },
-            disabled=(
-                ["Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
-                 "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "Final Status"]
-                + (["Admin Approval"] if not is_admin else [])
-            ),
+            column_config=column_config,
+            disabled=[
+                "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
+                "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "Final Status"
+            ],
             key="feedback_editor"
         )
 
@@ -696,16 +693,43 @@ if not editable_filtered.empty:
                 st.success("✅ Data refreshed successfully!")
 
         if submitted:
-            # Just updating Admin Approval and User Feedback in main DF
-            diffs = edited_df.copy()
-            diffs["_sheet_row"] = editable_filtered["_sheet_row"].values
-            diffs["User Feedback/Remark"] = diffs["User Feedback/Remark"].fillna("")
-            diffs["Admin Approval"] = diffs["Admin Approval"].fillna("")
+            common_index = edited_df.index.intersection(editable_filtered.index)
 
-            for idx, row in diffs.iterrows():
-                st.session_state.df.loc[idx, "User Feedback/Remark"] = row["User Feedback/Remark"]
-                st.session_state.df.loc[idx, "Admin Approval"] = row["Admin Approval"]
+            if len(common_index) > 0:
+                diffs_mask = (
+                    editable_filtered.loc[common_index, ["User Feedback/Remark", "Admin Approval"]]
+                    != edited_df.loc[common_index, ["User Feedback/Remark", "Admin Approval"]]
+                ).any(axis=1)
 
-            update_feedback_column(diffs)
-            st.success(f"✅ Updated {len(diffs)} row(s) with user/admin feedback.")
+                if diffs_mask.any():
+                    diffs = edited_df.loc[common_index[diffs_mask]].copy()
+                    diffs["_sheet_row"] = editable_filtered.loc[diffs.index, "_sheet_row"].values
+                    diffs["User Feedback/Remark"] = diffs["User Feedback/Remark"].fillna("")
+                    diffs["Admin Approval"] = diffs["Admin Approval"].fillna("")
+
+                    for idx, row in diffs.iterrows():
+                        user_remark = row["User Feedback/Remark"].strip()
+                        admin_approval = row["Admin Approval"].strip().lower()
+
+                        if admin_approval == "unsatisfactory":
+                            combined = "Remark unsatisfactory. Fill it again."
+                        elif user_remark:
+                            combined = user_remark
+                        else:
+                            combined = editable_filtered.loc[idx, "Feedback"]  # No change
+
+                        diffs.at[idx, "Feedback"] = combined
+                        diffs.at[idx, "User Feedback/Remark"] = ""
+                        st.session_state.df.loc[idx, "Feedback"] = combined
+                        st.session_state.df.loc[idx, "User Feedback/Remark"] = ""
+                        st.session_state.df.loc[idx, "Admin Approval"] = row["Admin Approval"]
+
+                    update_feedback_column(diffs)
+                    st.success(f"✅ Updated {len(diffs)} row(s) with admin approval and feedback.")
+                else:
+                    st.info("ℹ️ No changes detected to save.")
+            else:
+                st.warning("⚠️ No matching rows found.")
+
+
 
