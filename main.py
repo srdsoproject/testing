@@ -620,6 +620,7 @@ st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 # 👑 Admin toggle
 # 👑 Admin toggle
 # -- Apply status from admin approval
+admin_mode = st.checkbox("👑 Admin Mode")
 def derive_final_status(row):
     approval = str(row.get("Admin Approval", "")).strip().lower()
     if approval == "satisfactory":
@@ -695,6 +696,7 @@ if admin_mode:
 
             update_admin_approval_column(diffs)  # 🛠️ Create this function like update_feedback_column
             st.success(f"✅ Updated {len(diffs)} Admin Approval(s).")
+
 
 
 
