@@ -617,19 +617,45 @@ with tabs[0]:
 # Load once and keep in session
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
+# 👑 Admin toggle
+is_admin = st.checkbox("👑 Admin Mode", value=False)
+
 editable_filtered = filtered.copy()
 
 if not editable_filtered.empty:
     if "_sheet_row" not in editable_filtered.columns:
         editable_filtered["_sheet_row"] = editable_filtered.index + 2  
 
+    # 🆕 Ensure 'Admin Approval' column exists
+    if "Admin Approval" not in editable_filtered.columns:
+        editable_filtered["Admin Approval"] = ""  # Default blank
+
+    # 🆕 Derived 'Final Status' column
+    def compute_final_status(row):
+        feedback = str(row.get("Feedback", "")).strip().lower()
+        approval = str(row.get("Admin Approval", "")).strip().lower()
+        if feedback == "resolved":
+            return "Resolved" if approval == "satisfactory" else "Pending"
+        return "Pending"
+    
+    editable_filtered["Final Status"] = editable_filtered.apply(compute_final_status, axis=1)
+
     display_cols = [
         "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
         "Deficiencies Noted", "Inspection By", "Action By", "Feedback",
-        "User Feedback/Remark"
+        "User Feedback/Remark", "Admin Approval", "Final Status"
     ]
     editable_df = editable_filtered[display_cols].copy()
 
+    # 🔴 Highlight 'Final Status' if Pending
+    def highlight_pending(val):
+        return "color: red; font-weight: bold" if str(val).strip().lower() == "pending" else ""
+    
+    styled_df = editable_df.style.applymap(highlight_pending, subset=["Final Status"])
+    st.markdown("#### 🧾 Preview with Final Status Logic (Pending = 🔴 Red)")
+    st.write(styled_df)
+
+    # ⏺️ Store editable copy in session
     if (
         "feedback_buffer" not in st.session_state
         or not st.session_state.feedback_buffer.equals(editable_df)
@@ -639,20 +665,27 @@ if not editable_filtered.empty:
     with st.form("feedback_form", clear_on_submit=False):
         st.write("Rows:", st.session_state.feedback_buffer.shape[0], 
                  " | Columns:", st.session_state.feedback_buffer.shape[1])
-    
+
         edited_df = st.data_editor(
             st.session_state.feedback_buffer,
             use_container_width=True,
             hide_index=True,
             num_rows="fixed",
-            column_config={"User Feedback/Remark": st.column_config.TextColumn("User Feedback/Remark")},
-          
-            disabled=[
-                "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
-                "Deficiencies Noted", "Inspection By", "Action By", "Feedback"
-            ],
+            column_config={
+                "User Feedback/Remark": st.column_config.TextColumn("User Feedback/Remark"),
+                "Admin Approval": st.column_config.SelectboxColumn(
+                    label="Admin Approval",
+                    options=["", "Satisfactory", "Unsatisfactory"]
+                )
+            },
+            disabled=(
+                ["Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
+                 "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "Final Status"]
+                + (["Admin Approval"] if not is_admin else [])
+            ),
             key="feedback_editor"
         )
+
         col1, col2 = st.columns([1, 1])
         with col1:
             submitted = st.form_submit_button("✅ Submit Feedback")
@@ -661,48 +694,18 @@ if not editable_filtered.empty:
             if refresh_clicked:
                 st.session_state.df = load_data()
                 st.success("✅ Data refreshed successfully!")
-        #start from here
+
         if submitted:
-    # Make sure both edited_df and editable_filtered exist and have the expected column
-            if "User Feedback/Remark" not in edited_df.columns or "Feedback" not in editable_filtered.columns:
-                st.error("⚠️ Required columns are missing from the data.")
-            else:
-                # Calculate the common index
-                common_index = edited_df.index.intersection(editable_filtered.index)
-        
-                if len(common_index) > 0:
-                    # Check which rows actually changed
-                    diffs_mask = (
-                        editable_filtered.loc[common_index, "User Feedback/Remark"]
-                        != edited_df.loc[common_index, "User Feedback/Remark"]
-                    )
-        
-                    if diffs_mask.any():
-                        diffs = edited_df.loc[common_index[diffs_mask]].copy()
-                        diffs["_sheet_row"] = editable_filtered.loc[diffs.index, "_sheet_row"].values
-                        diffs["User Feedback/Remark"] = diffs["User Feedback/Remark"].fillna("")
-        
-                        for idx, row in diffs.iterrows():
-                            user_remark = row["User Feedback/Remark"]
-        
-                            if not user_remark.strip():
-                                continue  # Skip empty remarks
-        
-                            combined = user_remark.strip()
-        
-                            # Update in diffs
-                            diffs.at[idx, "Feedback"] = combined
-                            diffs.at[idx, "User Feedback/Remark"] = ""
-        
-                            # Update in session state
-                            st.session_state.df.loc[idx, "Feedback"] = combined
-                            st.session_state.df.loc[idx, "User Feedback/Remark"] = ""
-        
-                        # Update Google Sheet
-                        update_feedback_column(diffs)
-        
-                        st.success(f"✅ Updated {len(diffs)} Feedback row(s) with replaced remarks.")
-                    else:
-                        st.info("ℹ️ No changes detected to save.")
-                else:
-                    st.warning("⚠️ No rows matched for update.")
+            # Just updating Admin Approval and User Feedback in main DF
+            diffs = edited_df.copy()
+            diffs["_sheet_row"] = editable_filtered["_sheet_row"].values
+            diffs["User Feedback/Remark"] = diffs["User Feedback/Remark"].fillna("")
+            diffs["Admin Approval"] = diffs["Admin Approval"].fillna("")
+
+            for idx, row in diffs.iterrows():
+                st.session_state.df.loc[idx, "User Feedback/Remark"] = row["User Feedback/Remark"]
+                st.session_state.df.loc[idx, "Admin Approval"] = row["Admin Approval"]
+
+            update_feedback_column(diffs)
+            st.success(f"✅ Updated {len(diffs)} row(s) with user/admin feedback.")
+
