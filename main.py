@@ -641,15 +641,16 @@ if not editable_filtered.empty:
 
     # Final Status derived column
     def derive_final_status(row):
-        feedback = str(row.get("Feedback", "")).strip()
+        feedback = str(row.get("Feedback", "")).strip().lower()
         approval = str(row.get("Admin Approval", "")).strip().lower()
     
         if feedback == "":
             return "Pending"
-        elif approval == "unsatisfactory":
+        elif approval in ["unsatisfactory", "pending", "none", ""]:
             return "Pending"
         else:
             return "Resolved"
+
 
 
 
@@ -735,6 +736,7 @@ if not editable_filtered.empty:
                     st.info("ℹ️ No changes detected to save.")
             else:
                 st.warning("⚠️ No matching rows found.")
+
 
 
 
