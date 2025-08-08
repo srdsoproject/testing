@@ -648,7 +648,7 @@ if admin_mode:
 
         # Derive final status based on admin approval
         editable_admin_df["Final Status"] = editable_admin_df.apply(derive_final_status, axis=1)
-
+        status_filter = st.selectbox("Filter by Status", ["All", "Pending", "Resolved"])
         # Optional: apply status filter
         if status_filter == "Pending":
             editable_admin_df = editable_admin_df[editable_admin_df["Final Status"] == "Pending"]
@@ -703,6 +703,7 @@ if admin_mode:
         
             update_admin_approval_column(diffs)
             st.success(f"✅ Updated {len(diffs)} Admin Approval(s).")
+
 
 
 
