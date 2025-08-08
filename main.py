@@ -94,7 +94,7 @@ gate_list = ['LC-19', 'LC-22A', 'LC-25', 'LC-26', 'LC-27C', 'LC-28', 'LC-30', 'L
              'LC-15/C', 'LC-21', 'LC-26-A', 'LC-34', 'LC-36', 'LC-44', 'LC-47', 'LC-55', 'LC-57', 'LC-59', 'LC-60',
              'LC-61']
 HEAD_LIST = ["", "ELECT/TRD", "ELECT/G", "ELECT/TRO", "SIGNAL & TELECOM", "OPTG",
-             "ENGINEERING", "COMMERCIAL", "C&W"]
+             "ENGINEERING", "COMMERCIAL", "C&W", 'PERSONNEL', 'SECURITY']
 SUBHEAD_LIST = {
     "ELECT/TRD": ["T/W WAGON", "TSS/SP/SSP", "OHE SECTION", "OHE STATION", "MISC"],
     "ELECT/G": ["TL/AC COACH", "POWER/PANTRY CAR", "WIRING/EQUIPMENT", "UPS", "AC", "DG", "SOLAR LIGHT", "MISC"],
@@ -110,7 +110,7 @@ SUBHEAD_LIST = {
     "C&W": [ "BRAKE BINDING", 'WHEEL DEFECT', 'TRAIN PARTING', 'PASSENGER AMENITIES', 'AIR PRESSURE LEAKAGE',
             'DAMAGED UNDER GEAR PARTS', 'MISC'],
 }
-INSPECTION_BY_LIST = [""] + ["HQ OFFICERS",'DRM/SUR', 'ADRM', 'Sr.DSO', 'Sr.DOM', 'Sr.DEN/S', 'Sr.DEN/C', 'Sr.DEN/Co', 'Sr.DSTE',
+INSPECTION_BY_LIST = [""] + ["HQ OFFICER CCE/CR",'DRM/SUR', 'ADRM', 'Sr.DSO', 'Sr.DOM', 'Sr.DEN/S', 'Sr.DEN/C', 'Sr.DEN/Co', 'Sr.DSTE',
                              'Sr.DEE/TRD', 'Sr.DEE/G', 'Sr.DME', 'Sr.DCM', 'Sr.DPO', 'Sr.DFM', 'Sr.DMM', 'DSC',
                              'DME,DEE/TRD', 'DFM', 'DSTE/HQ', 'DSTE/KLBG', 'ADEN/T/SUR', 'ADEN/W/SUR', 'ADEN/KWV',
                              'ADEN/PVR', 'ADEN/LUR', 'ADEN/KLBG', 'ADSTE/SUR', 'ADSTE/I/KWV', 'ADSTE/II/KWV',
@@ -150,14 +150,14 @@ def classify_feedback(feedback, user_remark=""):
             "updated by", "adv to", "counselled the staff", "complied", "checked and found", "maintained",
             "for needful action", "provided at", "in working condition", "is working", "found working", "informed",
             "equipment is working", "item is working", "as per plan", "putright", "put right", "operational feasibility",
-            "will be provided", "will be supplied shortly", "advised to ubl"
+            "will be provided", "will be supplied shortly", "advised to ubl", 'Updated', 'updated'
         ]
 
         pending_keywords = [
             "will be", "needful", "to be", "pending", "not done", "awaiting", "waiting", "yet to", "next time",
             "follow up", "tdc", "t d c", "will attend", "will be attended", "scheduled", "reminder", "to inform",
             "to counsel", "to submit", "to do", "to replace", "prior", "remains", "still", "under process", "not yet",
-            "to be done", "will be ensure", "during next", "action will be taken", "will be supplied shortly"
+            "to be done", "will be ensure", "during next", "action will be taken", "will be supplied shortly", 'not available','not updated'
         ]
 
         if any(kw in text_normalized for kw in resolved_keywords) or date_found:
@@ -283,12 +283,17 @@ def apply_common_filters(df, prefix=""):
 
     df_filtered = df.copy()
     # Apply filters based on session state values
+   # Apply filters based on session state values
     if st.session_state.get(prefix + "insp"):
-        df_filtered = df_filtered[
-            df_filtered["Inspection By"].apply(lambda x: match_exact(st.session_state[prefix + "insp"], x))]
+        selected = st.session_state[prefix + "insp"]
+        df_filtered = df_filtered[df_filtered["Inspection By"].isin(selected if isinstance(selected, list) else [selected])]
+
+    
     if st.session_state.get(prefix + "action"):
-        df_filtered = df_filtered[
-            df_filtered["Action By"].apply(lambda x: match_exact(st.session_state[prefix + "action"], x))]
+        selected = st.session_state[prefix + "action"]
+        df_filtered = df_filtered[df_filtered["Action By"].isin(selected if isinstance(selected, list) else [selected])]
+
+
 
     # Convert 'Date of Inspection' to datetime for comparison if it exists
     if "Date of Inspection" in df_filtered.columns:
@@ -410,136 +415,171 @@ with tabs[0]:
     col_b.metric("🟩 Resolved", resolved_count)
     col_c.metric("📊 Total Records", total_count)
 
-    if not filtered.empty:
-        # ---------- EXISTING PENDING vs RESOLVED CHART ----------
-        summary = filtered["Status"].value_counts().reindex(["Pending", "Resolved"], fill_value=0).reset_index()
-        summary.columns = ["Status", "Count"]
-        total_count = summary["Count"].sum()
-        summary.loc[len(summary.index)] = ["Total", total_count]
 
-        dr = f"{start_date.strftime('%d-%m-%Y')} to {end_date.strftime('%d-%m-%Y')}"
-        heads = ", ".join(st.session_state.view_head_filter) if st.session_state.view_head_filter else "All Heads"
+        # ---------- NEW SUB HEAD DISTRIBUTION CHART ----------
 
-        fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-        wedges, texts, autotexts = axes[0].pie(
-            summary.loc[summary["Status"] != "Total", "Count"],
-            labels=summary.loc[summary["Status"] != "Total", "Status"],
-            autopct=lambda pct: f"{pct:.1f}%\n({int(round(pct / 100 * total_count))})",
-            startangle=90,
-            colors=["#b00020", "#137333"]  # Dark red & green
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from io import BytesIO
+    
+    if st.session_state.view_head_filter:
+        st.markdown("### 📊 Sub Head Distribution")
+    
+        # --- Prepare data ---
+        subhead_summary = (
+            filtered.groupby("Sub Head")["Sub Head"]
+            .count()
+            .reset_index(name="Count")
+            .sort_values(by="Count", ascending=False)
         )
-        axes[0].set_title("", fontsize=12)
-
-        # Table data
-        table_data = [["Status", "Count"]] + summary.values.tolist()
-        table_data.append(["Date Range", dr])
-        type_filter = st.session_state.view_type_filter
-        type_display = ", ".join(type_filter) if type_filter else "All Types"
-        table_data.append(["Type of Inspection", type_display])
-        location_display = st.session_state.view_location_filter or "All Locations"
-        table_data.append(["Location", location_display])
-        table_data.append(["Heads", heads])
-        if st.session_state.view_sub_filter:
-            table_data.append(["Sub Head", st.session_state.view_sub_filter])
-        if selected_status != "All":
-            table_data.append(["Filtered Status", selected_status])
+        total_subs = subhead_summary["Count"].sum()
+        subhead_summary.loc[len(subhead_summary)] = ["Total", total_subs]
+    
+        # --- Create figure ---
+        fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+    
+        # --- Pie chart ---
+            
+        # Filter data
+        import pandas as pd
+        import matplotlib.pyplot as plt
+        import numpy as np
+        
+        # Filter and sort data
+        import pandas as pd
+        import matplotlib.pyplot as plt
+        import numpy as np
+        
+        # Data preparation
+        import matplotlib.pyplot as plt
+        import numpy as np
+        import pandas as pd
+        
+        # --- Sample DataFrame (replace this with your actual subhead_summary) ---
+        # subhead_summary = pd.DataFrame({
+        #     'Sub Head': ['A', 'B', 'C', 'D', 'E', 'F', 'Total'],
+        #     'Count': [50, 30, 10, 5, 3, 2, 100]
+        # })
+        
+        # --- Pie chart data preparation ---
+        pie_data = subhead_summary[subhead_summary["Sub Head"] != "Total"].copy()
+        pie_data = pie_data.sort_values("Count", ascending=False)
+        
+        # Group small segments into "Others"
+        threshold = 0.02
+        total = pie_data["Count"].sum()
+        pie_data["Percent"] = pie_data["Count"] / total
+        
+        major = pie_data[pie_data["Percent"] >= threshold]
+        minor = pie_data[pie_data["Percent"] < threshold]
+        
+        if not minor.empty:
+            others_sum = minor["Count"].sum()
+            others_row = pd.DataFrame([{"Sub Head": "Others", "Count": others_sum}])
+            major = pd.concat([major, others_row], ignore_index=True)
+        
+        # --- Create figure with space for pie + table ---
+        fig, axes = plt.subplots(1, 2, figsize=(16, 8))  # Wider layout
+        
+        # --- Pie chart ---
+        wedges, texts, autotexts = axes[0].pie(
+            major["Count"],
+            startangle=90,
+            autopct='%1.1f%%',
+            colors=plt.cm.Paired.colors,
+            textprops=dict(color='black', fontsize=8)
+        )
+        
+        # Alternating labels (left/right)
+        for i, (wedge, (_, row)) in enumerate(zip(wedges, major.iterrows())):
+            ang = (wedge.theta2 + wedge.theta1) / 2.0
+            x = np.cos(np.deg2rad(ang))
+            y = np.sin(np.deg2rad(ang))
+        
+            place_on_right = (i % 2 == 0)
+            label_x = 1.5 if place_on_right else -1.5
+            label_y = 1.2 * y
+            align = "left" if place_on_right else "right"
+        
+            label = f"{row['Sub Head']} ({row['Count']})"
+        
+            axes[0].text(
+                label_x, label_y, label,
+                ha=align,
+                va="center",
+                fontsize=8,
+                bbox=dict(facecolor="white", edgecolor="gray", alpha=0.7, pad=1)
+            )
+        
+            axes[0].annotate(
+                "", xy=(0.9 * x, 0.9 * y), xytext=(label_x, label_y),
+                arrowprops=dict(arrowstyle="-", lw=0.8, color="black")
+            )
+        
+        #axes[0].set_title("Sub Head Breakdown", fontsize=14, fontweight="bold")
+        
+        # --- Table ---
+        table_data = [["Sub Head", "Count"]] + subhead_summary.values.tolist()
+        axes[1].axis('off')
+        
+        table_row_count = len(table_data)
+        row_scale = 1 + (table_row_count * 0.05)
+               
+        # --- Final layout adjustments ---
+        plt.tight_layout(rect=[0, 0.06, 1, 0.94])
+        plt.show()       
+    
+        # --- Table ---
+        table_data = [["Sub Head", "Count"]] + subhead_summary.values.tolist()
         axes[1].axis('off')
         tbl = axes[1].table(cellText=table_data, loc='center')
         tbl.auto_set_font_size(False)
         tbl.set_fontsize(10)
-        tbl.scale(1, 1.6)
+        tbl.scale(1, 1.5)
+    
+        # --- Annotations ---
+        dr = f"{start_date.strftime('%d-%m-%Y')} to {end_date.strftime('%d-%m-%Y')}"
+        heads = ", ".join(st.session_state.view_head_filter)
+        type_display = ", ".join(st.session_state.view_type_filter) if st.session_state.view_type_filter else "All Types"
+        location_display = st.session_state.view_location_filter or "All Locations"
+    
+        # Title
+        fig.suptitle("📊 Sub Head Breakdown", fontsize=14, fontweight="bold")
+        
+        # Dynamic bottom text
+        y_base = 0.02  # Push it slightly higher to avoid clipping
+        line_spacing = 0.015
+        
+        fig.text(
+            0.5, y_base + line_spacing,
+            f"Date Range: {dr}   |   Department: {heads}   |   Type: {type_display}   |   Location: {location_display}",
+            ha='center', fontsize=9, color='gray'
+        )
+        
+        if st.session_state.view_sub_filter:
+            fig.text(
+                0.5, y_base,
+                f"Sub Head Filter: {st.session_state.view_sub_filter}",
+                ha='center', fontsize=9, color='black', fontweight='bold'
+            )
 
-        plt.tight_layout(rect=[0, 0.05, 1, 0.90])
-        fig.text(0.5, 0.96, "📈 Pending vs Resolved Records", ha='center', fontsize=14, fontweight='bold')
-        fig.text(0.5, 0.03, f"Date Range: {dr}   |   Department: {heads}", ha='center', fontsize=10, color='gray')
 
+    
+        # --- Output ---
+        plt.tight_layout(rect=[0, 0.06, 1, 0.94])
         buf = BytesIO()
-        plt.savefig(buf, format="png", dpi=200)
+        plt.savefig(buf, format="png", dpi=200, bbox_inches="tight")
         buf.seek(0)
         plt.close()
+    
         st.image(buf, use_column_width=True)
-
         st.download_button(
-            "📥 Download Graph + Table (PNG)",
+            "📥 Download Sub Head Distribution (PNG)",
             data=buf,
-            file_name="status_summary.png",
+            file_name="subhead_distribution.png",
             mime="image/png"
         )
 
-        # ---------- NEW SUB HEAD DISTRIBUTION CHART ----------
-
-        import numpy as np
-        from io import BytesIO
-        
-        if st.session_state.view_head_filter:  # Show only if head is selected
-            st.markdown("### 📊 Sub Head Distribution")
-        
-            subhead_summary = (
-                filtered.groupby("Sub Head")["Sub Head"]
-                .count()
-                .reset_index(name="Count")
-                .sort_values(by="Count", ascending=False)
-            )
-            total_subs = subhead_summary["Count"].sum()
-        
-            fig2, axes2 = plt.subplots(1, 2, figsize=(12, 5))
-            axes2 = np.atleast_1d(axes2)  # ensure it's an array
-        
-            wedges, texts, autotexts = axes2[0].pie(
-            subhead_summary["Count"],
-            startangle=90,
-            colors=plt.cm.Paired.colors,
-            radius=0.9,
-            autopct=lambda pct: f"{pct:.1f}%"        )
-
-        
-            for i, (wedge, row) in enumerate(zip(wedges, subhead_summary.itertuples())):
-                ang = (wedge.theta2 + wedge.theta1) / 2.0
-                x = np.cos(np.deg2rad(ang))
-                y = np.sin(np.deg2rad(ang))
-        
-                label_x = 1.3 * np.sign(x)
-                label_y = 1.1 * y
-        
-                label = f"{row._1} ({row.Count})"
-                axes2[0].text(
-                    label_x, label_y, label,
-                    ha="left" if x > 0 else "right",
-                    va="center",
-                    fontsize=8,
-                    bbox=dict(facecolor="white", edgecolor="none", alpha=0.7, pad=1)
-                )
-        
-                axes2[0].annotate(
-                    "", xy=(0.9 * x, 0.9 * y), xytext=(label_x, label_y),
-                    arrowprops=dict(arrowstyle="-", lw=0.8, color="black")
-                )
-        
-            axes2[0].set_title("📈 Sub Head Distribution", fontsize=12, fontweight="bold")
-        
-            table_data = [["Sub Head", "Count"]] + subhead_summary.values.tolist()
-            table_data.append(["Total", total_subs])
-        
-            axes2[1].axis('off')
-            tbl = axes2[1].table(cellText=table_data, loc='center')
-            tbl.auto_set_font_size(False)
-            tbl.set_fontsize(10)
-            tbl.scale(1, 1.5)
-        
-            plt.tight_layout(rect=[0, 0.05, 1, 0.95])
-        
-            buf2 = BytesIO()
-            plt.savefig(buf2, format="png", dpi=200, bbox_inches="tight")
-            buf2.seek(0)
-            plt.close()
-            st.image(buf2, use_column_width=True)
-        
-            st.download_button(
-                "📥 Download Sub Head Distribution (PNG)",
-                data=buf2,
-                file_name="subhead_distribution.png",
-                mime="image/png"
-            )
 
 
 
@@ -605,9 +645,8 @@ if not editable_filtered.empty:
             use_container_width=True,
             hide_index=True,
             num_rows="fixed",
-            column_config={
-                "User Feedback/Remark": st.column_config.TextColumn("User Feedback/Remark")
-            },
+            column_config={"User Feedback/Remark": st.column_config.TextColumn("User Feedback/Remark")},
+          
             disabled=[
                 "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
                 "Deficiencies Noted", "Inspection By", "Action By", "Feedback"
@@ -667,9 +706,3 @@ if not editable_filtered.empty:
                         st.info("ℹ️ No changes detected to save.")
                 else:
                     st.warning("⚠️ No rows matched for update.")
-
-
-
-
-
-
