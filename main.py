@@ -207,18 +207,6 @@ def load_data():
         return pd.DataFrame(columns=REQUIRED_COLS)
 
 
-# --- UI PART ---
-st.markdown("### 📄 Data Preview")
-if st.button("🔄 Force Refresh Data"):
-    st.cache_data.clear()  # 🛠️ Purana cache hata do
-    st.session_state.df = load_data()  # Fresh load
-    st.success("✅ Data refreshed from Google Sheets!")
-
-# Normal load if no force refresh
-if "df" not in st.session_state:
-    st.session_state.df = load_data()
-
-st.dataframe(st.session_state.df)
 
 
 # ---------- SESSION STATE ----------
@@ -721,5 +709,6 @@ if not editable_filtered.empty:
                         st.info("ℹ️ No changes detected to save.")
                 else:
                     st.warning("⚠️ No rows matched for update.")
+
 
 
