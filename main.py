@@ -697,7 +697,7 @@ if not editable_filtered.empty:
                 st.success("✅ Data refreshed successfully!")
 
         if submitted:
-    # Make sure both edited_df and editable_filtered exist and have the expected column
+            # Make sure both edited_df and editable_filtered exist and have the expected column
             if "User Feedback/Remark" not in edited_df.columns or "Feedback" not in editable_filtered.columns:
                 st.error("⚠️ Required columns are missing from the data.")
             else:
@@ -721,6 +721,17 @@ if not editable_filtered.empty:
         
                             if not user_remark.strip():
                                 continue  # Skip empty remarks
+        
+                            # === Pertains to S&T check and update ===
+                            if "Pertains to S&T" in user_remark:
+                                st.session_state.df.at[idx, "Head"] = "SIGNAL & TELECOM"
+                                st.session_state.df.at[idx, "Action By"] = "Sr.DSTE"
+                                st.session_state.df.at[idx, "Sub Head"] = ""
+        
+                                diffs.at[idx, "Head"] = "SIGNAL & TELECOM"
+                                diffs.at[idx, "Action By"] = "Sr.DSTE"
+                                diffs.at[idx, "Sub Head"] = ""
+                            # === End of S&T logic ===
         
                             # Existing feedback text
                             existing_feedback = st.session_state.df.loc[idx, "Feedback"]
@@ -750,7 +761,6 @@ if not editable_filtered.empty:
                         st.info("ℹ️ No changes detected to save.")
                 else:
                     st.warning("⚠️ No rows matched for update.")
-
 
 st.markdown(
     """
