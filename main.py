@@ -620,7 +620,15 @@ with tabs[0]:
 def get_status(feedback, remark):
     status = classify_feedback(feedback, remark)  # tumhara existing function
     return status
+def color_status(val):
+    if val == "Pending":
+        return 'color: red; font-weight: bold'
+    elif val == "Resolved":
+        return 'color: green; font-weight: bold'
+    else:
+        return ''
 
+styled_df = editable_df.style.applymap(color_status, subset=['Status'])
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
 editable_filtered = filtered.copy()
@@ -725,6 +733,7 @@ if not editable_filtered.empty:
                         st.info("ℹ️ No changes detected to save.")
                 else:
                     st.warning("⚠️ No rows matched for update.")
+
 
 
 
