@@ -212,6 +212,29 @@ if "df" not in st.session_state:
 
 df = st.session_state.df
 
+# ---------- ADD STATUS COLUMN ----------
+df["Status"] = df.apply(
+    lambda row: classify_feedback(row["Feedback"], row["User Feedback/Remark"]),
+    axis=1
+)
+
+# ---------- COLOR STATUS FOR DISPLAY ----------
+def color_status(val):
+    if val == "Resolved":
+        return f"<span style='color: green; font-weight: bold;'>{val}</span>"
+    elif val == "Pending":
+        return f"<span style='color: red; font-weight: bold;'>{val}</span>"
+    else:
+        return f"<span style='color: gray;'>{val}</span>"
+
+df_display = df.copy()
+df_display["Status"] = df_display["Status"].apply(color_status)
+
+# ---------- DISPLAY TABLE WITH COLORS ----------
+st.markdown(
+    df_display.to_html(escape=False, index=False),
+    unsafe_allow_html=True
+)
 
 # ---------- UPDATE FEEDBACK ----------
 def update_feedback_column(edited_df):
@@ -706,6 +729,7 @@ if not editable_filtered.empty:
                         st.info("ℹ️ No changes detected to save.")
                 else:
                     st.warning("⚠️ No rows matched for update.")
+
 
 
 
