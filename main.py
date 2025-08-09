@@ -697,7 +697,7 @@ if not editable_filtered.empty:
                 st.success("✅ Data refreshed successfully!")
 
         if submitted:
-            # Make sure both edited_df and editable_filtered exist and have the expected column
+    # Make sure both edited_df and editable_filtered exist and have the expected column
             if "User Feedback/Remark" not in edited_df.columns or "Feedback" not in editable_filtered.columns:
                 st.error("⚠️ Required columns are missing from the data.")
             else:
@@ -722,22 +722,33 @@ if not editable_filtered.empty:
                             if not user_remark.strip():
                                 continue  # Skip empty remarks
         
-                            combined = user_remark.strip()
+                            # Existing feedback text
+                            existing_feedback = st.session_state.df.loc[idx, "Feedback"]
+        
+                            # Append with full stop separator if existing feedback is not empty
+                            if existing_feedback and existing_feedback.strip() != "":
+                                combined = existing_feedback.strip()
+                                if not combined.endswith("."):
+                                    combined += "."
+                                combined += " " + user_remark.strip()
+                            else:
+                                combined = user_remark.strip()
         
                             # Update in diffs
                             diffs.at[idx, "Feedback"] = combined
                             diffs.at[idx, "User Feedback/Remark"] = ""
         
-                            # Update in session state
+                            # Update in session state dataframe
                             st.session_state.df.loc[idx, "Feedback"] = combined
                             st.session_state.df.loc[idx, "User Feedback/Remark"] = ""
         
                         # Update Google Sheet
                         update_feedback_column(diffs)
         
-                        st.success(f"✅ Updated {len(diffs)} Feedback row(s) with replaced remarks.")
+                        st.success(f"✅ Updated {len(diffs)} Feedback row(s) with appended remarks.")
                     else:
                         st.info("ℹ️ No changes detected to save.")
                 else:
                     st.warning("⚠️ No rows matched for update.")
+
 
