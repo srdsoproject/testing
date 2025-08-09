@@ -163,13 +163,21 @@ def auto_classify(text):
     return "Pending"
 
 # ---------- LOAD DATA ----------
+import streamlit as st
+import pandas as pd
+import re
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import Pipeline
+
+# ---------- LOAD DATA ----------
 @st.cache_data(ttl=0)
 def load_data():
     REQUIRED_COLS = [
         "Date of Inspection", "Type of Inspection", "Location",
         "Head", "Sub Head", "Deficiencies Noted",
         "Inspection By", "Action By", "Feedback",
-        "User Feedback/Remark"
+        "User Feedback/Remark", "Status"
     ]
     try:
         data = sheet.get_all_values()
@@ -187,24 +195,57 @@ def load_data():
         df["Location"] = df["Location"].astype(str).str.strip().str.upper()
         df["_sheet_row"] = df.index + 2
 
-        # Apply auto classification
-        df["Status"] = df.apply(
-            lambda row: auto_classify(str(row["Feedback"]) + " " + str(row["User Feedback/Remark"])),
-            axis=1
-        )
-
         return df
     except Exception as e:
         st.error(f"❌ Error loading Google Sheet: {e}")
         return pd.DataFrame(columns=REQUIRED_COLS)
 
-# ---------- SESSION STATE ----------
+# ---------- ML MODEL TRAIN ----------
+@st.cache_resource
+def train_status_model(df):
+    train_df = df[df["Status"].isin(["Resolved", "Pending"])].copy()
+
+    if train_df.empty:
+        st.warning("⚠ No labeled data found to train model.")
+        return None
+
+    # Combine feedback + remarks
+    train_df["combined_text"] = (
+        train_df["Feedback"].astype(str) + " " + train_df["User Feedback/Remark"].astype(str)
+    )
+
+    X = train_df["combined_text"]
+    y = train_df["Status"]
+
+    model = Pipeline([
+        ("tfidf", TfidfVectorizer(ngram_range=(1, 2), max_features=500)),
+        ("clf", LogisticRegression(max_iter=500))
+    ])
+
+    model.fit(X, y)
+    return model
+
+# ---------- PREDICTION ----------
+def predict_status(model, feedback, remark):
+    if not model:
+        return "Pending"
+    text = str(feedback) + " " + str(remark)
+    return model.predict([text])[0]
+
+# ---------- MAIN EXECUTION ----------
 if "df" not in st.session_state:
     st.session_state.df = load_data()
 
 df = st.session_state.df
+model = train_status_model(df)
 
+# Predict where status is empty
+df["Status"] = df.apply(
+    lambda row: row["Status"] if row["Status"].strip() else predict_status(model, row["Feedback"], row["User Feedback/Remark"]),
+    axis=1
+)
 
+st.dataframe(df)
 
 # ---------- UPDATE FEEDBACK ----------
 def update_feedback_column(edited_df):
@@ -700,6 +741,7 @@ if not editable_filtered.empty:
                         st.info("ℹ️ No changes detected to save.")
                 else:
                     st.warning("⚠️ No rows matched for update.")
+
 
 
 
