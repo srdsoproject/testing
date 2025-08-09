@@ -355,7 +355,8 @@ with tabs[0]:
         if col not in df.columns:
             df[col] = ""
     
-    df["Status"] = df["Feedback"].apply(classify_feedback)
+    df["Status"] = df["Feedback"].apply(auto_classify)
+
     
     # ---------- FILTERS ----------
     start_date, end_date = st.date_input(
@@ -699,6 +700,7 @@ if not editable_filtered.empty:
                         st.info("ℹ️ No changes detected to save.")
                 else:
                     st.warning("⚠️ No rows matched for update.")
+
 
 
 
