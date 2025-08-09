@@ -120,61 +120,64 @@ ACTION_BY_LIST = [""] + ['DRM/SUR', 'ADRM', 'Sr.DSO', 'Sr.DOM', 'Sr.DEN/S', 'Sr.
                          'Sr.DEE/TRD', 'Sr.DEE/G', 'Sr.DME', 'Sr.DCM', 'Sr.DPO', 'Sr.DFM', 'Sr.DMM', 'DSC']
 
 # ---------- HELPER FUNCTIONS ----------
-def normalize(text):
-    if not isinstance(text, str):
-        return ""
-    text = text.lower()
-    text = re.sub(r'\s+', ' ', text)
-    return text.strip()
-
 import re
+import pandas as pd
+import streamlit as st
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import Pipeline
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
 
-def classify_feedback(feedback, user_remark=""):
-    def normalize(text):
-        return text.lower().strip()
-
-    def classify_single(text):
-        if not isinstance(text, str) or text.strip() == "":
-            return None  # Skip empty strings
-
-        text_normalized = normalize(text)
-        date_found = bool(re.search(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', text_normalized))
-
-        resolved_keywords = [
-            "attended", "solved", "submitted", "done", "completed", "informed", "confirmed by", "message given",
-            "tdc work completed", "replaced", "msg given", "msg sent", "counseled", "info shared", "communicated",
-            "counselled", "gate will be closed soon", "attending at the time", "handled", "resolved", "action taken",
-            "spoken to", "warned", "counselling", "hubli", "working normal", "met", "discussion held", "report sent",
-            "notified", "explained", "nil", "na", "tlc", "work completed", "acknowledged", "visited", "briefed",
-            "guided", "handover", "working properly", "checked found working", "supply restored", "noted please",
-            "updated by", "adv to", "counselled the staff", "complied", "checked and found", "maintained",
-            "for needful action", "provided at", "in working condition", "is working", "found working", "informed",
-            "equipment is working", "item is working", "as per plan", "putright", "put right", "operational feasibility",
-            "will be provided", "will be supplied shortly", "advised to ubl", 'Updated', 'updated'
-        ]
-
-        pending_keywords = [
-            "will be", "needful", "to be", "pending", "not done", "awaiting", "waiting", "yet to", "next time",
-            "follow up", "tdc", "t d c", "will attend", "will be attended", "scheduled", "reminder", "to inform",
-            "to counsel", "to submit", "to do", "to replace", "prior", "remains", "still", "under process", "not yet",
-            "to be done", "will be ensure", "during next", "action will be taken", "will be supplied shortly", 'not available','not updated'
-        ]
-
-        if any(kw in text_normalized for kw in resolved_keywords) or date_found:
-            return "Resolved"
-        if any(kw in text_normalized for kw in pending_keywords):
-            return "Pending"
+# ---------- ML MODEL TRAINING ----------
+@st.cache_resource
+def train_status_model(df):
+    # Ensure we have required columns
+    if "Status" not in df.columns:
+        st.warning("⚠️ No 'Status' column found in historical data — ML model cannot be trained.")
         return None
 
-    feedback_result = classify_single(feedback)
-    user_remark_result = classify_single(user_remark) if user_remark and user_remark.strip() else None
+    # Combine feedback + user remark into single text field
+    df["combined_text"] = (
+        df["Feedback"].fillna("").astype(str) + " " +
+        df["User Feedback/Remark"].fillna("").astype(str)
+    ).str.lower().str.strip()
 
-    if feedback_result == "Resolved" or user_remark_result == "Resolved":
-        return "Resolved"
-    if feedback_result == "Pending" or user_remark_result == "Pending":
-        return "Pending"
+    # Remove rows with empty text or missing status
+    df = df[(df["combined_text"].str.strip() != "") & (df["Status"].notna())]
 
-    return "Pending"  # Default fallback
+    if df.empty:
+        st.warning("⚠️ Not enough data to train ML model.")
+        return None
+
+    # Split data
+    X = df["combined_text"]
+    y = df["Status"].str.strip().str.capitalize()  # Ensure "Resolved" / "Pending"
+
+    # Build pipeline
+    model = Pipeline([
+        ("tfidf", TfidfVectorizer(ngram_range=(1, 2))),
+        ("clf", LogisticRegression(max_iter=500))
+    ])
+
+    model.fit(X, y)
+
+    # Optional: show accuracy for transparency
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    model.fit(X_train, y_train)
+    acc = accuracy_score(y_test, model.predict(X_test))
+    st.info(f"📊 ML Model trained — Accuracy: {acc*100:.2f}%")
+
+    return model
+
+# ---------- ML PREDICTION ----------
+def predict_status(model, feedback, user_remark=""):
+    if model is None:
+        return None
+    text = (str(feedback) + " " + str(user_remark)).lower().strip()
+    if not text:
+        return None
+    return model.predict([text])[0]
 
 # ---------- LOAD DATA ----------
 @st.cache_data(ttl=0)
@@ -183,7 +186,7 @@ def load_data():
         "Date of Inspection", "Type of Inspection", "Location",
         "Head", "Sub Head", "Deficiencies Noted",
         "Inspection By", "Action By", "Feedback",
-        "User Feedback/Remark"
+        "User Feedback/Remark", "Status"
     ]
     try:
         data = sheet.get_all_values()
@@ -206,14 +209,24 @@ def load_data():
         st.error(f"❌ Error loading Google Sheet: {e}")
         return pd.DataFrame(columns=REQUIRED_COLS)
 
-
-
-
 # ---------- SESSION STATE ----------
 if "df" not in st.session_state:
     st.session_state.df = load_data()
 
 df = st.session_state.df
+
+# ---------- TRAIN MODEL ----------
+ml_model = train_status_model(df)
+
+# ---------- APPLY PREDICTION ----------
+if ml_model:
+    df["ML Predicted Status"] = df.apply(
+        lambda row: predict_status(ml_model, row["Feedback"], row["User Feedback/Remark"]),
+        axis=1
+    )
+
+# Display
+st.dataframe(df)
 
 
 # ---------- UPDATE FEEDBACK ----------
@@ -709,6 +722,7 @@ if not editable_filtered.empty:
                         st.info("ℹ️ No changes detected to save.")
                 else:
                     st.warning("⚠️ No rows matched for update.")
+
 
 
 
