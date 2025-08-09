@@ -621,8 +621,6 @@ def get_status(feedback, remark):
     status = classify_feedback(feedback, remark)  # tumhara existing function
     return status
 
-
-styled_df = editable_df.style.applymap(color_status, subset=['Status'])
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
 editable_filtered = filtered.copy()
@@ -635,6 +633,7 @@ if not editable_filtered.empty:
             return 'color: green; font-weight: bold'
         else:
             return ''
+
     if "_sheet_row" not in editable_filtered.columns:
         editable_filtered["_sheet_row"] = editable_filtered.index + 2  
 
@@ -654,6 +653,11 @@ if not editable_filtered.empty:
             for _, row in editable_df.iterrows()
         ]
     )
+
+    # Abhi styling yahan karo, editable_df ke banne ke baad
+    styled_df = editable_df.style.applymap(color_status, subset=['Status'])
+    st.markdown("### 🖼️ Status Column with Colors (Readonly View)")
+    st.dataframe(styled_df, use_container_width=True)
 
     if (
         "feedback_buffer" not in st.session_state
@@ -734,6 +738,7 @@ if not editable_filtered.empty:
                         st.info("ℹ️ No changes detected to save.")
                 else:
                     st.warning("⚠️ No rows matched for update.")
+
 
 
 
