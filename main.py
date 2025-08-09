@@ -617,23 +617,24 @@ with tabs[0]:
 
 # Load once and keep in session
 # ---- Status calculation ----
+# ---- Status calculation ----
 def get_status(feedback, remark):
     status = classify_feedback(feedback, remark)  # tumhara existing function
     return status
+
+def color_text_status(status):
+    if status == "Pending":
+        return "🔴 Pending"
+    elif status == "Resolved":
+        return "🟢 Resolved"
+    else:
+        return status
 
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
 editable_filtered = filtered.copy()
 
 if not editable_filtered.empty:
-    def color_status(val):
-        if val == "Pending":
-            return 'color: red; font-weight: bold'
-        elif val == "Resolved":
-            return 'color: green; font-weight: bold'
-        else:
-            return ''
-
     if "_sheet_row" not in editable_filtered.columns:
         editable_filtered["_sheet_row"] = editable_filtered.index + 2  
 
@@ -654,10 +655,8 @@ if not editable_filtered.empty:
         ]
     )
 
-    # Abhi styling yahan karo, editable_df ke banne ke baad
-    styled_df = editable_df.style.applymap(color_status, subset=['Status'])
-    st.markdown("### 🖼️ Status Column with Colors (Readonly View)")
-    st.dataframe(styled_df, use_container_width=True)
+    # Add colored emoji prefix to Status for visual distinction
+    editable_df["Status"] = editable_df["Status"].apply(color_text_status)
 
     if (
         "feedback_buffer" not in st.session_state
@@ -676,7 +675,10 @@ if not editable_filtered.empty:
             num_rows="fixed",
             column_config={
                 "User Feedback/Remark": st.column_config.TextColumn("User Feedback/Remark"),
-                "Status": st.column_config.TextColumn("Status", help="Pending = Red, Resolved = Green")
+                "Status": st.column_config.TextColumn(
+                    "Status", 
+                    help="Pending = 🔴 Red, Resolved = 🟢 Green"
+                )
             },
             disabled=[
                 "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
@@ -738,14 +740,4 @@ if not editable_filtered.empty:
                         st.info("ℹ️ No changes detected to save.")
                 else:
                     st.warning("⚠️ No rows matched for update.")
-
-
-
-
-
-
-
-
-
-
 
