@@ -209,7 +209,10 @@ def train_status_model(df):
         st.warning("⚠ No labeled data found to train model.")
         return None
 
-    # Combine feedback + remarks
+    if train_df["Status"].nunique() < 2:
+        st.warning("⚠ Need at least 2 different statuses for training.")
+        return None
+
     train_df["combined_text"] = (
         train_df["Feedback"].astype(str) + " " + train_df["User Feedback/Remark"].astype(str)
     )
@@ -225,10 +228,11 @@ def train_status_model(df):
     model.fit(X, y)
     return model
 
+
 # ---------- PREDICTION ----------
 def predict_status(model, feedback, remark):
     if not model:
-        return "Pending"
+        return "Pending"  # Default fallback
     text = str(feedback) + " " + str(remark)
     return model.predict([text])[0]
 
@@ -741,6 +745,7 @@ if not editable_filtered.empty:
                         st.info("ℹ️ No changes detected to save.")
                 else:
                     st.warning("⚠️ No rows matched for update.")
+
 
 
 
