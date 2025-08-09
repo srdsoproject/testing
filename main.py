@@ -123,61 +123,44 @@ ACTION_BY_LIST = [""] + ['DRM/SUR', 'ADRM', 'Sr.DSO', 'Sr.DOM', 'Sr.DEN/S', 'Sr.
 import re
 import pandas as pd
 import streamlit as st
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
-from sklearn.pipeline import Pipeline
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
 
-# ---------- ML MODEL TRAINING ----------
-@st.cache_resource
-def train_status_model(df):
-    # Ensure we have required columns
-    if "Status" not in df.columns:
-        st.warning("⚠️ No 'Status' column found in historical data — ML model cannot be trained.")
-        return None
+# ---------- LIGHTWEIGHT TEXT CLASSIFIER ----------
+def auto_classify(text):
+    if not isinstance(text, str):
+        return "Pending"
 
-    # Combine feedback + user remark into single text field
-    df["combined_text"] = (
-        df["Feedback"].fillna("").astype(str) + " " +
-        df["User Feedback/Remark"].fillna("").astype(str)
-    ).str.lower().str.strip()
+    t = text.strip().lower()
 
-    # Remove rows with empty text or missing status
-    df = df[(df["combined_text"].str.strip() != "") & (df["Status"].notna())]
+    # Empty text = pending
+    if not t:
+        return "Pending"
 
-    if df.empty:
-        st.warning("⚠️ Not enough data to train ML model.")
-        return None
+    # Simple NLP-ish scoring
+    resolved_signals = [
+        r"\bcompleted\b", r"\bsolved\b", r"\bdone\b", r"\battended\b", r"\bresolved\b",
+        r"\bsubmitted\b", r"\bclosed\b", r"\bwork completed\b", r"\bfixed\b",
+        r"\bmessage given\b", r"\bnotified\b", r"\bvisited\b", r"\bconfirmed\b"
+    ]
+    pending_signals = [
+        r"\bwill be\b", r"\bpending\b", r"\bnot done\b", r"\bawaiting\b", r"\bstill\b",
+        r"\bnext time\b", r"\bfollow up\b", r"\bunder process\b", r"\bto be\b",
+        r"\bnot yet\b", r"\bscheduled\b", r"\bremains\b"
+    ]
 
-    # Split data
-    X = df["combined_text"]
-    y = df["Status"].str.strip().str.capitalize()  # Ensure "Resolved" / "Pending"
+    # If contains resolved pattern
+    if any(re.search(p, t) for p in resolved_signals):
+        return "Resolved"
 
-    # Build pipeline
-    model = Pipeline([
-        ("tfidf", TfidfVectorizer(ngram_range=(1, 2))),
-        ("clf", LogisticRegression(max_iter=500))
-    ])
+    # If contains pending pattern
+    if any(re.search(p, t) for p in pending_signals):
+        return "Pending"
 
-    model.fit(X, y)
+    # If it has a date -> assume resolved
+    if re.search(r"\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b", t):
+        return "Resolved"
 
-    # Optional: show accuracy for transparency
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    model.fit(X_train, y_train)
-    acc = accuracy_score(y_test, model.predict(X_test))
-    st.info(f"📊 ML Model trained — Accuracy: {acc*100:.2f}%")
-
-    return model
-
-# ---------- ML PREDICTION ----------
-def predict_status(model, feedback, user_remark=""):
-    if model is None:
-        return None
-    text = (str(feedback) + " " + str(user_remark)).lower().strip()
-    if not text:
-        return None
-    return model.predict([text])[0]
+    # Fallback → Pending
+    return "Pending"
 
 # ---------- LOAD DATA ----------
 @st.cache_data(ttl=0)
@@ -186,7 +169,7 @@ def load_data():
         "Date of Inspection", "Type of Inspection", "Location",
         "Head", "Sub Head", "Deficiencies Noted",
         "Inspection By", "Action By", "Feedback",
-        "User Feedback/Remark", "Status"
+        "User Feedback/Remark"
     ]
     try:
         data = sheet.get_all_values()
@@ -204,6 +187,12 @@ def load_data():
         df["Location"] = df["Location"].astype(str).str.strip().str.upper()
         df["_sheet_row"] = df.index + 2
 
+        # Apply auto classification
+        df["Status"] = df.apply(
+            lambda row: auto_classify(str(row["Feedback"]) + " " + str(row["User Feedback/Remark"])),
+            axis=1
+        )
+
         return df
     except Exception as e:
         st.error(f"❌ Error loading Google Sheet: {e}")
@@ -215,18 +204,6 @@ if "df" not in st.session_state:
 
 df = st.session_state.df
 
-# ---------- TRAIN MODEL ----------
-ml_model = train_status_model(df)
-
-# ---------- APPLY PREDICTION ----------
-if ml_model:
-    df["ML Predicted Status"] = df.apply(
-        lambda row: predict_status(ml_model, row["Feedback"], row["User Feedback/Remark"]),
-        axis=1
-    )
-
-# Display
-st.dataframe(df)
 
 
 # ---------- UPDATE FEEDBACK ----------
@@ -722,6 +699,7 @@ if not editable_filtered.empty:
                         st.info("ℹ️ No changes detected to save.")
                 else:
                     st.warning("⚠️ No rows matched for update.")
+
 
 
 
