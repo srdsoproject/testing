@@ -120,55 +120,61 @@ ACTION_BY_LIST = [""] + ['DRM/SUR', 'ADRM', 'Sr.DSO', 'Sr.DOM', 'Sr.DEN/S', 'Sr.
                          'Sr.DEE/TRD', 'Sr.DEE/G', 'Sr.DME', 'Sr.DCM', 'Sr.DPO', 'Sr.DFM', 'Sr.DMM', 'DSC']
 
 # ---------- HELPER FUNCTIONS ----------
-import re
-import pandas as pd
-import streamlit as st
-
-# ---------- LIGHTWEIGHT TEXT CLASSIFIER ----------
-def auto_classify(text):
+def normalize(text):
     if not isinstance(text, str):
-        return "Pending"
+        return ""
+    text = text.lower()
+    text = re.sub(r'\s+', ' ', text)
+    return text.strip()
 
-    t = text.strip().lower()
-
-    # Empty text = pending
-    if not t:
-        return "Pending"
-
-    # Simple NLP-ish scoring
-    resolved_signals = [
-        r"\bcompleted\b", r"\bsolved\b", r"\bdone\b", r"\battended\b", r"\bresolved\b",
-        r"\bsubmitted\b", r"\bclosed\b", r"\bwork completed\b", r"\bfixed\b",
-        r"\bmessage given\b", r"\bnotified\b", r"\bvisited\b", r"\bconfirmed\b"
-    ]
-    pending_signals = [
-        r"\bwill be\b", r"\bpending\b", r"\bnot done\b", r"\bawaiting\b", r"\bstill\b",
-        r"\bnext time\b", r"\bfollow up\b", r"\bunder process\b", r"\bto be\b",
-        r"\bnot yet\b", r"\bscheduled\b", r"\bremains\b"
-    ]
-
-    # If contains resolved pattern
-    if any(re.search(p, t) for p in resolved_signals):
-        return "Resolved"
-
-    # If contains pending pattern
-    if any(re.search(p, t) for p in pending_signals):
-        return "Pending"
-
-    # If it has a date -> assume resolved
-    if re.search(r"\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b", t):
-        return "Resolved"
-
-    # Fallback → Pending
-    return "Pending"
-
-# ---------- LOAD DATA ----------
-import streamlit as st
-import pandas as pd
 import re
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
-from sklearn.pipeline import Pipeline
+
+def classify_feedback(feedback, user_remark=""):
+    def normalize(text):
+        return text.lower().strip()
+
+    def classify_single(text):
+        if not isinstance(text, str) or text.strip() == "":
+            return None  # Skip empty strings
+
+        text_normalized = normalize(text)
+        date_found = bool(re.search(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', text_normalized))
+
+        resolved_keywords = [
+            "attended", "solved", "submitted", "done", "completed", "informed", "confirmed by", "message given",
+            "tdc work completed", "replaced", "msg given", "msg sent", "counseled", "info shared", "communicated",
+            "counselled", "gate will be closed soon", "attending at the time", "handled", "resolved", "action taken",
+            "spoken to", "warned", "counselling", "hubli", "working normal", "met", "discussion held", "report sent",
+            "notified", "explained", "nil", "na", "tlc", "work completed", "acknowledged", "visited", "briefed",
+            "guided", "handover", "working properly", "checked found working", "supply restored", "noted please",
+            "updated by", "adv to", "counselled the staff", "complied", "checked and found", "maintained",
+            "for needful action", "provided at", "in working condition", "is working", "found working", "informed",
+            "equipment is working", "item is working", "as per plan", "putright", "put right", "operational feasibility",
+            "will be provided", "will be supplied shortly", "advised to ubl", 'Updated', 'updated'
+        ]
+
+        pending_keywords = [
+            "will be", "needful", "to be", "pending", "not done", "awaiting", "waiting", "yet to", "next time",
+            "follow up", "tdc", "t d c", "will attend", "will be attended", "scheduled", "reminder", "to inform",
+            "to counsel", "to submit", "to do", "to replace", "prior", "remains", "still", "under process", "not yet",
+            "to be done", "will be ensure", "during next", "action will be taken", "will be supplied shortly", 'not available','not updated'
+        ]
+
+        if any(kw in text_normalized for kw in resolved_keywords) or date_found:
+            return "Resolved"
+        if any(kw in text_normalized for kw in pending_keywords):
+            return "Pending"
+        return None
+
+    feedback_result = classify_single(feedback)
+    user_remark_result = classify_single(user_remark) if user_remark and user_remark.strip() else None
+
+    if feedback_result == "Resolved" or user_remark_result == "Resolved":
+        return "Resolved"
+    if feedback_result == "Pending" or user_remark_result == "Pending":
+        return "Pending"
+
+    return "Pending"  # Default fallback
 
 # ---------- LOAD DATA ----------
 @st.cache_data(ttl=0)
@@ -177,7 +183,7 @@ def load_data():
         "Date of Inspection", "Type of Inspection", "Location",
         "Head", "Sub Head", "Deficiencies Noted",
         "Inspection By", "Action By", "Feedback",
-        "User Feedback/Remark", "Status"
+        "User Feedback/Remark"
     ]
     try:
         data = sheet.get_all_values()
@@ -200,56 +206,12 @@ def load_data():
         st.error(f"❌ Error loading Google Sheet: {e}")
         return pd.DataFrame(columns=REQUIRED_COLS)
 
-# ---------- ML MODEL TRAIN ----------
-@st.cache_resource
-def train_status_model(df):
-    train_df = df[df["Status"].isin(["Resolved", "Pending"])].copy()
-
-    if train_df.empty:
-        st.warning("⚠ No labeled data found to train model.")
-        return None
-
-    if train_df["Status"].nunique() < 2:
-        st.warning("⚠ Need at least 2 different statuses for training.")
-        return None
-
-    train_df["combined_text"] = (
-        train_df["Feedback"].astype(str) + " " + train_df["User Feedback/Remark"].astype(str)
-    )
-
-    X = train_df["combined_text"]
-    y = train_df["Status"]
-
-    model = Pipeline([
-        ("tfidf", TfidfVectorizer(ngram_range=(1, 2), max_features=500)),
-        ("clf", LogisticRegression(max_iter=500))
-    ])
-
-    model.fit(X, y)
-    return model
-
-
-# ---------- PREDICTION ----------
-def predict_status(model, feedback, remark):
-    if not model:
-        return "Pending"  # Default fallback
-    text = str(feedback) + " " + str(remark)
-    return model.predict([text])[0]
-
-# ---------- MAIN EXECUTION ----------
+# ---------- SESSION STATE ----------
 if "df" not in st.session_state:
     st.session_state.df = load_data()
 
 df = st.session_state.df
-model = train_status_model(df)
 
-# Predict where status is empty
-df["Status"] = df.apply(
-    lambda row: row["Status"] if row["Status"].strip() else predict_status(model, row["Feedback"], row["User Feedback/Remark"]),
-    axis=1
-)
-
-st.dataframe(df)
 
 # ---------- UPDATE FEEDBACK ----------
 def update_feedback_column(edited_df):
@@ -400,8 +362,7 @@ with tabs[0]:
         if col not in df.columns:
             df[col] = ""
     
-    df["Status"] = df["Feedback"].apply(auto_classify)
-
+    df["Status"] = df["Feedback"].apply(classify_feedback)
     
     # ---------- FILTERS ----------
     start_date, end_date = st.date_input(
@@ -745,11 +706,6 @@ if not editable_filtered.empty:
                         st.info("ℹ️ No changes detected to save.")
                 else:
                     st.warning("⚠️ No rows matched for update.")
-
-
-
-
-
 
 
 
