@@ -213,28 +213,6 @@ if "df" not in st.session_state:
 df = st.session_state.df
 
 # ---------- ADD STATUS COLUMN ----------
-df["Status"] = df.apply(
-    lambda row: classify_feedback(row["Feedback"], row["User Feedback/Remark"]),
-    axis=1
-)
-
-# ---------- COLOR STATUS FOR DISPLAY ----------
-def color_status(val):
-    if val == "Resolved":
-        return f"<span style='color: green; font-weight: bold;'>{val}</span>"
-    elif val == "Pending":
-        return f"<span style='color: red; font-weight: bold;'>{val}</span>"
-    else:
-        return f"<span style='color: gray;'>{val}</span>"
-
-df_display = df.copy()
-df_display["Status"] = df_display["Status"].apply(color_status)
-
-# ---------- DISPLAY TABLE WITH COLORS ----------
-st.markdown(
-    df_display.to_html(escape=False, index=False),
-    unsafe_allow_html=True
-)
 
 # ---------- UPDATE FEEDBACK ----------
 def update_feedback_column(edited_df):
@@ -642,40 +620,50 @@ st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
 editable_filtered = filtered.copy()
 
-if not editable_filtered.empty:
-    if "_sheet_row" not in editable_filtered.columns:
-        editable_filtered["_sheet_row"] = editable_filtered.index + 2  
+# ---- Status calculation ----
+def get_status(feedback, remark):
+    status = classify_feedback(feedback, remark)  # tumhara pehle se defined function
+    return status
 
-    display_cols = [
-        "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
-        "Deficiencies Noted", "Inspection By", "Action By", "Feedback",
-        "User Feedback/Remark"
+# ---- Inside your existing code ----
+display_cols = [
+    "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
+    "Deficiencies Noted", "Inspection By", "Action By", "Feedback",
+    "User Feedback/Remark"
+]
+
+editable_df = editable_filtered[display_cols].copy()
+
+# Insert Status column next to User Feedback/Remark
+editable_df.insert(
+    editable_df.columns.get_loc("User Feedback/Remark") + 1,
+    "Status",
+    [
+        get_status(row["Feedback"], row["User Feedback/Remark"])
+        for _, row in editable_df.iterrows()
     ]
-    editable_df = editable_filtered[display_cols].copy()
+)
 
-    if (
-        "feedback_buffer" not in st.session_state
-        or not st.session_state.feedback_buffer.equals(editable_df)
-    ):
-        st.session_state.feedback_buffer = editable_df.copy()
-
-    with st.form("feedback_form", clear_on_submit=False):
-        st.write("Rows:", st.session_state.feedback_buffer.shape[0], 
-                 " | Columns:", st.session_state.feedback_buffer.shape[1])
-    
-        edited_df = st.data_editor(
-            st.session_state.feedback_buffer,
-            use_container_width=True,
-            hide_index=True,
-            num_rows="fixed",
-            column_config={"User Feedback/Remark": st.column_config.TextColumn("User Feedback/Remark")},
-          
-            disabled=[
-                "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
-                "Deficiencies Noted", "Inspection By", "Action By", "Feedback"
-            ],
-            key="feedback_editor"
+# Show in editor with Status read-only
+edited_df = st.data_editor(
+    editable_df,
+    use_container_width=True,
+    hide_index=True,
+    num_rows="fixed",
+    column_config={
+        "User Feedback/Remark": st.column_config.TextColumn("User Feedback/Remark"),
+        "Status": st.column_config.TextColumn(
+            "Status",
+            help="Pending = Red, Resolved = Green"
         )
+    },
+    disabled=[
+        "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
+        "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "Status"
+    ],
+    key="feedback_editor"
+)
+
         col1, col2 = st.columns([1, 1])
         with col1:
             submitted = st.form_submit_button("✅ Submit Feedback")
@@ -729,6 +717,7 @@ if not editable_filtered.empty:
                         st.info("ℹ️ No changes detected to save.")
                 else:
                     st.warning("⚠️ No rows matched for update.")
+
 
 
 
