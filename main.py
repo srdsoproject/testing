@@ -218,6 +218,7 @@ df = st.session_state.df
 def update_feedback_column(edited_df):
     header = sheet.row_values(1)
 
+    # Get column indices (+1 because gspread is 1-based)
     try:
         feedback_col = header.index("Feedback") + 1
     except ValueError:
@@ -230,25 +231,59 @@ def update_feedback_column(edited_df):
         st.error("⚠️ 'User Feedback/Remark' column not found")
         return
 
+    try:
+        head_col = header.index("Head") + 1
+    except ValueError:
+        st.error("⚠️ 'Head' column not found")
+        return
+
+    try:
+        action_by_col = header.index("Action By") + 1
+    except ValueError:
+        st.error("⚠️ 'Action By' column not found")
+        return
+
+    try:
+        sub_head_col = header.index("Sub Head") + 1
+    except ValueError:
+        st.error("⚠️ 'Sub Head' column not found")
+        return
+
     updates = []
     for _, row in edited_df.iterrows():
         row_number = int(row["_sheet_row"])
+
         feedback_value = row["Feedback"] if pd.notna(row["Feedback"]) else ""
         remark_value = row["User Feedback/Remark"] if pd.notna(row["User Feedback/Remark"]) else ""
+        head_value = row["Head"] if pd.notna(row["Head"]) else ""
+        action_by_value = row["Action By"] if pd.notna(row["Action By"]) else ""
+        sub_head_value = row["Sub Head"] if pd.notna(row["Sub Head"]) else ""
 
+        # Get A1 notation for each cell to update
         feedback_cell = gspread.utils.rowcol_to_a1(row_number, feedback_col)
         remark_cell = gspread.utils.rowcol_to_a1(row_number, remark_col)
+        head_cell = gspread.utils.rowcol_to_a1(row_number, head_col)
+        action_by_cell = gspread.utils.rowcol_to_a1(row_number, action_by_col)
+        sub_head_cell = gspread.utils.rowcol_to_a1(row_number, sub_head_col)
 
+        # Append all updates to batch list
         updates.append({"range": feedback_cell, "values": [[feedback_value]]})
         updates.append({"range": remark_cell, "values": [[remark_value]]})
+        updates.append({"range": head_cell, "values": [[head_value]]})
+        updates.append({"range": action_by_cell, "values": [[action_by_value]]})
+        updates.append({"range": sub_head_cell, "values": [[sub_head_value]]})
 
-        # Update session state again just to be safe
+        # Update session state just to keep data consistent
         st.session_state.df.loc[st.session_state.df["_sheet_row"] == row_number, "Feedback"] = feedback_value
         st.session_state.df.loc[st.session_state.df["_sheet_row"] == row_number, "User Feedback/Remark"] = remark_value
+        st.session_state.df.loc[st.session_state.df["_sheet_row"] == row_number, "Head"] = head_value
+        st.session_state.df.loc[st.session_state.df["_sheet_row"] == row_number, "Action By"] = action_by_value
+        st.session_state.df.loc[st.session_state.df["_sheet_row"] == row_number, "Sub Head"] = sub_head_value
 
     if updates:
         body = {"valueInputOption": "USER_ENTERED", "data": updates}
         sheet.spreadsheet.values_batch_update(body)
+
 
 
 def apply_common_filters(df, prefix=""):
@@ -770,4 +805,5 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
