@@ -626,43 +626,43 @@ def get_status(feedback, remark):
     return status
 
 # ---- Inside your existing code ----
-display_cols = [
-    "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
-    "Deficiencies Noted", "Inspection By", "Action By", "Feedback",
-    "User Feedback/Remark"
-]
-
-editable_df = editable_filtered[display_cols].copy()
-
-# Insert Status column next to User Feedback/Remark
-editable_df.insert(
-    editable_df.columns.get_loc("User Feedback/Remark") + 1,
-    "Status",
-    [
-        get_status(row["Feedback"], row["User Feedback/Remark"])
-        for _, row in editable_df.iterrows()
-    ]
-)
-
-# Show in editor with Status read-only
-edited_df = st.data_editor(
-    editable_df,
-    use_container_width=True,
-    hide_index=True,
-    num_rows="fixed",
-    column_config={
-        "User Feedback/Remark": st.column_config.TextColumn("User Feedback/Remark"),
-        "Status": st.column_config.TextColumn(
-            "Status",
-            help="Pending = Red, Resolved = Green"
-        )
-    },
-    disabled=[
+    display_cols = [
         "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
-        "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "Status"
-    ],
-    key="feedback_editor"
-)
+        "Deficiencies Noted", "Inspection By", "Action By", "Feedback",
+        "User Feedback/Remark"
+    ]
+    
+    editable_df = editable_filtered[display_cols].copy()
+    
+    # Insert Status column next to User Feedback/Remark
+    editable_df.insert(
+        editable_df.columns.get_loc("User Feedback/Remark") + 1,
+        "Status",
+        [
+            get_status(row["Feedback"], row["User Feedback/Remark"])
+            for _, row in editable_df.iterrows()
+        ]
+    )
+    
+    # Show in editor with Status read-only
+    edited_df = st.data_editor(
+        editable_df,
+        use_container_width=True,
+        hide_index=True,
+        num_rows="fixed",
+        column_config={
+            "User Feedback/Remark": st.column_config.TextColumn("User Feedback/Remark"),
+            "Status": st.column_config.TextColumn(
+                "Status",
+                help="Pending = Red, Resolved = Green"
+            )
+        },
+        disabled=[
+            "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
+            "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "Status"
+        ],
+        key="feedback_editor"
+    )
 
         col1, col2 = st.columns([1, 1])
         with col1:
@@ -717,6 +717,7 @@ edited_df = st.data_editor(
                         st.info("ℹ️ No changes detected to save.")
                 else:
                     st.warning("⚠️ No rows matched for update.")
+
 
 
 
