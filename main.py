@@ -785,7 +785,37 @@ if not editable_filtered.empty:
                                 diffs.at[idx, "Head"] = "OPTG"
                                 diffs.at[idx, "Action By"] = "Sr.DOM"
                                 diffs.at[idx, "Sub Head"] = ""
+
+                            
+                            if "Pertains to COMMERCIAL" in user_remark:
+                                st.session_state.df.at[idx, "Head"] = "COMMERCIAL"
+                                st.session_state.df.at[idx, "Action By"] = "Sr.DCM"
+                                st.session_state.df.at[idx, "Sub Head"] = ""
+                                st.session_state.df.at[idx, "Feedback"] = ""
         
+                                diffs.at[idx, "Head"] = "COMMERCIAL"
+                                diffs.at[idx, "Action By"] = "Sr.DCM"
+                                diffs.at[idx, "Sub Head"] = ""
+
+                            
+                            if "Pertains to ELECT/G" in user_remark:
+                                st.session_state.df.at[idx, "Head"] = "ELECT/G"
+                                st.session_state.df.at[idx, "Action By"] = "Sr.DEE/G"
+                                st.session_state.df.at[idx, "Sub Head"] = ""
+                                st.session_state.df.at[idx, "Feedback"] = ""
+        
+                                diffs.at[idx, "Head"] = "ELECT/G"
+                                diffs.at[idx, "Action By"] = "Sr.DEE/G"
+                                diffs.at[idx, "Sub Head"] = ""
+                            if "Pertains to ELECT/TRD" in user_remark:
+                                st.session_state.df.at[idx, "Head"] = "ELECT/TRD"
+                                st.session_state.df.at[idx, "Action By"] = "Sr.DEE/TRD"
+                                st.session_state.df.at[idx, "Sub Head"] = ""
+                                st.session_state.df.at[idx, "Feedback"] = ""
+        
+                                diffs.at[idx, "Head"] = "ELECT/TRD"
+                                diffs.at[idx, "Action By"] = "Sr.DEE/TRD"
+                                diffs.at[idx, "Sub Head"] = ""
                             # Existing feedback text
                             existing_feedback = st.session_state.df.loc[idx, "Feedback"]
         
@@ -823,6 +853,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
