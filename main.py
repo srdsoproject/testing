@@ -768,6 +768,15 @@ if not editable_filtered.empty:
                                 diffs.at[idx, "Action By"] = "Sr.DSTE"
                                 diffs.at[idx, "Sub Head"] = ""
                             # === End of S&T logic ===
+                            if "Pertains to OPTG" in user_remark:
+                                st.session_state.df.at[idx, "Head"] = "OPTG"
+                                st.session_state.df.at[idx, "Action By"] = "Sr.DOM"
+                                st.session_state.df.at[idx, "Sub Head"] = ""
+                                st.session_state.df.at[idx, "Feedback"] = ""
+        
+                                diffs.at[idx, "Head"] = "OPTG"
+                                diffs.at[idx, "Action By"] = "Sr.DOM"
+                                diffs.at[idx, "Sub Head"] = ""
         
                             # Existing feedback text
                             existing_feedback = st.session_state.df.loc[idx, "Feedback"]
@@ -806,6 +815,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
