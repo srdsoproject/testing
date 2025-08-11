@@ -164,7 +164,9 @@ def classify_feedback(feedback, user_remark=""):
     "to procure", "yet pending", "incomplete", "tentative", "ongoing", "in progress", "being done",
     "arranging", "waiting for", "subject to", "awaiting approval", "awaiting material", "awaiting confirmation",
     "next schedule", "planned for", "will arrange", "proposed date", "to complete", "to be completed",
-    "likely completion", "expected completion", "not received", "awaiting response",]
+    "likely completion", "expected completion", "not received", "awaiting response",    r"\b\d{1,2}[.]\d{1,2}[.]\d{2,4}\b",
+    r"\b\d{1,2}[/]\d{1,2}[/]\d{2,4}\b",
+    r"\b\d{1,2}[-]\d{1,2}[-]\d{2,4}\b"]
 
         if any(kw in text_normalized for kw in resolved_keywords) or date_found:
             return "Resolved"
@@ -821,6 +823,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
