@@ -154,11 +154,17 @@ def classify_feedback(feedback, user_remark=""):
         ]
 
         pending_keywords = [
-            "will be", "needful", "to be", "pending", "not done", "awaiting", "waiting", "yet to", "next time",
-            "follow up", "tdc.","tdc", "t d c", "will attend", "will be attended", "scheduled", "reminder", "to inform",
-            "to counsel", "to submit", "to do", "to replace", "prior", "remains", "still", "under process", "not yet",
-            "to be done", "will be ensure", "during next", "action will be taken", "will be supplied shortly", 'not available','not updated'
-        ]
+    # Explicit status phrases
+    "work is going on", "tdc given", "target date", "expected by", "likely by", "planned by",
+    "will be", "needful", "to be", "pending", "not done", "awaiting", "waiting", "yet to", "next time",
+    "follow up", "tdc.", "tdc", "t d c", "will attend", "will be attended", "scheduled", "reminder", "to inform",
+    "to counsel", "to submit", "to do", "to replace", "prior", "remains", "still", "under process", "not yet",
+    "to be done", "will ensure", "during next", "action will be taken", "will be supplied shortly", "not available",
+    "not updated", "progress", "under progress", "to arrange", "awaited", "material awaited", "approval awaited",
+    "to procure", "yet pending", "incomplete", "tentative", "ongoing", "in progress", "being done",
+    "arranging", "waiting for", "subject to", "awaiting approval", "awaiting material", "awaiting confirmation",
+    "next schedule", "planned for", "will arrange", "proposed date", "to complete", "to be completed",
+    "likely completion", "expected completion", "not received", "awaiting response",]
 
         if any(kw in text_normalized for kw in resolved_keywords) or date_found:
             return "Resolved"
@@ -815,6 +821,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
