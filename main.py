@@ -762,6 +762,7 @@ if not editable_filtered.empty:
                                 st.session_state.df.at[idx, "Head"] = "SIGNAL & TELECOM"
                                 st.session_state.df.at[idx, "Action By"] = "Sr.DSTE"
                                 st.session_state.df.at[idx, "Sub Head"] = ""
+                                st.session_state.df.at[idx, "Feedback"] = ""
         
                                 diffs.at[idx, "Head"] = "SIGNAL & TELECOM"
                                 diffs.at[idx, "Action By"] = "Sr.DSTE"
@@ -805,6 +806,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
