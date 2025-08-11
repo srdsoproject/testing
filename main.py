@@ -800,10 +800,11 @@ if not editable_filtered.empty:
 st.markdown(
     """
     <marquee behavior="scroll" direction="left" style="color: red; font-weight: bold; font-size:16px;">
-        For any correction in data, contact Safety Department on srdsosurproject@gmail.com
+        For any correction in data, contact Safety Department on sursafetyposition@gmail.com
     </marquee>
     """,
     unsafe_allow_html=True
 )
+
 
 
