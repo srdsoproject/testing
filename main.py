@@ -155,7 +155,7 @@ def classify_feedback(feedback, user_remark=""):
 
         pending_keywords = [
             "will be", "needful", "to be", "pending", "not done", "awaiting", "waiting", "yet to", "next time",
-            "follow up", "tdc", "t d c", "will attend", "will be attended", "scheduled", "reminder", "to inform",
+            "follow up", "tdc.","tdc", "t d c", "will attend", "will be attended", "scheduled", "reminder", "to inform",
             "to counsel", "to submit", "to do", "to replace", "prior", "remains", "still", "under process", "not yet",
             "to be done", "will be ensure", "during next", "action will be taken", "will be supplied shortly", 'not available','not updated'
         ]
@@ -815,6 +815,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
