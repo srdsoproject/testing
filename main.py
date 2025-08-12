@@ -138,6 +138,8 @@ def classify_feedback(feedback, user_remark=""):
             return None  # Skip empty strings
 
         text_normalized = normalize(text)
+
+        # Detect dates like 26/07/2025, 26-07-25, 26.07.25
         date_found = bool(re.search(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', text_normalized))
 
         resolved_keywords = [
@@ -150,33 +152,47 @@ def classify_feedback(feedback, user_remark=""):
             "updated by", "adv to", "counselled the staff", "complied", "checked and found", "maintained",
             "for needful action", "provided at", "in working condition", "is working", "found working", "informed",
             "equipment is working", "item is working", "as per plan", "putright", "put right", "operational feasibility",
-            "will be provided", "will be supplied shortly", "advised to ubl", 'Updated', 'updated'
+            "will be provided", "will be supplied shortly", "advised to ubl", "updated"
         ]
 
         pending_keywords = [
-    # Explicit status phrases
-    "work is going on", "tdc given", "target date", "expected by", "likely by", "planned by",
-    "will be", "needful", "to be", "pending", "not done", "awaiting", "waiting", "yet to", "next time",
-    "follow up", "tdc.", "tdc", "t d c", "will attend", "will be attended", "scheduled", "reminder", "to inform",
-    "to counsel", "to submit", "to do", "to replace", "prior", "remains", "still", "under process", "not yet",
-    "to be done", "will ensure", "during next", "action will be taken", "will be supplied shortly", "not available",
-    "not updated", "progress", "under progress", "to arrange", "awaited", "material awaited", "approval awaited",
-    "to procure", "yet pending", "incomplete", "tentative", "ongoing", "in progress", "being done",
-    "arranging", "waiting for", "subject to", "awaiting approval", "awaiting material", "awaiting confirmation",
-    "next schedule", "planned for", "will arrange", "proposed date", "to complete", "to be completed",
-    "likely completion", "expected completion", "not received", "awaiting response",    r"\b\d{1,2}[.]\d{1,2}[.]\d{2,4}\b",
-    r"\b\d{1,2}[/]\d{1,2}[/]\d{2,4}\b",
-    r"\b\d{1,2}[-]\d{1,2}[-]\d{2,4}\b"]
+            # Explicit status phrases
+            "work is going on", "tdc given", "target date", "expected by", "likely by", "planned by",
+            "will be", "needful", "to be", "pending", "not done", "awaiting", "waiting", "yet to", "next time",
+            "follow up", "tdc.", "tdc", "t d c", "will attend", "will be attended", "scheduled", "reminder", "to inform",
+            "to counsel", "to submit", "to do", "to replace", "prior", "remains", "still", "under process", "not yet",
+            "to be done", "will ensure", "during next", "action will be taken", "will be supplied shortly", "not available",
+            "not updated", "progress", "under progress", "to arrange", "awaited", "material awaited", "approval awaited",
+            "to procure", "yet pending", "incomplete", "tentative", "ongoing", "in progress", "being done",
+            "arranging", "waiting for", "subject to", "awaiting approval", "awaiting material", "awaiting confirmation",
+            "next schedule", "planned for", "will arrange", "proposed date", "to complete", "to be completed",
+            "likely completion", "expected completion", "not received", "awaiting response",
+            r"\b\d{1,2}[.]\d{1,2}[.]\d{2,4}\b",
+            r"\b\d{1,2}[/]\d{1,2}[/]\d{2,4}\b",
+            r"\b\d{1,2}[-]\d{1,2}[-]\d{2,4}\b"
+        ]
 
-        if any(kw in text_normalized for kw in resolved_keywords) or date_found:
-            return "Resolved"
+        # Check pending first
         if any(kw in text_normalized for kw in pending_keywords):
             return "Pending"
+
+        # Date-only means resolved — but if 'tdc' present, it's pending
+        if date_found:
+            if "tdc" in text_normalized:
+                return "Pending"
+            return "Resolved"
+
+        # Then check resolved keywords
+        if any(kw in text_normalized for kw in resolved_keywords):
+            return "Resolved"
+
         return None
 
+    # Check both feedback and user_remark
     feedback_result = classify_single(feedback)
     user_remark_result = classify_single(user_remark) if user_remark and user_remark.strip() else None
 
+    # Final decision
     if feedback_result == "Resolved" or user_remark_result == "Resolved":
         return "Resolved"
     if feedback_result == "Pending" or user_remark_result == "Pending":
@@ -853,6 +869,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
