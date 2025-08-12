@@ -135,20 +135,25 @@ def classify_feedback(feedback, user_remark=""):
 
     def classify_single(text):
         if not isinstance(text, str) or text.strip() == "":
-            return None  # Skip empty strings
+            return ""
         return normalize(text)
 
-    # Normalize inputs
-    feedback_normalized = classify_single(feedback) or ""
-    remark_normalized = classify_single(user_remark) or ""
+    feedback_normalized = classify_single(feedback)
+    remark_normalized = classify_single(user_remark)
 
-    # Special override across both feedback & user_remark
-    if "!" in feedback_normalized or "!" in remark_normalized:
-        if "#" in feedback_normalized or "#" in remark_normalized:
-            return "Resolved"  # # wins over !
+    # Combine to preserve order
+    combined_text = f"{feedback_normalized} {remark_normalized}".strip()
+
+    # Step 1: Latest symbol override
+    last_marker_match = re.findall(r"[!#]", combined_text)
+    if last_marker_match:
+        last_marker = last_marker_match[-1]
+        if last_marker == "#":
+            return "Resolved"
+        elif last_marker == "!":
+            return "Pending"
 
     def run_classification(text_normalized):
-        # Detect dates like 26/07/2025, 26-07-25, 26.07.25
         date_found = bool(re.search(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', text_normalized))
 
         resolved_keywords = [
@@ -161,11 +166,10 @@ def classify_feedback(feedback, user_remark=""):
             "updated by", "adv to", "counselled the staff", "complied", "checked and found", "maintained",
             "for needful action", "provided at", "in working condition", "is working", "found working", "informed",
             "equipment is working", "item is working", "as per plan", "putright", "put right", "operational feasibility",
-            "will be provided", "will be supplied shortly", "advised to ubl", "updated", '#'
+            "will be provided", "will be supplied shortly", "advised to ubl", "updated"
         ]
 
         pending_keywords = [
-            '!',
             "work is going on", "tdc given", "target date", "expected by", "likely by", "planned by",
             "will be", "needful", "to be", "pending", "not done", "awaiting", "waiting", "yet to", "next time",
             "follow up", "tdc.", "tdc", "t d c", "will attend", "will be attended", "scheduled", "reminder", "to inform",
@@ -175,43 +179,37 @@ def classify_feedback(feedback, user_remark=""):
             "to procure", "yet pending", "incomplete", "tentative", "ongoing", "in progress", "being done",
             "arranging", "waiting for", "subject to", "awaiting approval", "awaiting material", "awaiting confirmation",
             "next schedule", "planned for", "will arrange", "proposed date", "to complete", "to be completed",
-            "likely completion", "expected completion", "not received", "awaiting response",
-            r"\b\d{1,2}[.]\d{1,2}[.]\d{2,4}\b",
-            r"\b\d{1,2}[/]\d{1,2}[/]\d{2,4}\b",
-            r"\b\d{1,2}[-]\d{1,2}[-]\d{2,4}\b"
+            "likely completion", "expected completion", "not received", "awaiting response"
         ]
 
         # If TDC present and resolved keyword also present → Resolved
         if "tdc" in text_normalized and any(kw in text_normalized for kw in resolved_keywords):
             return "Resolved"
 
-        # Check pending first
         if any(kw in text_normalized for kw in pending_keywords):
             return "Pending"
 
-        # Date-only means resolved — but if 'tdc' present without resolved keyword, it's pending
         if date_found:
             if "tdc" in text_normalized:
                 return "Pending"
             return "Resolved"
 
-        # Then check resolved keywords
         if any(kw in text_normalized for kw in resolved_keywords):
             return "Resolved"
 
         return None
 
-    # Classify each individually
+    # Step 2: Fallback to normal classification if no !/# found
     feedback_result = run_classification(feedback_normalized)
     remark_result = run_classification(remark_normalized)
 
-    # Final decision — Resolved has priority over Pending
     if feedback_result == "Resolved" or remark_result == "Resolved":
         return "Resolved"
     if feedback_result == "Pending" or remark_result == "Pending":
         return "Pending"
 
-    return "Pending"  # Default fallback
+    return "Pending"
+
 
 
 
@@ -884,6 +882,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
