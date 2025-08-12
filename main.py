@@ -156,7 +156,6 @@ def classify_feedback(feedback, user_remark=""):
         ]
 
         pending_keywords = [
-            # Explicit status phrases
             "work is going on", "tdc given", "target date", "expected by", "likely by", "planned by",
             "will be", "needful", "to be", "pending", "not done", "awaiting", "waiting", "yet to", "next time",
             "follow up", "tdc.", "tdc", "t d c", "will attend", "will be attended", "scheduled", "reminder", "to inform",
@@ -172,11 +171,15 @@ def classify_feedback(feedback, user_remark=""):
             r"\b\d{1,2}[-]\d{1,2}[-]\d{2,4}\b"
         ]
 
+        # If TDC present and resolved keyword also present → Resolved
+        if "tdc" in text_normalized and any(kw in text_normalized for kw in resolved_keywords):
+            return "Resolved"
+
         # Check pending first
         if any(kw in text_normalized for kw in pending_keywords):
             return "Pending"
 
-        # Date-only means resolved — but if 'tdc' present, it's pending
+        # Date-only means resolved — but if 'tdc' present without resolved keyword, it's pending
         if date_found:
             if "tdc" in text_normalized:
                 return "Pending"
@@ -199,6 +202,7 @@ def classify_feedback(feedback, user_remark=""):
         return "Pending"
 
     return "Pending"  # Default fallback
+
 
 # ---------- LOAD DATA ----------
 @st.cache_data(ttl=0)
@@ -869,6 +873,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
