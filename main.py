@@ -138,6 +138,10 @@ def classify_feedback(feedback, user_remark=""):
             return ""
         return normalize(text)
 
+    # NEW: Clear feedback trigger
+    if isinstance(feedback, str) and feedback.strip() == "`":
+        return ""  # This will leave the cell blank
+
     feedback_normalized = classify_single(feedback)
     remark_normalized = classify_single(user_remark)
 
@@ -209,6 +213,7 @@ def classify_feedback(feedback, user_remark=""):
         return "Pending"
 
     return "Pending"
+
 
 
 
@@ -882,6 +887,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
