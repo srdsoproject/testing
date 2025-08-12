@@ -136,13 +136,18 @@ def classify_feedback(feedback, user_remark=""):
     def classify_single(text):
         if not isinstance(text, str) or text.strip() == "":
             return None  # Skip empty strings
+        return normalize(text)
 
-        text_normalized = normalize(text)
+    # Normalize inputs
+    feedback_normalized = classify_single(feedback) or ""
+    remark_normalized = classify_single(user_remark) or ""
 
-        # Special override: if both "!" and "#" are present → Resolved
-        if "!" in text_normalized and "#" in text_normalized:
-            return "Resolved"
+    # Special override across both feedback & user_remark
+    if "!" in feedback_normalized or "!" in remark_normalized:
+        if "#" in feedback_normalized or "#" in remark_normalized:
+            return "Resolved"  # # wins over !
 
+    def run_classification(text_normalized):
         # Detect dates like 26/07/2025, 26-07-25, 26.07.25
         date_found = bool(re.search(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', text_normalized))
 
@@ -196,14 +201,14 @@ def classify_feedback(feedback, user_remark=""):
 
         return None
 
-    # Check both feedback and user_remark
-    feedback_result = classify_single(feedback)
-    user_remark_result = classify_single(user_remark) if user_remark and user_remark.strip() else None
+    # Classify each individually
+    feedback_result = run_classification(feedback_normalized)
+    remark_result = run_classification(remark_normalized)
 
-    # Final decision
-    if feedback_result == "Resolved" or user_remark_result == "Resolved":
+    # Final decision — Resolved has priority over Pending
+    if feedback_result == "Resolved" or remark_result == "Resolved":
         return "Resolved"
-    if feedback_result == "Pending" or user_remark_result == "Pending":
+    if feedback_result == "Pending" or remark_result == "Pending":
         return "Pending"
 
     return "Pending"  # Default fallback
@@ -879,6 +884,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
