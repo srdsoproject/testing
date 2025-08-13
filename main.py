@@ -42,6 +42,22 @@ if not st.session_state.logged_in:
             else:
                 st.error("❌ Invalid email or password.")
     st.stop()
+if not st.session_state.loading_done:
+    placeholder = st.empty()
+    with placeholder.container():
+        st.markdown(
+            """
+            <div style="text-align:center;">
+                <h2>Loading Safety Inspection App...</h2>
+                <img src="https://i.gifer.com/YCZH.gif" width="120">
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        time.sleep(2)  # Simulate loading delay
+    placeholder.empty()
+    st.session_state.loading_done = True
+    st.rerun()
 
 # ---------- GOOGLE SHEETS CONNECTION ----------
 import streamlit as st
@@ -887,6 +903,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
