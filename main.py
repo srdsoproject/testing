@@ -42,6 +42,7 @@ if not st.session_state.logged_in:
             else:
                 st.error("❌ Invalid email or password.")
     st.stop()
+# Show loading screen only once after login
 if not st.session_state.loading_done:
     placeholder = st.empty()
     with placeholder.container():
@@ -58,8 +59,7 @@ if not st.session_state.loading_done:
     placeholder.empty()
     st.session_state.loading_done = True
     st.rerun()
-st.title(f"Welcome {st.session_state.user['name']}")
-st.write("This is the main app content.")
+
 # ---------- GOOGLE SHEETS CONNECTION ----------
 import streamlit as st
 import pandas as pd
@@ -904,6 +904,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
