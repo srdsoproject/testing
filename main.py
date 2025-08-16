@@ -667,13 +667,13 @@ with tabs[0]:
                 for cell in row:
                     cell.alignment = Alignment(wrap_text=True, vertical="top")
         
-        towb.seek(0)
-        st.download_button(
-            "📥 Export Filtered Records to Excel",
-            data=towb,
-            file_name="filtered_records.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+            towb.seek(0)
+            st.download_button(
+                "📥 Export Filtered Records to Excel",
+                data=towb,
+                file_name="filtered_records.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
         st.markdown("### 📄 Preview of Filtered Records")
 
 # Load once and keep in session
@@ -921,4 +921,5 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
