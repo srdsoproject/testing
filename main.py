@@ -691,131 +691,226 @@ def color_text_status(status):
     else:
         return status
 
-with tabs[1]:
-    st.subheader("✏️ Editable Records")
+st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
-    # ---------- SCROLLBAR STYLING ----------
-    st.markdown(
-        """
-        <style>
-        /* Width of the scrollbar */
-        ::-webkit-scrollbar {
-            width: 16px;   /* vertical scrollbar width */
-            height: 16px;  /* horizontal scrollbar height */
-        }
+# 👇 Custom CSS for scrollbar (make it bigger & visible)
+st.markdown(
+    """
+    <style>
+    /* For WebKit browsers (Chrome, Edge, Safari) */
+    ::-webkit-scrollbar {
+        width: 16px;   /* vertical scrollbar width */
+        height: 16px;  /* horizontal scrollbar height */
+    }
+    ::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 8px;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 8px;
+        border: 3px solid #f1f1f1;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
 
-        /* Track (background of scrollbar) */
-        ::-webkit-scrollbar-track {
-            background: #1e1e1e;
-            border-radius: 8px;
-        }
+    /* For Firefox */
+    * {
+        scrollbar-width: auto;
+        scrollbar-color: #888 #f1f1f1;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
-        /* Handle (scroll thumb) */
-        ::-webkit-scrollbar-thumb {
-            background: #aaa;   /* lighter gray for dark theme */
-            border-radius: 8px;
-            border: 3px solid #1e1e1e;
-        }
+editable_filtered = filtered.copy()
 
-        /* Handle on hover */
-        ::-webkit-scrollbar-thumb:hover {
-            background: #fff;   /* bright white on hover */
-        }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
+if not editable_filtered.empty:
+    if "_sheet_row" not in editable_filtered.columns:
+        editable_filtered["_sheet_row"] = editable_filtered.index + 2  
 
-    # ---------- FILTERED DATA ----------
-    editable_filtered = df[
-        (df["Date of Inspection"] >= pd.to_datetime(start_date)) &
-        (df["Date of Inspection"] <= pd.to_datetime(end_date))
-    ]
-
-    if st.session_state.view_type_filter:
-        editable_filtered = editable_filtered[
-            editable_filtered["Type of Inspection"].isin(st.session_state.view_type_filter)
-        ]
-    if st.session_state.view_location_filter:
-        editable_filtered = editable_filtered[
-            editable_filtered["Location"] == st.session_state.view_location_filter
-        ]
-    if st.session_state.view_head_filter:
-        editable_filtered = editable_filtered[
-            editable_filtered["Head"].isin(st.session_state.view_head_filter)
-        ]
-    if st.session_state.view_sub_filter:
-        editable_filtered = editable_filtered[
-            editable_filtered["Sub Head"] == st.session_state.view_sub_filter
-        ]
-    if selected_status != "All":
-        editable_filtered = editable_filtered[
-            editable_filtered["Status"] == selected_status
-        ]
-
-    # apply global/common filters
-    editable_filtered = apply_common_filters(editable_filtered, prefix="view_")
-
-    # remove newlines in text columns
-    editable_filtered = editable_filtered.applymap(
-        lambda x: x.replace("\n", " ") if isinstance(x, str) else x
-    )
-
-    # sort by inspection date
-    editable_filtered = editable_filtered.sort_values("Date of Inspection")
-
-    # ---------- DISPLAY COLUMNS ----------
     display_cols = [
-        "Date of Inspection",
-        "Type of Inspection",
-        "Location",
-        "Head",
-        "Sub Head",
-        "Deficiencies Noted",
-        "Inspection By",
-        "Action By",
-        "Feedback",
+        "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
+        "Deficiencies Noted", "Inspection By", "Action By", "Feedback",
         "User Feedback/Remark"
     ]
-
-    # ensure missing columns exist
-    for col in display_cols:
-        if col not in editable_filtered.columns:
-            editable_filtered[col] = ""
-
-    # ✅ FIX: show only date (no time)
-    if "Date of Inspection" in editable_filtered.columns:
-        editable_filtered["Date of Inspection"] = pd.to_datetime(
-            editable_filtered["Date of Inspection"], errors="coerce"
-        ).dt.date
-
-    # final editable dataframe
     editable_df = editable_filtered[display_cols].copy()
 
-    # ---------- EDITABLE TABLE ----------
-    edited_df = st.data_editor(
-        editable_df,
-        num_rows="dynamic",
-        use_container_width=True,
-        hide_index=True,
-        height=600,  # adjustable height for more rows
-        column_config={
-            "Date of Inspection": st.column_config.DateColumn(format="DD.MM.YYYY"),
-            "Deficiencies Noted": st.column_config.TextColumn(width="large"),
-            "User Feedback/Remark": st.column_config.TextColumn(width="large"),
-        }
+    # Insert Status column next to User Feedback/Remark
+    editable_df.insert(
+        editable_df.columns.get_loc("User Feedback/Remark") + 1,
+        "Status",
+        [
+            get_status(row["Feedback"], row["User Feedback/Remark"])
+            for _, row in editable_df.iterrows()
+        ]
     )
 
-    # ---------- SAVE CHANGES ----------
-    if st.button("💾 Save Changes"):
-        try:
-            # Update original df with edited values
-            for idx, row in edited_df.iterrows():
-                orig_idx = editable_filtered.iloc[idx]["_original_sheet_index"]
-                for col in display_cols:
-                    st.session_state.df.at[orig_idx, col] = row[col]
+    # Add colored emoji prefix to Status for visual distinction
+    editable_df["Status"] = editable_df["Status"].apply(color_text_status)
 
-            st.success("✅ Changes saved successfully!")
+    if (
+        "feedback_buffer" not in st.session_state
+        or not st.session_state.feedback_buffer.equals(editable_df)
+    ):
+        st.session_state.feedback_buffer = editable_df.copy()
 
-        except Exception as e:
-            st.error(f"❌ Error saving changes: {e}")
+    with st.form("feedback_form", clear_on_submit=False):
+        st.write("Rows:", st.session_state.feedback_buffer.shape[0], 
+                 " | Columns:", st.session_state.feedback_buffer.shape[1])
+    
+        edited_df = st.data_editor(
+            st.session_state.feedback_buffer,
+            use_container_width=True,
+            hide_index=True,
+            num_rows="fixed",
+            height=600,   # 👈 Fixed height so scrollbar is stable
+            column_config={
+                "User Feedback/Remark": st.column_config.TextColumn("User Feedback/Remark"),
+                "Status": st.column_config.TextColumn(
+                    "Status", 
+                    help="Pending = 🔴 Red, Resolved = 🟢 Green"
+                )
+            },
+            disabled=[
+                "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
+                "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "Status"
+            ],
+            key="feedback_editor"
+        )
+
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            submitted = st.form_submit_button("✅ Submit Feedback")
+        with col2:
+            refresh_clicked = st.form_submit_button("🔄 Refresh Data")
+            if refresh_clicked:
+                st.session_state.df = load_data()
+                st.success("✅ Data refreshed successfully!")
+
+        if submitted:
+            # Make sure both edited_df and editable_filtered exist and have the expected column
+            if "User Feedback/Remark" not in edited_df.columns or "Feedback" not in editable_filtered.columns:
+                st.error("⚠️ Required columns are missing from the data.")
+            else:
+                # Calculate the common index
+                common_index = edited_df.index.intersection(editable_filtered.index)
+        
+                if len(common_index) > 0:
+                    # Check which rows actually changed
+                    diffs_mask = (
+                        editable_filtered.loc[common_index, "User Feedback/Remark"]
+                        != edited_df.loc[common_index, "User Feedback/Remark"]
+                    )
+        
+                    if diffs_mask.any():
+                        diffs = edited_df.loc[common_index[diffs_mask]].copy()
+                        diffs["_sheet_row"] = editable_filtered.loc[diffs.index, "_sheet_row"].values
+                        diffs["User Feedback/Remark"] = diffs["User Feedback/Remark"].fillna("")
+        
+                        for idx, row in diffs.iterrows():
+                            user_remark = row["User Feedback/Remark"]
+        
+                            if not user_remark.strip():
+                                continue  # Skip empty remarks
+        
+                            # === Pertains to S&T check and update ===
+                            if "Pertains to S&T" in user_remark:
+                                st.session_state.df.at[idx, "Head"] = "SIGNAL & TELECOM"
+                                st.session_state.df.at[idx, "Action By"] = "Sr.DSTE"
+                                st.session_state.df.at[idx, "Sub Head"] = ""
+                                st.session_state.df.at[idx, "Feedback"] = ""
+        
+                                diffs.at[idx, "Head"] = "SIGNAL & TELECOM"
+                                diffs.at[idx, "Action By"] = "Sr.DSTE"
+                                diffs.at[idx, "Sub Head"] = ""
+                            # === End of S&T logic ===
+                            if "Pertains to OPTG" in user_remark:
+                                st.session_state.df.at[idx, "Head"] = "OPTG"
+                                st.session_state.df.at[idx, "Action By"] = "Sr.DOM"
+                                st.session_state.df.at[idx, "Sub Head"] = ""
+                                st.session_state.df.at[idx, "Feedback"] = ""
+        
+                                diffs.at[idx, "Head"] = "OPTG"
+                                diffs.at[idx, "Action By"] = "Sr.DOM"
+                                diffs.at[idx, "Sub Head"] = ""
+
+                            
+                            if "Pertains to COMMERCIAL" in user_remark:
+                                st.session_state.df.at[idx, "Head"] = "COMMERCIAL"
+                                st.session_state.df.at[idx, "Action By"] = "Sr.DCM"
+                                st.session_state.df.at[idx, "Sub Head"] = ""
+                                st.session_state.df.at[idx, "Feedback"] = ""
+        
+                                diffs.at[idx, "Head"] = "COMMERCIAL"
+                                diffs.at[idx, "Action By"] = "Sr.DCM"
+                                diffs.at[idx, "Sub Head"] = ""
+
+                            
+                            if "Pertains to ELECT/G" in user_remark:
+                                st.session_state.df.at[idx, "Head"] = "ELECT/G"
+                                st.session_state.df.at[idx, "Action By"] = "Sr.DEE/G"
+                                st.session_state.df.at[idx, "Sub Head"] = ""
+                                st.session_state.df.at[idx, "Feedback"] = ""
+        
+                                diffs.at[idx, "Head"] = "ELECT/G"
+                                diffs.at[idx, "Action By"] = "Sr.DEE/G"
+                                diffs.at[idx, "Sub Head"] = ""
+                            if "Pertains to ELECT/TRD" in user_remark:
+                                st.session_state.df.at[idx, "Head"] = "ELECT/TRD"
+                                st.session_state.df.at[idx, "Action By"] = "Sr.DEE/TRD"
+                                st.session_state.df.at[idx, "Sub Head"] = ""
+                                st.session_state.df.at[idx, "Feedback"] = ""
+        
+                                diffs.at[idx, "Head"] = "ELECT/TRD"
+                                diffs.at[idx, "Action By"] = "Sr.DEE/TRD"
+                                diffs.at[idx, "Sub Head"] = ""
+                            # Existing feedback text
+                            existing_feedback = st.session_state.df.loc[idx, "Feedback"]
+        
+                            # Append with full stop separator if existing feedback is not empty
+                            if existing_feedback and existing_feedback.strip() != "":
+                                combined = existing_feedback.strip()
+                                if not combined.endswith("."):
+                                    combined += "."
+                                combined += " " + user_remark.strip()
+                            else:
+                                combined = user_remark.strip()
+        
+                            # Update in diffs
+                            diffs.at[idx, "Feedback"] = combined
+                            diffs.at[idx, "User Feedback/Remark"] = ""
+        
+                            # Update in session state dataframe
+                            st.session_state.df.loc[idx, "Feedback"] = combined
+                            st.session_state.df.loc[idx, "User Feedback/Remark"] = ""
+        
+                        # Update Google Sheet
+                        update_feedback_column(diffs)
+        
+                        st.success(f"✅ Updated {len(diffs)} Feedback row(s) with appended remarks.")
+                    else:
+                        st.info("ℹ️ No changes detected to save.")
+                else:
+                    st.warning("⚠️ No rows matched for update.")
+
+st.markdown(
+    """
+    <marquee behavior="scroll" direction="left" style="color: red; font-weight: bold; font-size:16px;">
+        For any correction in data, contact Safety Department on sursafetyposition@gmail.com
+    </marquee>
+    """,
+    unsafe_allow_html=True
+)
+
+
+
+
+
+
+
+
+
+#new
