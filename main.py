@@ -809,23 +809,7 @@ if not editable_filtered.empty:
             if refresh_clicked:
                 st.session_state.df = load_data()
                 st.success("✅ Data refreshed successfully!")
-        with col3:
-            download_clicked = st.form_submit_button("📥 Download Records (Excel)")
-            if download_clicked:
-                import io
-                from openpyxl import Workbook
-
-                output = io.BytesIO()
-                wb = Workbook()
-                ws = wb.active
-                ws.title = "Editable Records"
-
-                # Write headers
-                ws.append(list(st.session_state.feedback_buffer.columns))
-
-                # Write data rows
-                for row in st.session_state.feedback_buffer.itertuples(index=False, name=None):
-                    ws.append(row)
+     
                 
 
         if submitted:
@@ -943,6 +927,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
