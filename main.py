@@ -642,7 +642,7 @@ with tabs[0]:
             mime="image/png"
         )
 
-        towb.seek(0)
+        #towb.seek(0)
         st.download_button(
                 "📥 Export Filtered Records to Excel",
                 data=towb,
@@ -921,6 +921,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
