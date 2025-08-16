@@ -524,22 +524,7 @@ with tabs[0]:
         import matplotlib.pyplot as plt
         import numpy as np
         
-        # Filter and sort data
-        import pandas as pd
-        import matplotlib.pyplot as plt
-        import numpy as np
-        
-        # Data preparation
-        import matplotlib.pyplot as plt
-        import numpy as np
-        import pandas as pd
-        
-        # --- Sample DataFrame (replace this with your actual subhead_summary) ---
-        # subhead_summary = pd.DataFrame({
-        #     'Sub Head': ['A', 'B', 'C', 'D', 'E', 'F', 'Total'],
-        #     'Count': [50, 30, 10, 5, 3, 2, 100]
-        # })
-        
+       
         # --- Pie chart data preparation ---
         pie_data = subhead_summary[subhead_summary["Sub Head"] != "Total"].copy()
         pie_data = pie_data.sort_values("Count", ascending=False)
@@ -888,6 +873,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
