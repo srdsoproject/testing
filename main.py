@@ -682,6 +682,13 @@ def color_text_status(status):
         return "🟢 Resolved"
     else:
         return status
+import io
+
+def convert_df_to_excel(df):
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="FeedbackData")
+    return output.getvalue()
 st.download_button(
         label="📥 Download Records (Excel)",
         data=convert_df_to_excel(st.session_state.df),
@@ -944,6 +951,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
