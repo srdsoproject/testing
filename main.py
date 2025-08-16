@@ -691,30 +691,28 @@ def color_text_status(status):
     else:
         return status
 
+import streamlit as st
+import pandas as pd
+
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
-# 👇 CSS: wrap + auto-expand rows + make scroll area bigger
+# 👇 CSS: allow auto-wrap in Streamlit Data Editor
 st.markdown(
     """
     <style>
-    /* Wrap text inside table cells */
+    /* Wrap text in table cells */
     .stDataFrame td, .stDataFrame th {
         white-space: normal !important;
         word-wrap: break-word !important;
         overflow-wrap: break-word !important;
-        max-width: 600px !important;   /* wider cells */
+        max-width: 500px !important;
         height: auto !important;
         line-height: 1.4 !important;
     }
 
-    /* Ensure row height grows automatically */
+    /* Ensure row expands for wrapped text */
     .stDataFrame tr {
         height: auto !important;
-    }
-
-    /* Increase height of table container */
-    div[data-testid="stDataFrame"] div[role="grid"] {
-        height: 1000px !important;   /* show more rows */
     }
     </style>
     """,
@@ -734,7 +732,7 @@ if not editable_filtered.empty:
     ]
     editable_df = editable_filtered[display_cols].copy()
 
-    # ✅ Format dates
+    # ✅ Format dates to only show date (no time)
     if "Date of Inspection" in editable_df.columns:
         editable_df["Date of Inspection"] = pd.to_datetime(
             editable_df["Date of Inspection"], errors="coerce"
@@ -761,25 +759,28 @@ if not editable_filtered.empty:
         st.write("Rows:", st.session_state.feedback_buffer.shape[0], 
                  " | Columns:", st.session_state.feedback_buffer.shape[1])
     
-        # 👇 Increase height to show more rows at once
+        # 👇 Data editor with selective multiline wrapping
         edited_df = st.data_editor(
             st.session_state.feedback_buffer,
             use_container_width=True,
             hide_index=True,
             num_rows="fixed",
-            height=1000,   # make editor taller
+            height=1000,   # show more rows at once
             column_config={
                 "User Feedback/Remark": st.column_config.TextColumn(
                     "User Feedback/Remark",
-                    width="xlarge"
+                    width="xlarge",
+                    multiline=False   # single-line input
                 ),
                 "Feedback": st.column_config.TextColumn(
                     "Feedback",
-                    width="xlarge"
+                    width="xlarge",
+                    multiline=True    # 👈 expanded, wrapped
                 ),
                 "Deficiencies Noted": st.column_config.TextColumn(
                     "Deficiencies Noted",
-                    width="xlarge"
+                    width="xlarge",
+                    multiline=True    # 👈 expanded, wrapped
                 ),
                 "Status": st.column_config.TextColumn(
                     "Status", 
@@ -821,6 +822,7 @@ if not editable_filtered.empty:
         
                         for idx, row in diffs.iterrows():
                             user_remark = row["User Feedback/Remark"]
+        
                             if not user_remark.strip():
                                 continue  # Skip empty remarks
         
@@ -833,7 +835,7 @@ if not editable_filtered.empty:
                                 diffs.at[idx, "Head"] = "SIGNAL & TELECOM"
                                 diffs.at[idx, "Action By"] = "Sr.DSTE"
                                 diffs.at[idx, "Sub Head"] = ""
-        
+
                             if "Pertains to OPTG" in user_remark:
                                 st.session_state.df.at[idx, "Head"] = "OPTG"
                                 st.session_state.df.at[idx, "Action By"] = "Sr.DOM"
@@ -842,7 +844,7 @@ if not editable_filtered.empty:
                                 diffs.at[idx, "Head"] = "OPTG"
                                 diffs.at[idx, "Action By"] = "Sr.DOM"
                                 diffs.at[idx, "Sub Head"] = ""
-        
+
                             if "Pertains to COMMERCIAL" in user_remark:
                                 st.session_state.df.at[idx, "Head"] = "COMMERCIAL"
                                 st.session_state.df.at[idx, "Action By"] = "Sr.DCM"
@@ -851,7 +853,7 @@ if not editable_filtered.empty:
                                 diffs.at[idx, "Head"] = "COMMERCIAL"
                                 diffs.at[idx, "Action By"] = "Sr.DCM"
                                 diffs.at[idx, "Sub Head"] = ""
-        
+
                             if "Pertains to ELECT/G" in user_remark:
                                 st.session_state.df.at[idx, "Head"] = "ELECT/G"
                                 st.session_state.df.at[idx, "Action By"] = "Sr.DEE/G"
@@ -860,7 +862,7 @@ if not editable_filtered.empty:
                                 diffs.at[idx, "Head"] = "ELECT/G"
                                 diffs.at[idx, "Action By"] = "Sr.DEE/G"
                                 diffs.at[idx, "Sub Head"] = ""
-        
+
                             if "Pertains to ELECT/TRD" in user_remark:
                                 st.session_state.df.at[idx, "Head"] = "ELECT/TRD"
                                 st.session_state.df.at[idx, "Action By"] = "Sr.DEE/TRD"
@@ -869,8 +871,8 @@ if not editable_filtered.empty:
                                 diffs.at[idx, "Head"] = "ELECT/TRD"
                                 diffs.at[idx, "Action By"] = "Sr.DEE/TRD"
                                 diffs.at[idx, "Sub Head"] = ""
-        
-                            # Existing feedback text
+
+                            # === Merge remark into Feedback ===
                             existing_feedback = st.session_state.df.loc[idx, "Feedback"]
                             if existing_feedback and existing_feedback.strip() != "":
                                 combined = existing_feedback.strip()
@@ -887,6 +889,7 @@ if not editable_filtered.empty:
                             st.session_state.df.loc[idx, "User Feedback/Remark"] = ""
         
                         update_feedback_column(diffs)
+        
                         st.success(f"✅ Updated {len(diffs)} Feedback row(s) with appended remarks.")
                     else:
                         st.info("ℹ️ No changes detected to save.")
@@ -901,3 +904,4 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
