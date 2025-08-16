@@ -691,28 +691,34 @@ def color_text_status(status):
     else:
         return status
 
-import streamlit as st
-import pandas as pd
-
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
-# 👇 CSS: allow auto-wrap in Streamlit Data Editor
+# 👇 Custom CSS for scrollbar (make it bigger & visible)
 st.markdown(
     """
     <style>
-    /* Wrap text in table cells */
-    .stDataFrame td, .stDataFrame th {
-        white-space: normal !important;
-        word-wrap: break-word !important;
-        overflow-wrap: break-word !important;
-        max-width: 500px !important;
-        height: auto !important;
-        line-height: 1.4 !important;
+    /* For WebKit browsers (Chrome, Edge, Safari) */
+    ::-webkit-scrollbar {
+        width: 16px;   /* vertical scrollbar width */
+        height: 16px;  /* horizontal scrollbar height */
+    }
+    ::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 8px;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 8px;
+        border: 3px solid #f1f1f1;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: #555;
     }
 
-    /* Ensure row expands for wrapped text */
-    .stDataFrame tr {
-        height: auto !important;
+    /* For Firefox */
+    * {
+        scrollbar-width: auto;
+        scrollbar-color: #888 #f1f1f1;
     }
     </style>
     """,
@@ -732,13 +738,13 @@ if not editable_filtered.empty:
     ]
     editable_df = editable_filtered[display_cols].copy()
 
-    # ✅ Format dates to only show date (no time)
+    # ✅ Fix: format "Date of Inspection" to only show date
     if "Date of Inspection" in editable_df.columns:
         editable_df["Date of Inspection"] = pd.to_datetime(
             editable_df["Date of Inspection"], errors="coerce"
         ).dt.date
 
-    # Insert Status column
+    # Insert Status column next to User Feedback/Remark
     editable_df.insert(
         editable_df.columns.get_loc("User Feedback/Remark") + 1,
         "Status",
@@ -747,6 +753,8 @@ if not editable_filtered.empty:
             for _, row in editable_df.iterrows()
         ]
     )
+
+    # Add colored emoji prefix to Status for visual distinction
     editable_df["Status"] = editable_df["Status"].apply(color_text_status)
 
     if (
@@ -759,38 +767,25 @@ if not editable_filtered.empty:
         st.write("Rows:", st.session_state.feedback_buffer.shape[0], 
                  " | Columns:", st.session_state.feedback_buffer.shape[1])
     
-        # 👇 Data editor with selective multiline wrapping
         edited_df = st.data_editor(
-        st.session_state.feedback_buffer,
-        use_container_width=True,
-        hide_index=True,
-        num_rows="fixed",
-        height=1000,   # show more rows at once
-        column_config={
-            "User Feedback/Remark": st.column_config.TextColumn(
-                "User Feedback/Remark",
-                width="xlarge"
-            ),
-            "Feedback": st.column_config.TextColumn(
-                "Feedback",
-                width="xlarge"
-            ),
-            "Deficiencies Noted": st.column_config.TextColumn(
-                "Deficiencies Noted",
-                width="xlarge"
-            ),
-            "Status": st.column_config.TextColumn(
-                "Status", 
-                help="Pending = 🔴 Red, Resolved = 🟢 Green"
-            )
-        },
-        disabled=[
-            "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
-            "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "Status"
-        ],
-        key="feedback_editor"
-    )
-
+            st.session_state.feedback_buffer,
+            use_container_width=True,
+            hide_index=True,
+            num_rows="fixed",
+            height=600,   # 👈 Fixed height so scrollbar is stable
+            column_config={
+                "User Feedback/Remark": st.column_config.TextColumn("User Feedback/Remark"),
+                "Status": st.column_config.TextColumn(
+                    "Status", 
+                    help="Pending = 🔴 Red, Resolved = 🟢 Green"
+                )
+            },
+            disabled=[
+                "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
+                "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "Status"
+            ],
+            key="feedback_editor"
+        )
 
         col1, col2 = st.columns([1, 1])
         with col1:
@@ -802,12 +797,15 @@ if not editable_filtered.empty:
                 st.success("✅ Data refreshed successfully!")
 
         if submitted:
+            # Make sure both edited_df and editable_filtered exist and have the expected column
             if "User Feedback/Remark" not in edited_df.columns or "Feedback" not in editable_filtered.columns:
                 st.error("⚠️ Required columns are missing from the data.")
             else:
+                # Calculate the common index
                 common_index = edited_df.index.intersection(editable_filtered.index)
         
                 if len(common_index) > 0:
+                    # Check which rows actually changed
                     diffs_mask = (
                         editable_filtered.loc[common_index, "User Feedback/Remark"]
                         != edited_df.loc[common_index, "User Feedback/Remark"]
@@ -824,54 +822,61 @@ if not editable_filtered.empty:
                             if not user_remark.strip():
                                 continue  # Skip empty remarks
         
-                            # === Pertains logic ===
+                            # === Pertains to S&T check and update ===
                             if "Pertains to S&T" in user_remark:
                                 st.session_state.df.at[idx, "Head"] = "SIGNAL & TELECOM"
                                 st.session_state.df.at[idx, "Action By"] = "Sr.DSTE"
                                 st.session_state.df.at[idx, "Sub Head"] = ""
                                 st.session_state.df.at[idx, "Feedback"] = ""
+        
                                 diffs.at[idx, "Head"] = "SIGNAL & TELECOM"
                                 diffs.at[idx, "Action By"] = "Sr.DSTE"
                                 diffs.at[idx, "Sub Head"] = ""
-
+                            # === End of S&T logic ===
                             if "Pertains to OPTG" in user_remark:
                                 st.session_state.df.at[idx, "Head"] = "OPTG"
                                 st.session_state.df.at[idx, "Action By"] = "Sr.DOM"
                                 st.session_state.df.at[idx, "Sub Head"] = ""
                                 st.session_state.df.at[idx, "Feedback"] = ""
+        
                                 diffs.at[idx, "Head"] = "OPTG"
                                 diffs.at[idx, "Action By"] = "Sr.DOM"
                                 diffs.at[idx, "Sub Head"] = ""
 
+                            
                             if "Pertains to COMMERCIAL" in user_remark:
                                 st.session_state.df.at[idx, "Head"] = "COMMERCIAL"
                                 st.session_state.df.at[idx, "Action By"] = "Sr.DCM"
                                 st.session_state.df.at[idx, "Sub Head"] = ""
                                 st.session_state.df.at[idx, "Feedback"] = ""
+        
                                 diffs.at[idx, "Head"] = "COMMERCIAL"
                                 diffs.at[idx, "Action By"] = "Sr.DCM"
                                 diffs.at[idx, "Sub Head"] = ""
 
+                            
                             if "Pertains to ELECT/G" in user_remark:
                                 st.session_state.df.at[idx, "Head"] = "ELECT/G"
                                 st.session_state.df.at[idx, "Action By"] = "Sr.DEE/G"
                                 st.session_state.df.at[idx, "Sub Head"] = ""
                                 st.session_state.df.at[idx, "Feedback"] = ""
+        
                                 diffs.at[idx, "Head"] = "ELECT/G"
                                 diffs.at[idx, "Action By"] = "Sr.DEE/G"
                                 diffs.at[idx, "Sub Head"] = ""
-
                             if "Pertains to ELECT/TRD" in user_remark:
                                 st.session_state.df.at[idx, "Head"] = "ELECT/TRD"
                                 st.session_state.df.at[idx, "Action By"] = "Sr.DEE/TRD"
                                 st.session_state.df.at[idx, "Sub Head"] = ""
                                 st.session_state.df.at[idx, "Feedback"] = ""
+        
                                 diffs.at[idx, "Head"] = "ELECT/TRD"
                                 diffs.at[idx, "Action By"] = "Sr.DEE/TRD"
                                 diffs.at[idx, "Sub Head"] = ""
-
-                            # === Merge remark into Feedback ===
+                            # Existing feedback text
                             existing_feedback = st.session_state.df.loc[idx, "Feedback"]
+        
+                            # Append with full stop separator if existing feedback is not empty
                             if existing_feedback and existing_feedback.strip() != "":
                                 combined = existing_feedback.strip()
                                 if not combined.endswith("."):
@@ -880,12 +885,15 @@ if not editable_filtered.empty:
                             else:
                                 combined = user_remark.strip()
         
+                            # Update in diffs
                             diffs.at[idx, "Feedback"] = combined
                             diffs.at[idx, "User Feedback/Remark"] = ""
         
+                            # Update in session state dataframe
                             st.session_state.df.loc[idx, "Feedback"] = combined
                             st.session_state.df.loc[idx, "User Feedback/Remark"] = ""
         
+                        # Update Google Sheet
                         update_feedback_column(diffs)
         
                         st.success(f"✅ Updated {len(diffs)} Feedback row(s) with appended remarks.")
@@ -902,5 +910,3 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
-
