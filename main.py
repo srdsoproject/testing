@@ -722,10 +722,18 @@ st.markdown(
     }
 
     /* 👇 Force text wrapping inside data_editor cells */
-    .stDataFrame td {
+    .stDataFrame td, .stDataFrame th {
         white-space: normal !important;
         word-wrap: break-word !important;
-        max-width: 400px !important; /* Adjust max width */
+        overflow-wrap: break-word !important;
+        max-width: 450px !important;  /* control wrapping width */
+        height: auto !important;      /* auto row height */
+        line-height: 1.4 !important;
+    }
+
+    /* Expand row height dynamically */
+    .stDataFrame tr {
+        height: auto !important;
     }
     </style>
     """,
@@ -779,11 +787,11 @@ if not editable_filtered.empty:
             use_container_width=True,
             hide_index=True,
             num_rows="fixed",
-            height=600,   # 👈 Fixed height so scrollbar is stable
+            height=600,   # 👈 keeps scroll stable
             column_config={
                 "User Feedback/Remark": st.column_config.TextColumn(
                     "User Feedback/Remark",
-                    width="large"
+                    width="xlarge"   # ✅ allow bigger width
                 ),
                 "Feedback": st.column_config.TextColumn(
                     "Feedback",
