@@ -642,14 +642,6 @@ with tabs[0]:
             mime="image/png"
         )
 
-        #towb.seek(0)
-        st.download_button(
-                "📥 Export Filtered Records to Excel",
-                data=towb,
-                file_name="filtered_records.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-        st.markdown("### 📄 Preview of Filtered Records")
 
 
 
@@ -921,6 +913,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
