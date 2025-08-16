@@ -693,7 +693,7 @@ def color_text_status(status):
 
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
-# 👇 Custom CSS for scrollbar (make it bigger & visible)
+# 🎨 Custom CSS for scrollbar
 st.markdown(
     """
     <style>
@@ -719,6 +719,17 @@ st.markdown(
     * {
         scrollbar-width: auto;
         scrollbar-color: #888 #f1f1f1;
+    }
+
+    /* 👇 Increase row height & enable wrapping ONLY for Deficiencies Noted & Feedback */
+    div[data-testid="stDataFrame"] div[role="cell"]:has(div:contains("Deficiencies Noted")),
+    div[data-testid="stDataFrame"] div[role="cell"]:has(div:contains("Feedback")) {
+        min-height: 70px !important;
+        height: auto !important;
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        line-height: 1.6 !important;
+        vertical-align: top !important;
     }
     </style>
     """,
@@ -910,3 +921,4 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
