@@ -217,8 +217,6 @@ def classify_feedback(feedback, user_remark=""):
 
 
 
-
-
 # ---------- LOAD DATA ----------
 @st.cache_data(ttl=0)
 def load_data():
@@ -393,7 +391,7 @@ def apply_common_filters(df, prefix=""):
 st.title("📋 Welcome to S.A.R.A.L (Safety Abnormality Report & Action List)")
 tabs = st.tabs(["📊 View Records"])
 with tabs[0]:
-# ---------- GLOBAL CONSTANTS ----------
+    # ---------- GLOBAL CONSTANTS ----------
     VALID_INSPECTIONS = [
         "FOOTPLATE INSPECTION", "STATION INSPECTION", "LC GATE INSPECTION",
         "MISC", "COACHING DEPOT", "ON TRAIN", "SURPRISE/AMBUSH INSPECTION", "WORKSITE INSPECTION"
@@ -444,11 +442,9 @@ with tabs[0]:
     df["Status"] = df["Feedback"].apply(classify_feedback)
     
     # ---------- FILTERS ----------
-    start_date, end_date = st.date_input(
-        "📅 Select Date Range",
-        [df["Date of Inspection"].min(), df["Date of Inspection"].max()],
-        key="view_date_range"
-    )
+    # Use full available date range automatically (no date picker)
+    start_date = df["Date of Inspection"].min()
+    end_date = df["Date of Inspection"].max()
     
     col1, col2 = st.columns(2)
     col1.multiselect("Type of Inspection", VALID_INSPECTIONS, key="view_type_filter")
@@ -463,8 +459,8 @@ with tabs[0]:
     
     # ---------- APPLY FILTERS ----------
     filtered = df[
-        (df["Date of Inspection"] >= pd.to_datetime(start_date)) &
-        (df["Date of Inspection"] <= pd.to_datetime(end_date))
+        (df["Date of Inspection"] >= start_date) &
+        (df["Date of Inspection"] <= end_date)
     ]
     
     if st.session_state.view_type_filter:
@@ -484,6 +480,7 @@ with tabs[0]:
 
     st.write(f"🔹 Showing {len(filtered)} record(s) from **{start_date.strftime('%d.%m.%Y')}** "
              f"to **{end_date.strftime('%d.%m.%Y')}**")
+    
     # Summary Counts Display
     pending_count = (filtered["Status"] == "Pending").sum()
     resolved_count = (filtered["Status"] == "Resolved").sum()
@@ -493,6 +490,7 @@ with tabs[0]:
     col_a.metric("🟨 Pending", pending_count)
     col_b.metric("🟩 Resolved", resolved_count)
     col_c.metric("📊 Total Records", total_count)
+
 
 
         # ---------- NEW SUB HEAD DISTRIBUTION CHART ----------
@@ -873,6 +871,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
