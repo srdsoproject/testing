@@ -693,7 +693,7 @@ def color_text_status(status):
 
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
-# 👇 Custom CSS for scrollbar (make it bigger & visible)
+# 👇 Custom CSS for scrollbar + auto-wrap in table cells
 st.markdown(
     """
     <style>
@@ -719,6 +719,13 @@ st.markdown(
     * {
         scrollbar-width: auto;
         scrollbar-color: #888 #f1f1f1;
+    }
+
+    /* 👇 Force text wrapping inside data_editor cells */
+    .stDataFrame td {
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        max-width: 400px !important; /* Adjust max width */
     }
     </style>
     """,
@@ -774,7 +781,18 @@ if not editable_filtered.empty:
             num_rows="fixed",
             height=600,   # 👈 Fixed height so scrollbar is stable
             column_config={
-                "User Feedback/Remark": st.column_config.TextColumn("User Feedback/Remark"),
+                "User Feedback/Remark": st.column_config.TextColumn(
+                    "User Feedback/Remark",
+                    width="large"
+                ),
+                "Feedback": st.column_config.TextColumn(
+                    "Feedback",
+                    width="xlarge"
+                ),
+                "Deficiencies Noted": st.column_config.TextColumn(
+                    "Deficiencies Noted",
+                    width="xlarge"
+                ),
                 "Status": st.column_config.TextColumn(
                     "Status", 
                     help="Pending = 🔴 Red, Resolved = 🟢 Green"
@@ -910,4 +928,6 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
+
 
