@@ -738,6 +738,12 @@ if not editable_filtered.empty:
     ]
     editable_df = editable_filtered[display_cols].copy()
 
+    # ✅ Fix: format "Date of Inspection" to only show date
+    if "Date of Inspection" in editable_df.columns:
+        editable_df["Date of Inspection"] = pd.to_datetime(
+            editable_df["Date of Inspection"], errors="coerce"
+        ).dt.date
+
     # Insert Status column next to User Feedback/Remark
     editable_df.insert(
         editable_df.columns.get_loc("User Feedback/Remark") + 1,
@@ -905,12 +911,3 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-
-
-
-
-
-
-
-
-#new
