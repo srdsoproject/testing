@@ -790,7 +790,7 @@ if not editable_filtered.empty:
             key="feedback_editor"
         )
 
-        col1, col2 = st.columns([1, 1])
+        col1, col2, col3 = st.columns([1, 1, 1])
         with col1:
             submitted = st.form_submit_button("✅ Submit Feedback")
         with col2:
@@ -798,6 +798,31 @@ if not editable_filtered.empty:
             if refresh_clicked:
                 st.session_state.df = load_data()
                 st.success("✅ Data refreshed successfully!")
+        with col3:
+            download_clicked = st.form_submit_button("📥 Download Records (Excel)")
+            if download_clicked:
+                import io
+                from openpyxl import Workbook
+
+                output = io.BytesIO()
+                wb = Workbook()
+                ws = wb.active
+                ws.title = "Editable Records"
+
+                # Write headers
+                ws.append(list(st.session_state.feedback_buffer.columns))
+
+                # Write data rows
+                for row in st.session_state.feedback_buffer.itertuples(index=False, name=None):
+                    ws.append(row)
+
+                wb.save(output)
+                st.download_button(
+                    label="📥 Download Excel File",
+                    data=output.getvalue(),
+                    file_name="editable_records.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
 
         if submitted:
             # Make sure both edited_df and editable_filtered exist and have the expected column
@@ -905,6 +930,7 @@ if not editable_filtered.empty:
                 else:
                     st.warning("⚠️ No rows matched for update.")
 
+
 st.markdown(
     """
     <marquee behavior="scroll" direction="left" style="color: red; font-weight: bold; font-size:16px;">
@@ -913,6 +939,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
