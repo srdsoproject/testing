@@ -761,38 +761,36 @@ if not editable_filtered.empty:
     
         # 👇 Data editor with selective multiline wrapping
         edited_df = st.data_editor(
-            st.session_state.feedback_buffer,
-            use_container_width=True,
-            hide_index=True,
-            num_rows="fixed",
-            height=1000,   # show more rows at once
-            column_config={
-                "User Feedback/Remark": st.column_config.TextColumn(
-                    "User Feedback/Remark",
-                    width="xlarge",
-                    multiline=False   # single-line input
-                ),
-                "Feedback": st.column_config.TextColumn(
-                    "Feedback",
-                    width="xlarge",
-                    multiline=True    # 👈 expanded, wrapped
-                ),
-                "Deficiencies Noted": st.column_config.TextColumn(
-                    "Deficiencies Noted",
-                    width="xlarge",
-                    multiline=True    # 👈 expanded, wrapped
-                ),
-                "Status": st.column_config.TextColumn(
-                    "Status", 
-                    help="Pending = 🔴 Red, Resolved = 🟢 Green"
-                )
-            },
-            disabled=[
-                "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
-                "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "Status"
-            ],
-            key="feedback_editor"
-        )
+        st.session_state.feedback_buffer,
+        use_container_width=True,
+        hide_index=True,
+        num_rows="fixed",
+        height=1000,   # show more rows at once
+        column_config={
+            "User Feedback/Remark": st.column_config.TextColumn(
+                "User Feedback/Remark",
+                width="xlarge"
+            ),
+            "Feedback": st.column_config.TextColumn(
+                "Feedback",
+                width="xlarge"
+            ),
+            "Deficiencies Noted": st.column_config.TextColumn(
+                "Deficiencies Noted",
+                width="xlarge"
+            ),
+            "Status": st.column_config.TextColumn(
+                "Status", 
+                help="Pending = 🔴 Red, Resolved = 🟢 Green"
+            )
+        },
+        disabled=[
+            "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
+            "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "Status"
+        ],
+        key="feedback_editor"
+    )
+
 
         col1, col2 = st.columns([1, 1])
         with col1:
@@ -904,4 +902,5 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
