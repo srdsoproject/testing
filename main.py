@@ -826,21 +826,7 @@ if not editable_filtered.empty:
                 # Write data rows
                 for row in st.session_state.feedback_buffer.itertuples(index=False, name=None):
                     ws.append(row)
-                import io
-                def convert_df_to_excel(df):
-                    output = io.BytesIO()
-                    with pd.ExcelWriter(output, engine="openpyxl") as writer:
-                        df.to_excel(writer, index=False, sheet_name="EditableRecords")
-                    return output.getvalue()
-
                 
-                wb.save(output)
-                st.download_button(
-                    label="📥 Download Excel File",
-                    data=output.getvalue(),
-                    file_name="editable_records.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
 
         if submitted:
             # Make sure both edited_df and editable_filtered exist and have the expected column
@@ -957,6 +943,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
