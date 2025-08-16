@@ -697,48 +697,50 @@ st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 st.markdown(
     """
     <style>
-    /* For WebKit browsers (Chrome, Edge, Safari) */
-    ::-webkit-scrollbar {
-        width: 16px;   /* vertical scrollbar width */
-        height: 16px;  /* horizontal scrollbar height */
+    /* Target only the data editor container */
+    div[data-testid="stDataFrame"] ::-webkit-scrollbar {
+        width: 18px;   /* vertical scrollbar width */
+        height: 18px;  /* horizontal scrollbar height */
     }
-    ::-webkit-scrollbar-track {
+    div[data-testid="stDataFrame"] ::-webkit-scrollbar-track {
         background: #f1f1f1;
-        border-radius: 8px;
+        border-radius: 10px;
     }
-    ::-webkit-scrollbar-thumb {
-        background: #888;
-        border-radius: 8px;
+    div[data-testid="stDataFrame"] ::-webkit-scrollbar-thumb {
+        background: #666;
+        border-radius: 10px;
         border: 3px solid #f1f1f1;
     }
-    ::-webkit-scrollbar-thumb:hover {
-        background: #555;
+    div[data-testid="stDataFrame"] ::-webkit-scrollbar-thumb:hover {
+        background: #333;
     }
 
-    /* For Firefox */
-    * {
-        scrollbar-width: auto;
-        scrollbar-color: #888 #f1f1f1;
+    /* For Firefox specifically */
+    div[data-testid="stDataFrame"] {
+        scrollbar-width: thick;   /* "auto" → thin, "thin" → very slim, "thick" → bigger */
+        scrollbar-color: #666 #f1f1f1;
     }
 
     /* 👇 Force text wrapping inside data_editor cells */
-    .stDataFrame td, .stDataFrame th {
+    div[data-testid="stDataFrame"] td, 
+    div[data-testid="stDataFrame"] th {
         white-space: normal !important;
         word-wrap: break-word !important;
         overflow-wrap: break-word !important;
-        max-width: 450px !important;  /* control wrapping width */
-        height: auto !important;      /* auto row height */
+        max-width: 450px !important;
+        height: auto !important;
         line-height: 1.4 !important;
     }
 
     /* Expand row height dynamically */
-    .stDataFrame tr {
+    div[data-testid="stDataFrame"] tr {
         height: auto !important;
     }
     </style>
     """,
     unsafe_allow_html=True
 )
+
 
 editable_filtered = filtered.copy()
 
@@ -936,6 +938,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
