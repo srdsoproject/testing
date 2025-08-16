@@ -26,7 +26,7 @@ if "user" not in st.session_state:
     st.session_state.user = {}
 
 if not st.session_state.logged_in:
-    st.title("🔐 Login to Safety Inspection App")
+    st.title("🔐 Login to S.A.R.A.L (Safety Abnormality Report & Action List)")
     with st.form("login_form", clear_on_submit=True):
         email = st.text_input("📧 Email")
         password = st.text_input("🔒 Password", type="password")
@@ -93,13 +93,14 @@ gate_list = ['LC-19', 'LC-22A', 'LC-25', 'LC-26', 'LC-27C', 'LC-28', 'LC-30', 'L
              'LC-5', 'LC-6', 'LC-57', 'LC-62', 'LC-66', 'LC-70', 'LC-39', 'LC-2/C', 'LC-6/C', 'LC-10', 'LC-11', 'LC-03',
              'LC-15/C', 'LC-21', 'LC-26-A', 'LC-34', 'LC-36', 'LC-44', 'LC-47', 'LC-55', 'LC-57', 'LC-59', 'LC-60',
              'LC-61']
-HEAD_LIST = ["", "ELECT/TRD", "ELECT/G", "ELECT/TRO", "SIGNAL & TELECOM", "OPTG",
+HEAD_LIST = ["", "ELECT/TRD", "ELECT/G", "ELECT/TRO", "SIGNAL & TELECOM", "OPTG","MECHANICAL",
              "ENGINEERING", "COMMERCIAL", "C&W", 'PERSONNEL', 'SECURITY']
 SUBHEAD_LIST = {
     "ELECT/TRD": ["T/W WAGON", "TSS/SP/SSP", "OHE SECTION", "OHE STATION", "MISC"],
     "ELECT/G": ["TL/AC COACH", "POWER/PANTRY CAR", "WIRING/EQUIPMENT", "UPS", "AC", "DG", "SOLAR LIGHT", "MISC"],
     "ELECT/TRO": ["LOCO DEFECTS", "RUNNING ROOM DEFICIENCIES", "LOBBY DEFICIENCIES", "LRD RELATED", "PERSONAL STORE", "PR RELATED",
                   "CMS", "MISC"],
+    "MECHANICAL":["MISC"],
     
     "SIGNAL & TELECOM": [ "SIGNAL PUTBACK/BLANK", "OTHER SIGNAL FAILURE", "BPAC", "GATE", "RELAY ROOM",
                          "STATION(VDU/BLOCK INSTRUMENT)", "MISC", "CCTV", "DISPLAY BOARDS"],
@@ -161,8 +162,8 @@ def classify_feedback(feedback, user_remark=""):
         date_found = bool(re.search(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', text_normalized))
 
         resolved_keywords = [
-            "attended", "solved", "submitted", "done", "completed",  "confirmed by", "message given",
-            "tdc work completed", "replaced", "msg given", "msg sent", "counseled", "info shared", "communicated",
+            "attended", "solved", "done", "completed",  "confirmed by", "message given",
+            "tdc work completed", "replaced", "msg given", "msg sent", "counseled", "info shared", "communicated", "sent successfully",
             "counselled", "gate will be closed soon", "attending at the time", "handled", "resolved", "action taken",
             "spoken to", "warned", "counselling", "hubli", "working normal", "met", "discussion held", "report sent",
             "notified", "explained", "nil", "na", "tlc", "work completed", "acknowledged", "visited", "briefed",
@@ -389,7 +390,7 @@ def apply_common_filters(df, prefix=""):
 # -------------------- HELPER FUNCTIONS --------------------
 # All functions are defined here before they are called in the UI logic.
 # ---------- MAIN APP ----------
-st.title("📋 Safety Inspection Viewer")
+st.title("📋 Welcome to S.A.R.A.L (Safety Abnormality Report & Action List)")
 tabs = st.tabs(["📊 View Records"])
 with tabs[0]:
 # ---------- GLOBAL CONSTANTS ----------
@@ -887,4 +888,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
+
+
 
