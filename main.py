@@ -388,7 +388,7 @@ def apply_common_filters(df, prefix=""):
 # -------------------- HELPER FUNCTIONS --------------------
 # All functions are defined here before they are called in the UI logic.
 # ---------- MAIN APP ----------
-st.title("📋 Welcome to S.A.R.A.L (Safety Abnormality Report & Action List) -version 1.0")
+st.title("📋 Welcome to S.A.R.A.L (Safety Abnormality Report & Action List) -version 1.1")
 tabs = st.tabs(["📊 View Records"])
 with tabs[0]:
     # ---------- GLOBAL CONSTANTS ----------
@@ -927,6 +927,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
