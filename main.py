@@ -693,54 +693,28 @@ def color_text_status(status):
 
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
-# 👇 Custom CSS for scrollbar + auto-wrap in table cells
+# 👇 CSS: auto-wrap + dynamic row height
 st.markdown(
     """
     <style>
-    /* Target only the data editor container */
-    div[data-testid="stDataFrame"] ::-webkit-scrollbar {
-        width: 18px;   /* vertical scrollbar width */
-        height: 18px;  /* horizontal scrollbar height */
-    }
-    div[data-testid="stDataFrame"] ::-webkit-scrollbar-track {
-        background: #f1f1f1;
-        border-radius: 10px;
-    }
-    div[data-testid="stDataFrame"] ::-webkit-scrollbar-thumb {
-        background: #666;
-        border-radius: 10px;
-        border: 3px solid #f1f1f1;
-    }
-    div[data-testid="stDataFrame"] ::-webkit-scrollbar-thumb:hover {
-        background: #333;
-    }
-
-    /* For Firefox specifically */
-    div[data-testid="stDataFrame"] {
-        scrollbar-width: thick;   /* "auto" → thin, "thin" → very slim, "thick" → bigger */
-        scrollbar-color: #666 #f1f1f1;
-    }
-
-    /* 👇 Force text wrapping inside data_editor cells */
-    div[data-testid="stDataFrame"] td, 
-    div[data-testid="stDataFrame"] th {
+    /* Wrap text in table cells */
+    .stDataFrame td, .stDataFrame th {
         white-space: normal !important;
         word-wrap: break-word !important;
         overflow-wrap: break-word !important;
-        max-width: 450px !important;
-        height: auto !important;
+        max-width: 500px !important;  /* widen cells */
+        height: auto !important;      
         line-height: 1.4 !important;
     }
 
-    /* Expand row height dynamically */
-    div[data-testid="stDataFrame"] tr {
+    /* Ensure row expands for wrapped text */
+    .stDataFrame tr {
         height: auto !important;
     }
     </style>
     """,
     unsafe_allow_html=True
 )
-
 
 editable_filtered = filtered.copy()
 
@@ -755,13 +729,13 @@ if not editable_filtered.empty:
     ]
     editable_df = editable_filtered[display_cols].copy()
 
-    # ✅ Fix: format "Date of Inspection" to only show date
+    # ✅ Format dates
     if "Date of Inspection" in editable_df.columns:
         editable_df["Date of Inspection"] = pd.to_datetime(
             editable_df["Date of Inspection"], errors="coerce"
         ).dt.date
 
-    # Insert Status column next to User Feedback/Remark
+    # Insert Status column
     editable_df.insert(
         editable_df.columns.get_loc("User Feedback/Remark") + 1,
         "Status",
@@ -770,8 +744,6 @@ if not editable_filtered.empty:
             for _, row in editable_df.iterrows()
         ]
     )
-
-    # Add colored emoji prefix to Status for visual distinction
     editable_df["Status"] = editable_df["Status"].apply(color_text_status)
 
     if (
@@ -784,16 +756,17 @@ if not editable_filtered.empty:
         st.write("Rows:", st.session_state.feedback_buffer.shape[0], 
                  " | Columns:", st.session_state.feedback_buffer.shape[1])
     
+        # 👇 Increase height to show more rows at once
         edited_df = st.data_editor(
             st.session_state.feedback_buffer,
             use_container_width=True,
             hide_index=True,
             num_rows="fixed",
-            height=600,   # 👈 keeps scroll stable
+            height=800,   # show more rows at once
             column_config={
                 "User Feedback/Remark": st.column_config.TextColumn(
                     "User Feedback/Remark",
-                    width="xlarge"   # ✅ allow bigger width
+                    width="xlarge"
                 ),
                 "Feedback": st.column_config.TextColumn(
                     "Feedback",
@@ -814,6 +787,7 @@ if not editable_filtered.empty:
             ],
             key="feedback_editor"
         )
+
 
         col1, col2 = st.columns([1, 1])
         with col1:
@@ -938,6 +912,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
