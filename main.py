@@ -649,7 +649,6 @@ with tabs[0]:
             "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
             "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "User Feedback/Remark"
         ]].copy()
-        export_df["Date of Inspection"] = export_df["Date of Inspection"].dt.strftime('%d-%m-%Y')
         from io import BytesIO
         from openpyxl.styles import Alignment    
         towb = BytesIO()
@@ -666,6 +665,16 @@ with tabs[0]:
             for row in worksheet.iter_rows(min_row=2, min_col=col_idx, max_col=col_idx, max_row=len(export_df)+1):
                 for cell in row:
                     cell.alignment = Alignment(wrap_text=True, vertical="top")
+        
+        towb.seek(0)
+        st.download_button(
+            "📥 Export Filtered Records to Excel",
+            data=towb,
+            file_name="filtered_records.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        st.markdown("### 📄 Preview of Filtered Records")
+
         
             
 # Load once and keep in session
@@ -948,6 +957,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
