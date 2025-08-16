@@ -693,6 +693,38 @@ def color_text_status(status):
 
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
+# 👇 Custom CSS for scrollbar (make it bigger & visible)
+st.markdown(
+    """
+    <style>
+    /* For WebKit browsers (Chrome, Edge, Safari) */
+    ::-webkit-scrollbar {
+        width: 16px;   /* vertical scrollbar width */
+        height: 16px;  /* horizontal scrollbar height */
+    }
+    ::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 8px;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 8px;
+        border: 3px solid #f1f1f1;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+
+    /* For Firefox */
+    * {
+        scrollbar-width: auto;
+        scrollbar-color: #888 #f1f1f1;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 editable_filtered = filtered.copy()
 
 if not editable_filtered.empty:
@@ -734,7 +766,7 @@ if not editable_filtered.empty:
             use_container_width=True,
             hide_index=True,
             num_rows="fixed",
-            height=500,   # 👈 Fixed height so scroll bar is always visible
+            height=600,   # 👈 Fixed height so scrollbar is stable
             column_config={
                 "User Feedback/Remark": st.column_config.TextColumn("User Feedback/Remark"),
                 "Status": st.column_config.TextColumn(
@@ -872,6 +904,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
