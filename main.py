@@ -682,7 +682,12 @@ def color_text_status(status):
         return "🟢 Resolved"
     else:
         return status
-
+st.download_button(
+        label="📥 Download Records (Excel)",
+        data=convert_df_to_excel(st.session_state.df),
+        file_name="inspection_feedback.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
 # 🎨 Custom CSS for scrollbar
@@ -939,6 +944,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
