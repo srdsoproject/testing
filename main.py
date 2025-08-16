@@ -863,14 +863,31 @@ if not editable_filtered.empty:
                 else:
                     st.warning("⚠️ No rows matched for update.")
 
+# ----------- Big Scrolling Banner -----------
 st.markdown(
     """
-    <marquee behavior="scroll" direction="left" style="color: red; font-weight: bold; font-size:16px;">
-        For any correction in data, contact Safety Department on sursafetyposition@gmail.com
-    </marquee>
+    <div style="
+        position: relative;
+        background-color: #ffe6e6; 
+        border: 2px solid red; 
+        border-radius: 8px; 
+        padding: 10px; 
+        height: 50px; 
+        overflow: hidden; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center;
+        margin-top: 20px;
+    ">
+        <marquee behavior="scroll" direction="left" scrollamount="6" 
+            style="color: red; font-weight: bold; font-size:18px; width:100%;">
+            For any correction in data, contact Safety Department on sursafetyposition@gmail.com
+        </marquee>
+    </div>
     """,
     unsafe_allow_html=True
 )
+
 
 
 
