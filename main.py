@@ -316,11 +316,15 @@ def apply_common_filters(df, prefix=""):
         out = out[out["Action By"].isin(sel if isinstance(sel, list) else [sel])]
 
     # Filter by Date Range (assuming your df has a "Date" column)
-    if st.session_state.get(prefix+"from_date") and st.session_state.get(prefix+"to_date"):
-        from_date = st.session_state[prefix+"from_date"]
-        to_date   = st.session_state[prefix+"to_date"]
-        out = out[(out["Date"] >= pd.to_datetime(from_date)) & 
-                  (out["Date"] <= pd.to_datetime(to_date))]
+# Filter by Date Range (using "Date of Inspection")
+if st.session_state.get(prefix+"from_date") and st.session_state.get(prefix+"to_date"):
+    from_date = st.session_state[prefix+"from_date"]
+    to_date   = st.session_state[prefix+"to_date"]
+    out = out[
+        (out["Date of Inspection"] >= pd.to_datetime(from_date)) &
+        (out["Date of Inspection"] <= pd.to_datetime(to_date))
+    ]
+
 
     return out
 
@@ -643,4 +647,5 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
