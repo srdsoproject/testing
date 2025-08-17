@@ -389,33 +389,26 @@ def apply_common_filters(df, prefix=""):
 # All functions are defined here before they are called in the UI logic.
 # ---------- MAIN APP ----------
 
-st.title("📋 Welcome to S.A.R.A.L (Safety Abnormality Report & Action List) – version 1.1")
+import streamlit as st
+
+st.title("📋 S.A.R.A.L (Safety Abnormality Report & Action List – Version 1.1)")
 
 st.markdown(
     """
-    <div style="background: linear-gradient(90deg, #87CEEB, #4682B4);
-                padding: 25px; 
-                border-radius: 12px; 
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-                margin-bottom: 25px;">
-        <div style="display: flex; align-items: center;">
-            <img src="https://raw.githubusercontent.com/srdsoproject/testing/main/Central%20Railway%20Logo.png"
-                 width="90" 
-                 style="margin-right: 25px; border-radius: 8px; background:white; padding:8px;">
-            <div>
-                <h1 style="margin: 0; font-size: 2em; font-weight: bold; color: black;">
-                    📋 S.A.R.A.L <span style="font-size: 0.6em; font-weight: normal; color: #222;">
-                    (Safety Abnormality Report & Action List – Version 1.1)</span>
-                </h1>
-                <p style="margin: 0; font-size: 1.05em; font-style: italic; color: #222;">
-                    An initiative by <b>Safety Department</b>, Solapur Division
-                </p>
-            </div>
+    <div style="display: flex; align-items: center; margin-top: 10px;">
+        <img src="https://raw.githubusercontent.com/srdsoproject/testing/main/Central%20Railway%20Logo.png"
+             width="90" 
+             style="margin-right: 20px;">
+        <div>
+            <h3 style="margin: 0; font-weight: bold; color: black;">
+                An initiative by <b>Safety Department</b>, Solapur Division
+            </h3>
         </div>
     </div>
     """,
     unsafe_allow_html=True
 )
+
 tabs = st.tabs(["📊 View Records"])
 with tabs[0]:
     # ---------- GLOBAL CONSTANTS ----------
@@ -954,6 +947,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
