@@ -325,7 +325,7 @@ def apply_common_filters(df, prefix=""):
             (out["Date of Inspection"] <= pd.to_datetime(to_date))
         ]
 
-return out
+    return out
 
 
 # -------------------- HEADER --------------------
@@ -646,6 +646,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
