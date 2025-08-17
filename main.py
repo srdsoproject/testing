@@ -326,7 +326,7 @@ if st.session_state.get(prefix+"from_date") and st.session_state.get(prefix+"to_
     ]
 
 
-    return out
+return out
 
 
 # -------------------- HEADER --------------------
@@ -647,5 +647,6 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
