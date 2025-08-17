@@ -402,9 +402,9 @@ st.markdown(
             <img src="https://raw.githubusercontent.com/srdsoproject/testing/main/Central%20Railway%20Logo.png"
                  width="90" 
                  style="margin-right: 25px; border-radius: 8px; background:white; padding:8px;">
-            <div style="color: black;">
-                <h1 style="margin: 0; font-size: 2em; font-weight: bold;">📋 S.A.R.A.L</h1>
-                <p style="margin: 3px 0; font-size: 1.2em; font-weight: 500;">
+            <div>
+                <h1 style="margin: 0; font-size: 2em; font-weight: bold; color: black;">📋 S.A.R.A.L</h1>
+                <p style="margin: 3px 0; font-size: 1.2em; font-weight: 500; color: black;">
                     Safety Abnormality Report & Action List – <b>Version 1.1</b>
                 </p>
                 <p style="margin: 0; font-size: 1.05em; font-style: italic; color: #222;">
@@ -416,6 +416,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 tabs = st.tabs(["📊 View Records"])
 with tabs[0]:
     # ---------- GLOBAL CONSTANTS ----------
@@ -954,6 +955,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
