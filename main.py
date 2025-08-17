@@ -388,8 +388,20 @@ def apply_common_filters(df, prefix=""):
 # -------------------- HELPER FUNCTIONS --------------------
 # All functions are defined here before they are called in the UI logic.
 # ---------- MAIN APP ----------
-st.title("📋 Welcome to S.A.R.A.L (Safety Abnormality Report & Action List) -version 1.1\n An initiative by Safety Department, Solapur Division.")
-tabs = st.tabs(["📊 View Records"])
+
+st.title("📋 Welcome to S.A.R.A.L (Safety Abnormality Report & Action List) – version 1.1")
+
+st.markdown(
+    """
+    <div style="display: flex; align-items: center;">
+        <img src="https://raw.githubusercontent.com/srdsoproject/testing/main/Central%20Railway%20Logo.png"
+             width="40" style="margin-right: 10px;">
+        <span style="font-size: 1.1em;">An initiative by Safety Department, Solapur Division.</span>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
 with tabs[0]:
     # ---------- GLOBAL CONSTANTS ----------
     VALID_INSPECTIONS = [
@@ -927,6 +939,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
