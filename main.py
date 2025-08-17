@@ -400,7 +400,7 @@ st.markdown(
              width="90" 
              style="margin-right: 20px;">
         <div>
-            <h3 style="margin: 0; font-weight: bold; color: black;">
+            <h3 style="margin: 0; font-weight: bold; color: var(--text-color);">
                 An initiative by <b>Safety Department</b>, Solapur Division
             </h3>
         </div>
@@ -947,6 +947,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
