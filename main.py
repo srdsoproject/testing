@@ -401,7 +401,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
+tabs = st.tabs(["📊 View Records"])
 with tabs[0]:
     # ---------- GLOBAL CONSTANTS ----------
     VALID_INSPECTIONS = [
@@ -939,6 +939,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
