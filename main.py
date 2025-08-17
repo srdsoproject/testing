@@ -393,18 +393,25 @@ st.title("📋 Welcome to S.A.R.A.L (Safety Abnormality Report & Action List) �
 
 st.markdown(
     """
-    <div style="display: flex; align-items: center; 
-                background: linear-gradient(to right, #a6192e, #d32f2f);
-                padding: 12px 18px; 
-                border-radius: 8px; 
+    <div style="background: linear-gradient(to right, #800000, #a6192e);
+                padding: 20px 25px; 
+                border-radius: 10px; 
                 color: white; 
-                margin-top: 15px;">
-        <img src="https://raw.githubusercontent.com/srdsoproject/testing/main/Central%20Railway%20Logo.png"
-             width="55" 
-             style="margin-right: 15px; border-radius: 5px; background:white; padding:3px;">
-        <span style="font-size: 1.1em; font-weight: bold;">
-            An initiative by Safety Department, Solapur Division.
-        </span>
+                margin-bottom: 20px;">
+        <div style="display: flex; align-items: center;">
+            <img src="https://raw.githubusercontent.com/srdsoproject/testing/main/Central%20Railway%20Logo.png"
+                 width="70" 
+                 style="margin-right: 20px; border-radius: 6px; background:white; padding:5px;">
+            <div>
+                <h2 style="margin: 0; padding: 0;">📋 S.A.R.A.L</h2>
+                <p style="margin: 0; font-size: 1.1em; font-weight: 500;">
+                    Safety Abnormality Report & Action List – Version 1.1
+                </p>
+                <p style="margin: 3px 0 0 0; font-size: 1em; font-style: italic;">
+                    An initiative by <b>Safety Department</b>, Solapur Division
+                </p>
+            </div>
+        </div>
     </div>
     """,
     unsafe_allow_html=True
@@ -947,6 +954,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
