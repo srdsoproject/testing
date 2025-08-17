@@ -403,9 +403,10 @@ st.markdown(
                  width="90" 
                  style="margin-right: 25px; border-radius: 8px; background:white; padding:8px;">
             <div>
-                <h1 style="margin: 0; font-size: 2em; font-weight: bold; color: black;">📋 S.A.R.A.L (Safety Abnormality Report & Action List – Version 1.1)</h1>
-               
-                </p>
+                <h1 style="margin: 0; font-size: 2em; font-weight: bold; color: black;">
+                    📋 S.A.R.A.L <span style="font-size: 0.6em; font-weight: normal; color: #222;">
+                    (Safety Abnormality Report & Action List – Version 1.1)</span>
+                </h1>
                 <p style="margin: 0; font-size: 1.05em; font-style: italic; color: #222;">
                     An initiative by <b>Safety Department</b>, Solapur Division
                 </p>
@@ -415,7 +416,6 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
 tabs = st.tabs(["📊 View Records"])
 with tabs[0]:
     # ---------- GLOBAL CONSTANTS ----------
@@ -954,6 +954,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
