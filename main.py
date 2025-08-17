@@ -395,8 +395,8 @@ st.markdown(
     """
     <div style="display: flex; align-items: center; margin-top: 10px; margin-bottom: 20px;">
         <img src="https://raw.githubusercontent.com/srdsoproject/testing/main/Central%20Railway%20Logo.png"
-             width="90" 
-             style="margin-right: 20px;">
+             height="55" 
+             style="margin-right: 15px; object-fit: contain;">
         <div>
             <h3 style="margin: 0; font-weight: bold; color: var(--text-color);">
                 An initiative by <b>Safety Department</b>, Solapur Division
@@ -952,6 +952,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
