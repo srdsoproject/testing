@@ -403,7 +403,7 @@ st.markdown(
                  width="90" 
                  style="margin-right: 25px; border-radius: 8px; background:white; padding:8px;">
             <div>
-                <h1 style="margin: 0; font-size: 2em; font-weight: bold; color: black;">📋 S.A.R.A.L</h1>
+                <h1 style="margin: 0; font-size: 2em; font-weight: bold; color: black;">📋 S.A.R.A.L Safety Abnormality Report & Action List – <b>Version 1.1</b></h1>
                 <p style="margin: 3px 0; font-size: 1.2em; font-weight: 500; color: black;">
                     Safety Abnormality Report & Action List – <b>Version 1.1</b>
                 </p>
@@ -955,6 +955,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
