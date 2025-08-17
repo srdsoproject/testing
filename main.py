@@ -294,17 +294,36 @@ def update_feedback_column(edited_df):
 def apply_common_filters(df, prefix=""):
     with st.expander("🔍 Apply Additional Filters", expanded=True):
         c1, c2 = st.columns(2)
-        c1.multiselect("Inspection By", INSPECTION_BY_LIST[1:], default=st.session_state.get(prefix+"insp", []), key=prefix+"insp")
-        c2.multiselect("Action By",     ACTION_BY_LIST[1:],    default=st.session_state.get(prefix+"action", []), key=prefix+"action")
+        c1.multiselect("Inspection By", INSPECTION_BY_LIST[1:], 
+                       default=st.session_state.get(prefix+"insp", []), key=prefix+"insp")
+        c2.multiselect("Action By", ACTION_BY_LIST[1:], 
+                       default=st.session_state.get(prefix+"action", []), key=prefix+"action")
+
+        d1, d2 = st.columns(2)
+        d1.date_input("📅 From Date", key=prefix+"from_date")
+        d2.date_input("📅 To Date", key=prefix+"to_date")
 
     out = df.copy()
+
+    # Filter by "Inspection By"
     if st.session_state.get(prefix+"insp"):
         sel = st.session_state[prefix+"insp"]
         out = out[out["Inspection By"].isin(sel if isinstance(sel, list) else [sel])]
+
+    # Filter by "Action By"
     if st.session_state.get(prefix+"action"):
         sel = st.session_state[prefix+"action"]
         out = out[out["Action By"].isin(sel if isinstance(sel, list) else [sel])]
+
+    # Filter by Date Range (assuming your df has a "Date" column)
+    if st.session_state.get(prefix+"from_date") and st.session_state.get(prefix+"to_date"):
+        from_date = st.session_state[prefix+"from_date"]
+        to_date   = st.session_state[prefix+"to_date"]
+        out = out[(out["Date"] >= pd.to_datetime(from_date)) & 
+                  (out["Date"] <= pd.to_datetime(to_date))]
+
     return out
+
 
 # -------------------- HEADER --------------------
 st.markdown(
@@ -624,3 +643,4 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
