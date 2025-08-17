@@ -391,11 +391,9 @@ def apply_common_filters(df, prefix=""):
 
 import streamlit as st
 
-st.title("📋 S.A.R.A.L (Safety Abnormality Report & Action List – Version 1.1)")
-
 st.markdown(
     """
-    <div style="display: flex; align-items: center; margin-top: 10px;">
+    <div style="display: flex; align-items: center; margin-top: 10px; margin-bottom: 20px;">
         <img src="https://raw.githubusercontent.com/srdsoproject/testing/main/Central%20Railway%20Logo.png"
              width="90" 
              style="margin-right: 20px;">
@@ -405,6 +403,13 @@ st.markdown(
             </h3>
         </div>
     </div>
+    
+    <h1 style="margin-top: 0; color: var(--text-color);">
+        📋 S.A.R.A.L
+    </h1>
+    <h3 style="margin-top: -10px; font-weight: normal; color: var(--text-color);">
+        (Safety Abnormality Report & Action List – Version 1.1)
+    </h3>
     """,
     unsafe_allow_html=True
 )
@@ -947,6 +952,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
