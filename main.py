@@ -393,21 +393,21 @@ st.title("📋 Welcome to S.A.R.A.L (Safety Abnormality Report & Action List) �
 
 st.markdown(
     """
-    <div style="background: linear-gradient(to right, #800000, #a6192e);
-                padding: 20px 25px; 
-                border-radius: 10px; 
-                color: white; 
-                margin-bottom: 20px;">
+    <div style="background: linear-gradient(90deg, #800000, #b71c1c);
+                padding: 25px; 
+                border-radius: 12px; 
+                box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                margin-bottom: 25px;">
         <div style="display: flex; align-items: center;">
             <img src="https://raw.githubusercontent.com/srdsoproject/testing/main/Central%20Railway%20Logo.png"
-                 width="70" 
-                 style="margin-right: 20px; border-radius: 6px; background:white; padding:5px;">
-            <div>
-                <h2 style="margin: 0; padding: 0;">📋 S.A.R.A.L</h2>
-                <p style="margin: 0; font-size: 1.1em; font-weight: 500;">
-                    Safety Abnormality Report & Action List – Version 1.1
+                 width="90" 
+                 style="margin-right: 25px; border-radius: 8px; background:white; padding:8px;">
+            <div style="color: white;">
+                <h1 style="margin: 0; font-size: 2em;">📋 S.A.R.A.L</h1>
+                <p style="margin: 3px 0; font-size: 1.2em; font-weight: 500;">
+                    Safety Abnormality Report & Action List – <b>Version 1.1</b>
                 </p>
-                <p style="margin: 3px 0 0 0; font-size: 1em; font-style: italic;">
+                <p style="margin: 0; font-size: 1.05em; font-style: italic; color: #f5f5f5;">
                     An initiative by <b>Safety Department</b>, Solapur Division
                 </p>
             </div>
@@ -954,6 +954,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
