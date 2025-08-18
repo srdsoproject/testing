@@ -394,7 +394,7 @@ with tabs[0]:
     if st.session_state.view_head_filter:
         filtered = filtered[filtered["Head"].isin(st.session_state.view_head_filter)]
     if st.session_state.view_sub_filter:
-        filtered = filtered[filtered["Sub Head"] == st.session_state.view_sub_filter]
+         filtered = filtered[filtered["Sub Head"].isin(st.session_state.view_sub_filter)]
     if selected_status != "All":
         filtered = filtered[filtered["Status"] == selected_status]
 
@@ -646,6 +646,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
