@@ -528,6 +528,25 @@ st.markdown(
 # -------------------- EDITOR --------------------
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
+# -------------------- CSS for text wrapping --------------------
+st.markdown(
+    """
+    <style>
+    /* Wrap text only in selected columns */
+    div[data-testid="stDataFrame"] td:nth-child(6),  /* Deficiencies Noted */
+    div[data-testid="stDataFrame"] td:nth-child(11) { /* User Feedback/Remark */
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        overflow-wrap: anywhere !important;
+        line-height: 1.3em !important;
+        min-height: 2.5em !important;
+        height: auto !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 editable_filtered = filtered.copy()
 if not editable_filtered.empty:
     if "_sheet_row" not in editable_filtered.columns:
@@ -647,15 +666,3 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
-
-
-
-
-
-
-
-
-
-
-
