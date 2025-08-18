@@ -390,7 +390,7 @@ with tabs[0]:
     if st.session_state.view_type_filter:
         filtered = filtered[filtered["Type of Inspection"].isin(st.session_state.view_type_filter)]
     if st.session_state.view_location_filter:
-        filtered = filtered[filtered["Location"] == st.session_state.view_location_filter]
+        filtered = filtered[filtered["Location"].isin(st.session_state.view_location_filter)]
     if st.session_state.view_head_filter:
         filtered = filtered[filtered["Head"].isin(st.session_state.view_head_filter)]
     if st.session_state.view_sub_filter:
@@ -646,6 +646,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
