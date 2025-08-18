@@ -387,14 +387,19 @@ with tabs[0]:
 
     # Apply filters
     filtered = df[(df["Date of Inspection"] >= start_date) & (df["Date of Inspection"] <= end_date)]
+
     if st.session_state.view_type_filter:
         filtered = filtered[filtered["Type of Inspection"].isin(st.session_state.view_type_filter)]
+    
     if st.session_state.view_location_filter:
         filtered = filtered[filtered["Location"].isin(st.session_state.view_location_filter)]
+    
     if st.session_state.view_head_filter:
         filtered = filtered[filtered["Head"].isin(st.session_state.view_head_filter)]
+    
     if st.session_state.view_sub_filter:
         filtered = filtered[filtered["Sub Head"].isin(st.session_state.view_sub_filter)]
+    
     if selected_status != "All":
         filtered = filtered[filtered["Status"] == selected_status]
 
@@ -646,6 +651,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
