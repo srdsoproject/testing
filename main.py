@@ -527,13 +527,18 @@ st.markdown(
 
 # -------------------- EDITOR --------------------
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+import pandas as pd
+import streamlit as st
 
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
 editable_filtered = filtered.copy()
 if not editable_filtered.empty:
+    # Ensure stable IDs exist for reliable updates
+    if "_original_sheet_index" not in editable_filtered.columns:
+        editable_filtered["_original_sheet_index"] = editable_filtered.index
     if "_sheet_row" not in editable_filtered.columns:
-        editable_filtered["_sheet_row"] = editable_filtered.index + 2
+        editable_filtered["_sheet_row"] = editable_filtered.index + 2  # sheet row (header + 1)
 
     display_cols = [
         "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
@@ -542,7 +547,7 @@ if not editable_filtered.empty:
     ]
     editable_df = editable_filtered[display_cols].copy()
 
-    # show only date part
+    # Show only date part
     if "Date of Inspection" in editable_df.columns:
         editable_df["Date of Inspection"] = pd.to_datetime(
             editable_df["Date of Inspection"], errors="coerce"
@@ -556,19 +561,31 @@ if not editable_filtered.empty:
     )
     editable_df["Status"] = editable_df["Status"].apply(color_text_status)
 
-    # -------- AG GRID CONFIG --------
+    # Carry ID columns through grid (hidden)
+    editable_df["_original_sheet_index"] = editable_filtered["_original_sheet_index"].values
+    editable_df["_sheet_row"] = editable_filtered["_sheet_row"].values
+
+    # -------- AG GRID CONFIG (wrap + auto height, only remarks editable) --------
     gb = GridOptionsBuilder.from_dataframe(editable_df)
     gb.configure_default_column(editable=False, wrapText=True, autoHeight=True)
 
-    # Make only User Feedback/Remark editable
-    gb.configure_column("User Feedback/Remark", editable=True, wrapText=True, autoHeight=True)
+    # Make ONLY "User Feedback/Remark" editable with a large text editor popup
+    gb.configure_column(
+        "User Feedback/Remark",
+        editable=True,
+        wrapText=True,
+        autoHeight=True,
+        cellEditor="agLargeTextCellEditor",
+        cellEditorPopup=True,
+        cellEditorParams={"maxLength": 4000, "rows": 10, "cols": 60}
+    )
 
-    # All other columns stay read-only
-    for col in [
-        "Date of Inspection","Type of Inspection","Location","Head","Sub Head",
-        "Deficiencies Noted","Inspection By","Action By","Feedback","Status"
-    ]:
-        gb.configure_column(col, editable=False, wrapText=True, autoHeight=True)
+    # Hide helper ID columns
+    gb.configure_column("_original_sheet_index", hide=True)
+    gb.configure_column("_sheet_row", hide=True)
+
+    # Easier editing UX
+    gb.configure_grid_options(singleClickEdit=True)
 
     grid_options = gb.build()
 
@@ -581,69 +598,81 @@ if not editable_filtered.empty:
         allow_unsafe_jscode=True
     )
 
-    edited_df = grid_response["data"]
+    edited_df = pd.DataFrame(grid_response["data"])
 
-    c1, c2, _ = st.columns([1,1,1])
+    c1, c2, _ = st.columns([1, 1, 1])
     submitted = c1.button("✅ Submit Feedback")
     if c2.button("🔄 Refresh Data"):
         st.session_state.df = load_data()
         st.success("✅ Data refreshed successfully!")
 
     if submitted:
-        if "User Feedback/Remark" not in edited_df.columns or "Feedback" not in editable_filtered.columns:
+        # Validate needed columns
+        need_cols = {"_original_sheet_index", "User Feedback/Remark"}
+        if not need_cols.issubset(edited_df.columns) or "Feedback" not in editable_filtered.columns:
             st.error("⚠️ Required columns are missing from the data.")
         else:
-            common_index = edited_df.index.intersection(editable_filtered.index)
-            if len(common_index) > 0:
-                diffs_mask = (
-                    editable_filtered.loc[common_index, "User Feedback/Remark"]
-                    != edited_df.loc[common_index, "User Feedback/Remark"]
-                )
-                if diffs_mask.any():
-                    diffs = edited_df.loc[common_index[diffs_mask]].copy()
-                    diffs["_sheet_row"] = editable_filtered.loc[diffs.index, "_sheet_row"].values
-                    diffs["User Feedback/Remark"] = diffs["User Feedback/Remark"].fillna("")
+            # Compare remarks using the stable ID to find changes
+            orig = editable_filtered.set_index("_original_sheet_index")
+            new = edited_df.set_index("_original_sheet_index")
 
-                    for idx, row in diffs.iterrows():
-                        user_remark = row["User Feedback/Remark"].strip()
-                        if not user_remark:
-                            continue
+            old_remarks = orig["User Feedback/Remark"].fillna("").astype(str)
+            new_remarks = new["User Feedback/Remark"].fillna("").astype(str)
 
-                        # Auto routing by keywords
-                        routing = {
-                            "Pertains to S&T":       ("SIGNAL & TELECOM", "Sr.DSTE"),
-                            "Pertains to OPTG":      ("OPTG", "Sr.DOM"),
-                            "Pertains to COMMERCIAL":("COMMERCIAL", "Sr.DCM"),
-                            "Pertains to ELECT/G":   ("ELECT/G", "Sr.DEE/G"),
-                            "Pertains to ELECT/TRD": ("ELECT/TRD", "Sr.DEE/TRD"),
-                        }
-                        for key, (head, action_by) in routing.items():
-                            if key in user_remark:
-                                st.session_state.df.at[idx, "Head"] = head
-                                st.session_state.df.at[idx, "Action By"] = action_by
-                                st.session_state.df.at[idx, "Sub Head"] = ""
-                                st.session_state.df.at[idx, "Feedback"] = ""
-                                diffs.at[idx, "Head"] = head
-                                diffs.at[idx, "Action By"] = action_by
-                                diffs.at[idx, "Sub Head"] = ""
+            changed_ids = new_remarks[new_remarks != old_remarks].index.tolist()
 
-                        existing_feedback = st.session_state.df.loc[idx, "Feedback"]
-                        combined = (existing_feedback.strip() + ("" if existing_feedback.strip().endswith(".") or not existing_feedback.strip() else ".") + (" " if existing_feedback.strip() else "") + user_remark).strip()
-                        if combined.startswith("."):
-                            combined = combined[1:].strip()
+            if changed_ids:
+                diffs = new.loc[changed_ids].copy()
+                diffs["_sheet_row"] = orig.loc[changed_ids, "_sheet_row"].values
 
-                        diffs.at[idx, "Feedback"] = combined
-                        diffs.at[idx, "User Feedback/Remark"] = ""
+                for oid in changed_ids:
+                    user_remark = new.loc[oid, "User Feedback/Remark"].strip()
+                    if not user_remark:
+                        continue
 
-                        st.session_state.df.loc[idx, "Feedback"] = combined
-                        st.session_state.df.loc[idx, "User Feedback/Remark"] = ""
+                    # Auto routing by keywords
+                    routing = {
+                        "Pertains to S&T":        ("SIGNAL & TELECOM", "Sr.DSTE"),
+                        "Pertains to OPTG":       ("OPTG", "Sr.DOM"),
+                        "Pertains to COMMERCIAL": ("COMMERCIAL", "Sr.DCM"),
+                        "Pertains to ELECT/G":    ("ELECT/G", "Sr.DEE/G"),
+                        "Pertains to ELECT/TRD":  ("ELECT/TRD", "Sr.DEE/TRD"),
+                    }
+                    for key, (head, action_by) in routing.items():
+                        if key in user_remark:
+                            st.session_state.df.at[oid, "Head"] = head
+                            st.session_state.df.at[oid, "Action By"] = action_by
+                            st.session_state.df.at[oid, "Sub Head"] = ""
+                            st.session_state.df.at[oid, "Feedback"] = ""
+                            diffs.at[oid, "Head"] = head
+                            diffs.at[oid, "Action By"] = action_by
+                            diffs.at[oid, "Sub Head"] = ""
 
-                    update_feedback_column(diffs)
-                    st.success(f"✅ Updated {len(diffs)} Feedback row(s) with appended remarks.")
-                else:
-                    st.info("ℹ️ No changes detected to save.")
+                    existing_feedback = st.session_state.df.loc[oid, "Feedback"]
+                    existing_feedback = ("" if pd.isna(existing_feedback) else str(existing_feedback)).strip()
+
+                    combined = (
+                        existing_feedback
+                        + ("" if existing_feedback.endswith(".") or not existing_feedback else ".")
+                        + (" " if existing_feedback else "")
+                        + user_remark
+                    ).strip()
+                    if combined.startswith("."):
+                        combined = combined[1:].strip()
+
+                    diffs.at[oid, "Feedback"] = combined
+                    diffs.at[oid, "User Feedback/Remark"] = ""
+
+                    st.session_state.df.at[oid, "Feedback"] = combined
+                    st.session_state.df.at[oid, "User Feedback/Remark"] = ""
+
+                # Persist to storage (expects _sheet_row in diffs)
+                update_feedback_column(diffs.reset_index().rename(columns={"index": "_original_sheet_index"}))
+                st.success(f"✅ Updated {len(changed_ids)} Feedback row(s) with appended remarks.")
             else:
-                st.warning("⚠️ No rows matched for update.")
+                st.info("ℹ️ No changes detected to save.")
+else:
+    st.info("No records to show.")
 
 # -------------------- FOOTER --------------------
 st.markdown(
@@ -654,4 +683,6 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
+
 
