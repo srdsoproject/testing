@@ -376,30 +376,25 @@ with tabs[0]:
 
     c1, c2 = st.columns(2)
     c1.multiselect("Type of Inspection", VALID_INSPECTIONS, key="view_type_filter")
-    c2.selectbox("Location", [""] + FOOTPLATE_LIST, key="view_location_filter")
+    c2.multiselect("Location", FOOTPLATE_LIST, key="view_location_filter")   # ⬅️ changed to multiselect
 
     c3, c4 = st.columns(2)
     c3.multiselect("Head", HEAD_LIST[1:], key="view_head_filter")
     sub_opts = sorted({s for h in st.session_state.view_head_filter for s in SUBHEAD_LIST.get(h, [])})
-    c4.selectbox("Sub Head", [""] + sub_opts, key="view_sub_filter")
+    c4.multiselect("Sub Head", sub_opts, key="view_sub_filter")   # ⬅️ changed to multiselect
 
     selected_status = st.selectbox("🔘 Status", ["All", "Pending", "Resolved"], key="view_status_filter")
 
     # Apply filters
     filtered = df[(df["Date of Inspection"] >= start_date) & (df["Date of Inspection"] <= end_date)]
-
     if st.session_state.view_type_filter:
-        filtered = filtered[filtered["Type of Inspection"].isin(st.session_state.view_type_filter)]
-    
+        filtered = filtered[filtered["Type of Inspection"].isin(st.session_state.view_type_filter)]    
     if st.session_state.view_location_filter:
-        filtered = filtered[filtered["Location"].isin(st.session_state.view_location_filter)]
-    
+        filtered = filtered[filtered["Location"].isin(st.session_state.view_location_filter)]    
     if st.session_state.view_head_filter:
-        filtered = filtered[filtered["Head"].isin(st.session_state.view_head_filter)]
-    
+        filtered = filtered[filtered["Head"].isin(st.session_state.view_head_filter)]    
     if st.session_state.view_sub_filter:
-        filtered = filtered[filtered["Sub Head"].isin(st.session_state.view_sub_filter)]
-    
+        filtered = filtered[filtered["Sub Head"].isin(st.session_state.view_sub_filter)]    
     if selected_status != "All":
         filtered = filtered[filtered["Status"] == selected_status]
 
@@ -415,6 +410,7 @@ with tabs[0]:
     col_a.metric("🟨 Pending",  (filtered["Status"] == "Pending").sum())
     col_b.metric("🟩 Resolved", (filtered["Status"] == "Resolved").sum())
     col_c.metric("📊 Total Records", len(filtered))
+
 
     # ---------- SUB HEAD DISTRIBUTION CHART ----------
     if st.session_state.view_head_filter and not filtered.empty:
@@ -651,6 +647,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
