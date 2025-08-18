@@ -638,6 +638,10 @@ if not editable_filtered.empty:
                         "Pertains to COMMERCIAL": ("COMMERCIAL", "Sr.DCM"),
                         "Pertains to ELECT/G":    ("ELECT/G", "Sr.DEE/G"),
                         "Pertains to ELECT/TRD":  ("ELECT/TRD", "Sr.DEE/TRD"),
+                        "Pertains to Sr.DEN/S":  ("ENGINEERING", "Sr.DEN/S"),
+                        "Pertains to Sr.DEN/C":  ("ENGINEERING", "Sr.DEN/C"),
+                        "Pertains to Sr.DEN/Co":  ("ENGINEERING", "Sr.DEN/Co"),
+                        
                     }
                     for key, (head, action_by) in routing.items():
                         if key in user_remark:
@@ -684,7 +688,3 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
-
-
-
