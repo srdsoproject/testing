@@ -550,8 +550,9 @@ if not editable_filtered.empty:
     # Show only date part
     if "Date of Inspection" in editable_df.columns:
         editable_df["Date of Inspection"] = pd.to_datetime(
-            editable_df["Date of Inspection"], errors="coerce"
-        ).dt.date
+        editable_df["Date of Inspection"], errors="coerce"
+    ).dt.strftime("%Y-%m-%d")  # convert to string in YYYY-MM-DD format
+
 
     # Status column
     editable_df.insert(
@@ -683,6 +684,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
