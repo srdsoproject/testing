@@ -404,11 +404,8 @@ with tabs[0]:
 
     st.write(f"🔹 Showing {len(filtered)} record(s) from **{start_date.strftime('%d.%m.%Y')}** "
              f"to **{end_date.strftime('%d.%m.%Y')}**")
-
     # Summary metrics
-    # Summary metrics
-    col_a, col_b, col_c, col_d = st.columns(4)
-    
+    col_a, col_b, col_c, col_d = st.columns(4)    
     pending_count     = (filtered["Status"] == "Pending").sum()
     no_response_count = filtered["Feedback"].isna().sum() + (filtered["Feedback"].astype(str).str.strip() == "").sum()
     resolved_count    = (filtered["Status"] == "Resolved").sum()
@@ -417,9 +414,6 @@ with tabs[0]:
     col_b.metric("⚠️ No Response", no_response_count)
     col_c.metric("🟩 Resolved", resolved_count)
     col_d.metric("📊 Total Records", len(filtered))
-
-
-
 
     # ---------- SUB HEAD DISTRIBUTION CHART ----------
     if st.session_state.view_head_filter and not filtered.empty:
@@ -639,7 +633,6 @@ if not editable_filtered.empty:
                     user_remark = new.loc[oid, "User Feedback/Remark"].strip()
                     if not user_remark:
                         continue
-
                     # Auto routing by keywords
                     routing = {
                         "Pertains to S&T":        ("SIGNAL & TELECOM", "Sr.DSTE"),
@@ -664,7 +657,6 @@ if not editable_filtered.empty:
 
                     existing_feedback = st.session_state.df.loc[oid, "Feedback"]
                     existing_feedback = ("" if pd.isna(existing_feedback) else str(existing_feedback)).strip()
-
                     combined = (
                         existing_feedback
                         + ("" if existing_feedback.endswith(".") or not existing_feedback else ".")
@@ -697,10 +689,3 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
-
-
-
-
-
-
