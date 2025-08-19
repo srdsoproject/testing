@@ -409,14 +409,15 @@ with tabs[0]:
     # Summary metrics
     col_a, col_b, col_c, col_d = st.columns(4)
     
-    pending_count    = (filtered["Status"] == "Pending").sum()
-    resolved_count   = (filtered["Status"] == "Resolved").sum()
+    pending_count     = (filtered["Status"] == "Pending").sum()
     no_response_count = filtered["Feedback"].isna().sum() + (filtered["Feedback"].astype(str).str.strip() == "").sum()
+    resolved_count    = (filtered["Status"] == "Resolved").sum()
     
     col_a.metric("🟨 Pending", pending_count)
-    col_b.metric("🟩 Resolved", resolved_count)
-    col_c.metric("⭕ No Response", no_response_count)
+    col_b.metric("⚠️ No Response", no_response_count)
+    col_c.metric("🟩 Resolved", resolved_count)
     col_d.metric("📊 Total Records", len(filtered))
+
 
 
 
@@ -696,6 +697,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
