@@ -305,18 +305,21 @@ def apply_common_filters(df, prefix=""):
 
     out = df.copy()
 
-    # Filter by "Inspection By"
+    # --- Filter by "Inspection By"
     if st.session_state.get(prefix+"insp"):
         sel = st.session_state[prefix+"insp"]
-        out = out[out["Inspection By"].isin(sel if isinstance(sel, list) else [sel])]
+        out = out[out["Inspection By"].apply(
+            lambda x: any(s.strip() in str(x).split(",") for s in sel)
+        )]
 
-    # Filter by "Action By"
+    # --- Filter by "Action By"
     if st.session_state.get(prefix+"action"):
         sel = st.session_state[prefix+"action"]
-        out = out[out["Action By"].isin(sel if isinstance(sel, list) else [sel])]
+        out = out[out["Action By"].apply(
+            lambda x: any(s.strip() in str(x).split(",") for s in sel)
+        )]
 
-    # Filter by Date Range (assuming your df has a "Date" column)
-# Filter by Date Range (using "Date of Inspection")
+    # --- Filter by Date Range (using "Date of Inspection")
     if st.session_state.get(prefix+"from_date") and st.session_state.get(prefix+"to_date"):
         from_date = st.session_state[prefix+"from_date"]
         to_date   = st.session_state[prefix+"to_date"]
@@ -689,3 +692,4 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
