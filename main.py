@@ -677,7 +677,7 @@ if not editable_filtered.empty:
             else:
                 st.info("ℹ️ No changes detected to save.")
 else:
-    st.info("No records to show.")
+    st.info("Deficiencies will be updated soon !")
 
 # -------------------- FOOTER --------------------
 st.markdown(
@@ -688,4 +688,5 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
