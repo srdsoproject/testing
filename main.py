@@ -356,7 +356,7 @@ df = st.session_state.df
 tabs = st.tabs(["📊 View Records"])
 with tabs[0]:
     if df.empty:
-        st.warning("No records found")
+        st.warning("Deficiencies will be updated soon !")
         st.stop()
 
     # Ensure required cols exist
@@ -688,3 +688,4 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
