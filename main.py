@@ -491,9 +491,9 @@ with tabs[0]:
                                file_name="subhead_distribution.png", mime="image/png")
 
     # ---------- EXPORT ----------
-       from io import BytesIO
-       import pandas as pd
-       from openpyxl.styles import Alignment, Font
+    from io import BytesIO
+    import pandas as pd
+    from openpyxl.styles import Alignment, Font
         
        export_df = filtered[[
             "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
@@ -703,4 +703,5 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
