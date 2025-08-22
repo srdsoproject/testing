@@ -491,25 +491,44 @@ with tabs[0]:
                                file_name="subhead_distribution.png", mime="image/png")
 
     # ---------- EXPORT ----------
-    export_df = filtered[[
+   from io import BytesIO
+   import pandas as pd
+   from openpyxl.styles import Alignment, Font
+    
+   export_df = filtered[[
         "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
-        "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "User Feedback/Remark", "Status"
+        "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "User Feedback/Remark",
+        "Status"
     ]].copy()
+    
     towb = BytesIO()
     with pd.ExcelWriter(towb, engine="openpyxl") as writer:
         export_df.to_excel(writer, index=False, sheet_name="Filtered Records")
         ws = writer.sheets["Filtered Records"]
+    
+        # Wrap text in "Deficiencies Noted"
         col_idx = export_df.columns.get_loc("Deficiencies Noted") + 1
-        for row in ws.iter_rows(min_row=2, min_col=col_idx, max_col=col_idx, max_row=len(export_df)+1):
+        for row in ws.iter_rows(min_row=2, min_col=col_idx, max_col=col_idx, max_row=len(export_df) + 1):
             for cell in row:
                 cell.alignment = Alignment(wrap_text=True, vertical="top")
+    
+        # Apply color formatting to Status column
+        status_col_idx = export_df.columns.get_loc("Status") + 1
+        for row in ws.iter_rows(min_row=2, min_col=status_col_idx, max_col=status_col_idx, max_row=len(export_df) + 1):
+            for cell in row:
+                if str(cell.value).strip().lower() == "pending":
+                    cell.font = Font(color="FF0000")  # Red
+                elif str(cell.value).strip().lower() == "resolved":
+                    cell.font = Font(color="008000")  # Green
+    
     towb.seek(0)
+    
+    # Streamlit download button
     st.download_button("📥 Export Filtered Records to Excel", data=towb,
                        file_name="filtered_records.xlsx",
                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-
+    
     st.markdown("### 📄 Preview of Filtered Records")
-
 # -------------------- STATUS UTILS --------------------
 def get_status(feedback, remark):
     return classify_feedback(feedback, remark)
@@ -695,6 +714,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
