@@ -615,74 +615,74 @@ if not editable_filtered.empty:
 
    if submitted:
     # Validate needed columns
-    need_cols = {"_original_sheet_index", "User Feedback/Remark"}
-    if not need_cols.issubset(edited_df.columns) or "Feedback" not in editable_filtered.columns:
-        st.error("⚠️ Required columns are missing from the data.")
-    else:
-        # Compare remarks using the stable ID to find changes
-        orig = editable_filtered.set_index("_original_sheet_index")
-        new = edited_df.set_index("_original_sheet_index")
-
-        old_remarks = orig["User Feedback/Remark"].fillna("").astype(str)
-        new_remarks = new["User Feedback/Remark"].fillna("").astype(str)
-
-        # 🔧 Fix: Align indexes before comparing
-        common_ids = new_remarks.index.intersection(old_remarks.index)
-        diff_mask = new_remarks.loc[common_ids] != old_remarks.loc[common_ids]
-        changed_ids = diff_mask[diff_mask].index.tolist()
-
-        if changed_ids:
-            diffs = new.loc[changed_ids].copy()
-            diffs["_sheet_row"] = orig.loc[changed_ids, "_sheet_row"].values
-
-            for oid in changed_ids:
-                user_remark = new.loc[oid, "User Feedback/Remark"].strip()
-                if not user_remark:
-                    continue
-                # Auto routing by keywords
-                routing = {
-                    "Pertains to S&T":        ("SIGNAL & TELECOM", "Sr.DSTE"),
-                    "Pertains to OPTG":       ("OPTG", "Sr.DOM"),
-                    "Pertains to COMMERCIAL": ("COMMERCIAL", "Sr.DCM"),
-                    "Pertains to ELECT/G":    ("ELECT/G", "Sr.DEE/G"),
-                    "Pertains to ELECT/TRD":  ("ELECT/TRD", "Sr.DEE/TRD"),
-                    "Pertains to ELECT/TRO":  ("ELECT/TRO", "Sr.DEE/TRO"),
-                    "Pertains to Sr.DEN/S":   ("ENGINEERING", "Sr.DEN/S"),
-                    "Pertains to Sr.DEN/C":   ("ENGINEERING", "Sr.DEN/C"),
-                    "Pertains to Sr.DEN/Co":  ("ENGINEERING", "Sr.DEN/Co"),
-                }
-                for key, (head, action_by) in routing.items():
-                    if key in user_remark:
-                        st.session_state.df.at[oid, "Head"] = head
-                        st.session_state.df.at[oid, "Action By"] = action_by
-                        st.session_state.df.at[oid, "Sub Head"] = ""
-                        st.session_state.df.at[oid, "Feedback"] = ""
-                        diffs.at[oid, "Head"] = head
-                        diffs.at[oid, "Action By"] = action_by
-                        diffs.at[oid, "Sub Head"] = ""
-
-                existing_feedback = st.session_state.df.loc[oid, "Feedback"]
-                existing_feedback = ("" if pd.isna(existing_feedback) else str(existing_feedback)).strip()
-                combined = (
-                    existing_feedback
-                    + ("" if existing_feedback.endswith(".") or not existing_feedback else ".")
-                    + (" " if existing_feedback else "")
-                    + user_remark
-                ).strip()
-                if combined.startswith("."):
-                    combined = combined[1:].strip()
-
-                diffs.at[oid, "Feedback"] = combined
-                diffs.at[oid, "User Feedback/Remark"] = ""
-
-                st.session_state.df.at[oid, "Feedback"] = combined
-                st.session_state.df.at[oid, "User Feedback/Remark"] = ""
-
-            # Persist to storage (expects _sheet_row in diffs)
-            update_feedback_column(diffs.reset_index().rename(columns={"index": "_original_sheet_index"}))
-            st.success(f"✅ Updated {len(changed_ids)} Feedback row(s) with appended remarks.")
+        need_cols = {"_original_sheet_index", "User Feedback/Remark"}
+        if not need_cols.issubset(edited_df.columns) or "Feedback" not in editable_filtered.columns:
+            st.error("⚠️ Required columns are missing from the data.")
         else:
-            st.info("ℹ️ No changes detected to save.")
+            # Compare remarks using the stable ID to find changes
+            orig = editable_filtered.set_index("_original_sheet_index")
+            new = edited_df.set_index("_original_sheet_index")
+    
+            old_remarks = orig["User Feedback/Remark"].fillna("").astype(str)
+            new_remarks = new["User Feedback/Remark"].fillna("").astype(str)
+    
+            # 🔧 Fix: Align indexes before comparing
+            common_ids = new_remarks.index.intersection(old_remarks.index)
+            diff_mask = new_remarks.loc[common_ids] != old_remarks.loc[common_ids]
+            changed_ids = diff_mask[diff_mask].index.tolist()
+    
+            if changed_ids:
+                diffs = new.loc[changed_ids].copy()
+                diffs["_sheet_row"] = orig.loc[changed_ids, "_sheet_row"].values
+    
+                for oid in changed_ids:
+                    user_remark = new.loc[oid, "User Feedback/Remark"].strip()
+                    if not user_remark:
+                        continue
+                    # Auto routing by keywords
+                    routing = {
+                        "Pertains to S&T":        ("SIGNAL & TELECOM", "Sr.DSTE"),
+                        "Pertains to OPTG":       ("OPTG", "Sr.DOM"),
+                        "Pertains to COMMERCIAL": ("COMMERCIAL", "Sr.DCM"),
+                        "Pertains to ELECT/G":    ("ELECT/G", "Sr.DEE/G"),
+                        "Pertains to ELECT/TRD":  ("ELECT/TRD", "Sr.DEE/TRD"),
+                        "Pertains to ELECT/TRO":  ("ELECT/TRO", "Sr.DEE/TRO"),
+                        "Pertains to Sr.DEN/S":   ("ENGINEERING", "Sr.DEN/S"),
+                        "Pertains to Sr.DEN/C":   ("ENGINEERING", "Sr.DEN/C"),
+                        "Pertains to Sr.DEN/Co":  ("ENGINEERING", "Sr.DEN/Co"),
+                    }
+                    for key, (head, action_by) in routing.items():
+                        if key in user_remark:
+                            st.session_state.df.at[oid, "Head"] = head
+                            st.session_state.df.at[oid, "Action By"] = action_by
+                            st.session_state.df.at[oid, "Sub Head"] = ""
+                            st.session_state.df.at[oid, "Feedback"] = ""
+                            diffs.at[oid, "Head"] = head
+                            diffs.at[oid, "Action By"] = action_by
+                            diffs.at[oid, "Sub Head"] = ""
+    
+                    existing_feedback = st.session_state.df.loc[oid, "Feedback"]
+                    existing_feedback = ("" if pd.isna(existing_feedback) else str(existing_feedback)).strip()
+                    combined = (
+                        existing_feedback
+                        + ("" if existing_feedback.endswith(".") or not existing_feedback else ".")
+                        + (" " if existing_feedback else "")
+                        + user_remark
+                    ).strip()
+                    if combined.startswith("."):
+                        combined = combined[1:].strip()
+    
+                    diffs.at[oid, "Feedback"] = combined
+                    diffs.at[oid, "User Feedback/Remark"] = ""
+    
+                    st.session_state.df.at[oid, "Feedback"] = combined
+                    st.session_state.df.at[oid, "User Feedback/Remark"] = ""
+    
+                # Persist to storage (expects _sheet_row in diffs)
+                update_feedback_column(diffs.reset_index().rename(columns={"index": "_original_sheet_index"}))
+                st.success(f"✅ Updated {len(changed_ids)} Feedback row(s) with appended remarks.")
+            else:
+                st.info("ℹ️ No changes detected to save.")
 else:
     st.info("Deficiencies will be updated soon !")
 
@@ -695,6 +695,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
