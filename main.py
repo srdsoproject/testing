@@ -645,7 +645,7 @@ if not editable_filtered.empty:
                         "Pertains to ELECT/TRD":  ("ELECT/TRD", "Sr.DEE/TRD"),
                         "Pertains to ELECT/TRO":  ("ELECT/TRO", "Sr.DEE/TRO"),
                         "Pertains to Sr.DEN/S":  ("ENGINEERING", "Sr.DEN/S"),
-                        "Pertains to Sr.DEN/C":  ("ENGINEERING", "Sr.DEN/C"),
+                        "Pertains to ENGG CENTRAL":  ("ENGINEERING", "Sr.DEN/C"),
                         "Pertains to Sr.DEN/Co":  ("ENGINEERING", "Sr.DEN/Co"),
                         
                     }
@@ -693,6 +693,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
