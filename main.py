@@ -345,7 +345,7 @@ st.markdown(
     </div>
     <h1 style="margin-top:0;color:var(--text-color);">📋 S.A.R.A.L</h1>
     <h3 style="margin-top:-10px;font-weight:normal;color:var(--text-color);">
-        (Safety Abnormality Report & Action List – Version 1.1.5)
+        (Safety Abnormality Report & Action List – Version 1.1.8)
     </h3>
     """,
     unsafe_allow_html=True
@@ -695,6 +695,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
