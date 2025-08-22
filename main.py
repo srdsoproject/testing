@@ -493,7 +493,7 @@ with tabs[0]:
     # ---------- EXPORT ----------
     export_df = filtered[[
         "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
-        "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "User Feedback/Remark"
+        "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "User Feedback/Remark", "Status"
     ]].copy()
     towb = BytesIO()
     with pd.ExcelWriter(towb, engine="openpyxl") as writer:
@@ -695,6 +695,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 
