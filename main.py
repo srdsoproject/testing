@@ -706,3 +706,10 @@ st.markdown(
 
 
 
+st.markdown("""
+**Following is the syntax to forward deficiency attention to other department:**  
+
+- For Operating: Pertains to **OPTG**  
+- For Signal & Telecom: Pertains to **S&T** 
+
+""")
