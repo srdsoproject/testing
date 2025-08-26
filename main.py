@@ -698,7 +698,7 @@ else:
 st.markdown(
     """
     <marquee behavior="scroll" direction="left" style="color:red;font-weight:bold;font-size:16px;">
-        For any correction in data, contact Safety Department on sursafetyposition@gmail.com
+        For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 90225 07772
     </marquee>
     """,
     unsafe_allow_html=True
@@ -707,9 +707,16 @@ st.markdown(
 
 
 st.markdown("""
-**Following is the syntax to forward deficiency attention to other department:**  
+**Use the following syntax or copy to forward attention to other department:**  
 
 - For Operating: Pertains to **OPTG**  
 - For Signal & Telecom: Pertains to **S&T** 
+- For Commercial: Pertains to **COMMERCIAL**
+- For ELECT/G: Pertains to **ELECT/G**
+- For ELECT/TRD: Pertains to **ELECT/TRD**
+- For ELECT/TRO: Pertains to **ELECT/TRO**
+- For Engineering South: Pertains to **Sr.DEN/S**
+- For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
