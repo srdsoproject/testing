@@ -698,7 +698,7 @@ else:
 st.markdown(
     """
     <marquee behavior="scroll" direction="left" style="color:red;font-weight:bold;font-size:16px;">
-        For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 90225 07772
+        For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
     </marquee>
     """,
     unsafe_allow_html=True
@@ -719,4 +719,5 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
