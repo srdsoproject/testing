@@ -605,6 +605,7 @@ if not editable_filtered.empty:
     # ---------------- LOCKING RULE ----------------
     cutoff_date = dt.date.today() - dt.timedelta(days=30)
 
+    # Count pending per head
     recent_pending = (
         filtered[filtered["Date of Inspection"].dt.date >= cutoff_date]
         .groupby("Head")["Status"]
@@ -614,13 +615,35 @@ if not editable_filtered.empty:
 
     locked_heads = [head for head, count in recent_pending.items() if count > 90]
 
-    if locked_heads:
-        st.warning(
-            f"🚫 Feedback entry is locked for {', '.join(locked_heads)} "
-            f"because they have more than 90 pending deficiencies in the last 30 days."
+    # Default: all rows unlocked
+    editable_filtered["Locked"] = False
+
+    # Apply restriction: lock all rows except the latest 2 inspection dates
+    for head in locked_heads:
+        head_rows = editable_filtered[editable_filtered["Head"] == head]
+
+        # Find the latest 2 inspection dates for this head
+        latest_dates = (
+            head_rows["Date of Inspection"]
+            .dropna()
+            .sort_values(ascending=False)
+            .dt.date
+            .unique()[:2]   # take 2 most recent unique dates
         )
 
-    editable_filtered["Locked"] = editable_filtered["Head"].isin(locked_heads)
+        # Lock all rows for this head EXCEPT the latest 2 dates
+        editable_filtered.loc[
+            (editable_filtered["Head"] == head) &
+            (~editable_filtered["Date of Inspection"].dt.date.isin(latest_dates)),
+            "Locked"
+        ] = True
+
+    if locked_heads:
+        st.warning(
+            f"🚫 Feedback entry is restricted for {', '.join(locked_heads)} "
+            f"(more than 90 pending in the last 30 days). "
+            f"Only the latest 2 inspection dates are open for feedback until backlog is cleared."
+        )
 
     # ---------------- BUILD DISPLAY DF ----------------
     display_cols = [
@@ -769,6 +792,7 @@ else:
     st.info("Deficiencies will be updated soon !")
 
 
+
 # -------------------- FOOTER --------------------
 st.markdown(
     """
@@ -794,6 +818,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
