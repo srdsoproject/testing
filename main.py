@@ -761,7 +761,24 @@ if st.session_state.alerts_log:
             st.markdown(log, unsafe_allow_html=True)
             if st.button("Mark as Read", key=f"mark_{i}"):
                 st.session_state.alerts_log.pop(i)
+                st.session_state.last_alert_clicked = i  # save position
                 st.rerun()
+
+# After rerun, if we just clicked
+if "last_alert_clicked" in st.session_state:
+    st.markdown(
+        f"""
+        <script>
+            var el = window.document.querySelector('details');
+            if (el) {{
+                el.scrollIntoView({{behavior: "smooth", block: "start"}});
+            }}
+        </script>
+        """,
+        unsafe_allow_html=True
+    )
+    del st.session_state.last_alert_clicked
+
 else:
     st.info("✅ No pending alerts.")
 
@@ -789,4 +806,5 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
