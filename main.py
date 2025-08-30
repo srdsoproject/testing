@@ -493,8 +493,9 @@ with tabs[0]:
     # ---------- EXPORT ----------
     from io import BytesIO
     import pandas as pd
-    from openpyxl.styles import Alignment, Font
-        
+    from openpyxl.styles import Alignment, Font, Border, Side
+    
+    # Export dataframe
     export_df = filtered[[
         "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
         "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "User Feedback/Remark",
@@ -506,11 +507,32 @@ with tabs[0]:
         export_df.to_excel(writer, index=False, sheet_name="Filtered Records")
         ws = writer.sheets["Filtered Records"]
     
-        # Wrap text in "Deficiencies Noted"
-        col_idx = export_df.columns.get_loc("Deficiencies Noted") + 1
-        for row in ws.iter_rows(min_row=2, min_col=col_idx, max_col=col_idx, max_row=len(export_df) + 1):
+        # Set alignment + wrap text for ALL cells
+        for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
             for cell in row:
                 cell.alignment = Alignment(wrap_text=True, vertical="top")
+    
+        # Auto column widths
+        for col in ws.columns:
+            max_length = 0
+            col_letter = col[0].column_letter
+            for cell in col:
+                try:
+                    if cell.value:
+                        max_length = max(max_length, len(str(cell.value)))
+                except:
+                    pass
+            adjusted_width = (max_length + 2) if max_length < 50 else 50  # cap width
+            ws.column_dimensions[col_letter].width = adjusted_width
+    
+        # Apply border to all cells
+        thin_border = Border(left=Side(style='thin'),
+                             right=Side(style='thin'),
+                             top=Side(style='thin'),
+                             bottom=Side(style='thin'))
+        for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
+            for cell in row:
+                cell.border = thin_border
     
         # Apply color formatting to Status column
         status_col_idx = export_df.columns.get_loc("Status") + 1
@@ -524,11 +546,13 @@ with tabs[0]:
     towb.seek(0)
     
     # Streamlit download button
-    st.download_button("📥 Export Filtered Records to Excel", data=towb,
-                       file_name="filtered_records.xlsx",
-                       mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    
-    st.markdown("### 📄 Preview of Filtered Records")
+    st.download_button(
+        "📥 Export Filtered Records to Excel", 
+        data=towb,
+        file_name="filtered_records.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
 # -------------------- STATUS UTILS --------------------
 def get_status(feedback, remark):
     return classify_feedback(feedback, remark)
@@ -719,5 +743,6 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
