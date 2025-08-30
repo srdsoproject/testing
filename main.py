@@ -595,11 +595,11 @@ st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
 editable_filtered = filtered.copy()
 if not editable_filtered.empty:
-    # Ensure stable IDs exist for reliable updates
+    # Ensure stable IDs exist
     if "_original_sheet_index" not in editable_filtered.columns:
         editable_filtered["_original_sheet_index"] = editable_filtered.index
     if "_sheet_row" not in editable_filtered.columns:
-        editable_filtered["_sheet_row"] = editable_filtered.index + 2  # sheet row (header + 1)
+        editable_filtered["_sheet_row"] = editable_filtered.index + 2  # excel row index
 
     display_cols = [
         "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
@@ -608,13 +608,13 @@ if not editable_filtered.empty:
     ]
     editable_df = editable_filtered[display_cols].copy()
 
-    # Show only date part
+    # Format inspection date (show only YYYY-MM-DD)
     if "Date of Inspection" in editable_df.columns:
         editable_df["Date of Inspection"] = pd.to_datetime(
             editable_df["Date of Inspection"], errors="coerce"
-        ).dt.strftime("%Y-%m-%d")  # convert to string in YYYY-MM-DD format
+        ).dt.strftime("%Y-%m-%d")
 
-    # Status column
+    # Add Status column
     editable_df.insert(
         editable_df.columns.get_loc("User Feedback/Remark") + 1,
         "Status",
@@ -622,15 +622,15 @@ if not editable_filtered.empty:
     )
     editable_df["Status"] = editable_df["Status"].apply(color_text_status)
 
-    # Carry ID columns through grid (hidden)
+    # Carry helper IDs
     editable_df["_original_sheet_index"] = editable_filtered["_original_sheet_index"].values
     editable_df["_sheet_row"] = editable_filtered["_sheet_row"].values
 
-    # -------- AG GRID CONFIG (wrap + auto height, only remarks editable) --------
+    # --- GRID CONFIG ---
     gb = GridOptionsBuilder.from_dataframe(editable_df)
     gb.configure_default_column(editable=False, wrapText=True, autoHeight=True)
 
-    # Make ONLY "User Feedback/Remark" editable with a large text editor popup
+    # Only "User Feedback/Remark" editable
     gb.configure_column(
         "User Feedback/Remark",
         editable=True,
@@ -641,7 +641,7 @@ if not editable_filtered.empty:
         cellEditorParams={"maxLength": 4000, "rows": 10, "cols": 60}
     )
 
-    # Hide helper ID columns
+    # Hide helper ID cols
     gb.configure_column("_original_sheet_index", hide=True)
     gb.configure_column("_sheet_row", hide=True)
 
@@ -650,6 +650,7 @@ if not editable_filtered.empty:
 
     grid_options = gb.build()
 
+    # Render grid
     grid_response = AgGrid(
         editable_df,
         gridOptions=grid_options,
@@ -668,19 +669,17 @@ if not editable_filtered.empty:
         st.success("✅ Data refreshed successfully!")
 
     if submitted:
-        # Validate needed columns
+        # Validate columns
         need_cols = {"_original_sheet_index", "User Feedback/Remark"}
         if not need_cols.issubset(edited_df.columns) or "Feedback" not in editable_filtered.columns:
             st.error("⚠️ Required columns are missing from the data.")
         else:
-            # Compare remarks using the stable ID to find changes
             orig = editable_filtered.set_index("_original_sheet_index")
             new = edited_df.set_index("_original_sheet_index")
 
             old_remarks = orig["User Feedback/Remark"].fillna("").astype(str)
             new_remarks = new["User Feedback/Remark"].fillna("").astype(str)
 
-            # 🔧 Fix: Align indexes before comparing
             common_ids = new_remarks.index.intersection(old_remarks.index)
             diff_mask = new_remarks.loc[common_ids] != old_remarks.loc[common_ids]
             changed_ids = diff_mask[diff_mask].index.tolist()
@@ -689,23 +688,26 @@ if not editable_filtered.empty:
                 diffs = new.loc[changed_ids].copy()
                 diffs["_sheet_row"] = orig.loc[changed_ids, "_sheet_row"].values
 
+                # mapping for routing
+                routing = {
+                    "Pertains to S&T":        ("SIGNAL & TELECOM", "Sr.DSTE"),
+                    "Pertains to OPTG":       ("OPTG", "Sr.DOM"),
+                    "Pertains to COMMERCIAL": ("COMMERCIAL", "Sr.DCM"),
+                    "Pertains to ELECT/G":    ("ELECT/G", "Sr.DEE/G"),
+                    "Pertains to ELECT/TRD":  ("ELECT/TRD", "Sr.DEE/TRD"),
+                    "Pertains to ELECT/TRO":  ("ELECT/TRO", "Sr.DEE/TRO"),
+                    "Pertains to Sr.DEN/S":   ("ENGINEERING", "Sr.DEN/S"),
+                    "Pertains to Sr.DEN/C":   ("ENGINEERING", "Sr.DEN/C"),
+                    "Pertains to Sr.DEN/Co":  ("ENGINEERING", "Sr.DEN/Co"),
+                }
+
+                triggered_alerts = []  # collect alerts
+
                 for oid in changed_ids:
                     user_remark = new.loc[oid, "User Feedback/Remark"].strip()
                     if not user_remark:
                         continue
 
-                    # Auto routing by keywords
-                    routing = {
-                        "Pertains to S&T":        ("SIGNAL & TELECOM", "Sr.DSTE"),
-                        "Pertains to OPTG":       ("OPTG", "Sr.DOM"),
-                        "Pertains to COMMERCIAL": ("COMMERCIAL", "Sr.DCM"),
-                        "Pertains to ELECT/G":    ("ELECT/G", "Sr.DEE/G"),
-                        "Pertains to ELECT/TRD":  ("ELECT/TRD", "Sr.DEE/TRD"),
-                        "Pertains to ELECT/TRO":  ("ELECT/TRO", "Sr.DEE/TRO"),
-                        "Pertains to Sr.DEN/S":   ("ENGINEERING", "Sr.DEN/S"),
-                        "Pertains to Sr.DEN/C":   ("ENGINEERING", "Sr.DEN/C"),
-                        "Pertains to Sr.DEN/Co":  ("ENGINEERING", "Sr.DEN/Co"),
-                    }
                     for key, (head, action_by) in routing.items():
                         if key in user_remark:
                             st.session_state.df.at[oid, "Head"] = head
@@ -715,46 +717,28 @@ if not editable_filtered.empty:
                             diffs.at[oid, "Action By"] = action_by
                             diffs.at[oid, "Sub Head"] = ""
 
-                    # ✅ Replace Feedback with new remark (no append)
+                            # 🚨 Add alert message
+                            triggered_alerts.append(f"New alert received on **{head}** department")
+
+                    # replace Feedback with remark
                     diffs.at[oid, "Feedback"] = user_remark
                     diffs.at[oid, "User Feedback/Remark"] = ""
 
                     st.session_state.df.at[oid, "Feedback"] = user_remark
                     st.session_state.df.at[oid, "User Feedback/Remark"] = ""
 
-                # Persist to storage (expects _sheet_row in diffs)
                 update_feedback_column(diffs.reset_index().rename(columns={"index": "_original_sheet_index"}))
-                st.success(f"✅ Updated {len(changed_ids)} Feedback row(s) with new remarks.")
+                st.success(f"✅ Updated {len(changed_ids)} Feedback row(s).")
+
+                # show all alerts at bottom
+                for alert in triggered_alerts:
+                    st.warning(alert)
+
             else:
                 st.info("ℹ️ No changes detected to save.")
-
-    # ---------------- ALERT SYSTEM ----------------
-    alert_mapping = {
-        "Pertains to S&T": "SIGNAL & TELECOM",
-        "Pertains to OPTG": "OPERATING",
-        "Pertains to COMMERCIAL": "COMMERCIAL",
-        "Pertains to ELECT/G": "ELECTRICAL (G)",
-        "Pertains to ELECT/TRD": "ELECTRICAL (TRD)",
-        "Pertains to ELECT/TRO": "ELECTRICAL (TRO)",
-        "Pertains to Sr.DEN/S": "ENGINEERING (Sr.DEN/S)",
-        "Pertains to Sr.DEN/C": "ENGINEERING (Sr.DEN/C)",
-        "Pertains to Sr.DEN/Co": "ENGINEERING (Sr.DEN/Co)",
-    }
-
-    triggered_alerts = []
-    if "User Feedback/Remark" in edited_df.columns:
-        for remark in edited_df["User Feedback/Remark"].dropna():
-            for key, dept in alert_mapping.items():
-                if key in remark:
-                    triggered_alerts.append(dept)
-
-    if triggered_alerts:
-        st.markdown("---")
-        for dept in set(triggered_alerts):
-            st.warning(f"🔔 New alert received on **{dept}** department")
-
 else:
     st.info("Deficiencies will be updated soon !")
+
 
 # -------------------- FOOTER --------------------
 st.markdown(
@@ -781,6 +765,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
