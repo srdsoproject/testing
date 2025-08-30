@@ -590,22 +590,20 @@ st.markdown(
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 import pandas as pd
 import streamlit as st
-import datetime
 
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
-# --- Setup log in session state ---
-today_str = datetime.date.today().strftime("%Y-%m-%d")
-if "alerts_log" not in st.session_state or st.session_state.get("alerts_date") != today_str:
-    st.session_state.alerts_log = []   # reset log for new day
-    st.session_state.alerts_date = today_str
+# Initialize alerts log
+if "alerts_log" not in st.session_state:
+    st.session_state.alerts_log = []
 
 editable_filtered = filtered.copy()
 if not editable_filtered.empty:
+    # Ensure stable IDs exist for reliable updates
     if "_original_sheet_index" not in editable_filtered.columns:
         editable_filtered["_original_sheet_index"] = editable_filtered.index
     if "_sheet_row" not in editable_filtered.columns:
-        editable_filtered["_sheet_row"] = editable_filtered.index + 2
+        editable_filtered["_sheet_row"] = editable_filtered.index + 2  # sheet row (header + 1)
 
     display_cols = [
         "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
@@ -614,11 +612,13 @@ if not editable_filtered.empty:
     ]
     editable_df = editable_filtered[display_cols].copy()
 
+    # Show only date part
     if "Date of Inspection" in editable_df.columns:
         editable_df["Date of Inspection"] = pd.to_datetime(
             editable_df["Date of Inspection"], errors="coerce"
-        ).dt.strftime("%Y-%m-%d")
+        ).dt.strftime("%Y-%m-%d")  # convert to string in YYYY-MM-DD format
 
+    # Status column
     editable_df.insert(
         editable_df.columns.get_loc("User Feedback/Remark") + 1,
         "Status",
@@ -626,12 +626,15 @@ if not editable_filtered.empty:
     )
     editable_df["Status"] = editable_df["Status"].apply(color_text_status)
 
+    # Carry ID columns through grid (hidden)
     editable_df["_original_sheet_index"] = editable_filtered["_original_sheet_index"].values
     editable_df["_sheet_row"] = editable_filtered["_sheet_row"].values
 
+    # -------- AG GRID CONFIG (wrap + auto height, only remarks editable) --------
     gb = GridOptionsBuilder.from_dataframe(editable_df)
     gb.configure_default_column(editable=False, wrapText=True, autoHeight=True)
 
+    # Make ONLY "User Feedback/Remark" editable with a large text editor popup
     gb.configure_column(
         "User Feedback/Remark",
         editable=True,
@@ -642,9 +645,11 @@ if not editable_filtered.empty:
         cellEditorParams={"maxLength": 4000, "rows": 10, "cols": 60}
     )
 
+    # Hide helper ID columns
     gb.configure_column("_original_sheet_index", hide=True)
     gb.configure_column("_sheet_row", hide=True)
 
+    # Easier editing UX
     gb.configure_grid_options(singleClickEdit=True)
 
     grid_options = gb.build()
@@ -667,16 +672,19 @@ if not editable_filtered.empty:
         st.success("✅ Data refreshed successfully!")
 
     if submitted:
+        # Validate needed columns
         need_cols = {"_original_sheet_index", "User Feedback/Remark"}
         if not need_cols.issubset(edited_df.columns) or "Feedback" not in editable_filtered.columns:
             st.error("⚠️ Required columns are missing from the data.")
         else:
+            # Compare remarks using the stable ID to find changes
             orig = editable_filtered.set_index("_original_sheet_index")
             new = edited_df.set_index("_original_sheet_index")
 
             old_remarks = orig["User Feedback/Remark"].fillna("").astype(str)
             new_remarks = new["User Feedback/Remark"].fillna("").astype(str)
 
+            # 🔧 Fix: Align indexes before comparing
             common_ids = new_remarks.index.intersection(old_remarks.index)
             diff_mask = new_remarks.loc[common_ids] != old_remarks.loc[common_ids]
             changed_ids = diff_mask[diff_mask].index.tolist()
@@ -685,6 +693,7 @@ if not editable_filtered.empty:
                 diffs = new.loc[changed_ids].copy()
                 diffs["_sheet_row"] = orig.loc[changed_ids, "_sheet_row"].values
 
+                # Routing dictionary
                 routing = {
                     "Pertains to S&T":        ("SIGNAL & TELECOM", "Sr.DSTE"),
                     "Pertains to OPTG":       ("OPTG", "Sr.DOM"),
@@ -701,7 +710,7 @@ if not editable_filtered.empty:
                     user_remark = new.loc[oid, "User Feedback/Remark"].strip()
                     if not user_remark:
                         continue
-                
+
                     for key, (head, action_by) in routing.items():
                         if key in user_remark:
                             st.session_state.df.at[oid, "Head"] = head
@@ -710,12 +719,12 @@ if not editable_filtered.empty:
                             diffs.at[oid, "Head"] = head
                             diffs.at[oid, "Action By"] = action_by
                             diffs.at[oid, "Sub Head"] = ""
-                
+
                             # 👉 Collect extra info
                             date_str = orig.loc[oid, "Date of Inspection"]
                             deficiency = orig.loc[oid, "Deficiencies Noted"]
-                            forwarded_by = orig.loc[oid, "Head"]
-                
+                            forwarded_by = orig.loc[oid, "Inspection By"]
+
                             # 👉 Build alert message (now includes Forwarded By)
                             alert_msg = (
                                 f"📌 **{head} Department Alert**\n"
@@ -724,28 +733,37 @@ if not editable_filtered.empty:
                                 f"- Forwarded By: {forwarded_by}\n"
                                 f"- Forwarded Remark: {user_remark}"
                             )
-                
-                            # Add to persistent log
-                            st.session_state.alerts_log.insert(0,alert_msg)
 
+                            # Insert at top of log
+                            st.session_state.alerts_log.insert(0, alert_msg)
+
+                    # ✅ Replace Feedback with new remark (no append)
                     diffs.at[oid, "Feedback"] = user_remark
                     diffs.at[oid, "User Feedback/Remark"] = ""
+
                     st.session_state.df.at[oid, "Feedback"] = user_remark
                     st.session_state.df.at[oid, "User Feedback/Remark"] = ""
 
+                # Persist to storage (expects _sheet_row in diffs)
                 update_feedback_column(diffs.reset_index().rename(columns={"index": "_original_sheet_index"}))
-                st.success(f"✅ Updated {len(changed_ids)} Feedback row(s).")
+                st.success(f"✅ Updated {len(changed_ids)} Feedback row(s) with new remarks.")
             else:
                 st.info("ℹ️ No changes detected to save.")
-
-    # --- Always display alerts log (persistent) ---
-    if st.session_state.alerts_log:
-        st.subheader("🚨 Attention Passed to Departments (Log)")
-        for alert in st.session_state.alerts_log:
-            st.info(alert)
-
 else:
     st.info("Deficiencies will be updated soon !")
+
+# ---------------- ALERT LOG SECTION ----------------
+st.markdown("## 📋 Alerts Log")
+
+if st.session_state.alerts_log:
+    for i, log in enumerate(st.session_state.alerts_log):
+        with st.expander(f"🔔 Alert {i+1}", expanded=True):
+            st.markdown(log, unsafe_allow_html=True)
+            if st.button("Mark as Read", key=f"mark_{i}"):
+                st.session_state.alerts_log.pop(i)
+                st.experimental_rerun()
+else:
+    st.info("✅ No pending alerts.")
 
 
 # -------------------- FOOTER --------------------
@@ -771,9 +789,3 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
-
-
-
-
-
-
