@@ -698,30 +698,35 @@ if not editable_filtered.empty:
                 }
 
                 for oid in changed_ids:
-                    user_remark = new.loc[oid, "User Feedback/Remark"].strip()
-                    if not user_remark:
-                        continue
-
-                    for key, (head, action_by) in routing.items():
-                        if key in user_remark:
-                            st.session_state.df.at[oid, "Head"] = head
-                            st.session_state.df.at[oid, "Action By"] = action_by
-                            st.session_state.df.at[oid, "Sub Head"] = ""
-                            diffs.at[oid, "Head"] = head
-                            diffs.at[oid, "Action By"] = action_by
-                            diffs.at[oid, "Sub Head"] = ""
-
-                            # 👉 Build alert message
-                            date_str = orig.loc[oid, "Date of Inspection"]
-                            deficiency = orig.loc[oid, "Deficiencies Noted"]
-                            alert_msg = (
-                                f"📌 **{head} Department Alert**\n"
-                                f"- Date: {date_str}\n"
-                                f"- Deficiency: {deficiency}\n"
-                                f"- Forwarded Remark: {user_remark}"
-                            )
-                            # Add to persistent log
-                            st.session_state.alerts_log.append(alert_msg)
+                user_remark = new.loc[oid, "User Feedback/Remark"].strip()
+                if not user_remark:
+                    continue
+            
+                for key, (head, action_by) in routing.items():
+                    if key in user_remark:
+                        st.session_state.df.at[oid, "Head"] = head
+                        st.session_state.df.at[oid, "Action By"] = action_by
+                        st.session_state.df.at[oid, "Sub Head"] = ""
+                        diffs.at[oid, "Head"] = head
+                        diffs.at[oid, "Action By"] = action_by
+                        diffs.at[oid, "Sub Head"] = ""
+            
+                        # 👉 Collect extra info
+                        date_str = orig.loc[oid, "Date of Inspection"]
+                        deficiency = orig.loc[oid, "Deficiencies Noted"]
+                        forwarded_by = orig.loc[oid, "Inspection By"]
+            
+                        # 👉 Build alert message (now includes Forwarded By)
+                        alert_msg = (
+                            f"📌 **{head} Department Alert**\n"
+                            f"- Date: {date_str}\n"
+                            f"- Deficiency: {deficiency}\n"
+                            f"- Forwarded By: {forwarded_by}\n"
+                            f"- Forwarded Remark: {user_remark}"
+                        )
+            
+                        # Add to persistent log
+                        st.session_state.alerts_log.append(alert_msg)
 
                     diffs.at[oid, "Feedback"] = user_remark
                     diffs.at[oid, "User Feedback/Remark"] = ""
@@ -766,4 +771,5 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
