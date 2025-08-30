@@ -662,24 +662,23 @@ if not editable_filtered.empty:
 
     # Conditionally editable User Feedback/Remark
     gb.configure_column(
-        "User Feedback/Remark",
-        wrapText=True,
-        autoHeight=True,
-        editable=True,  # base true
-        cellEditor="agLargeTextCellEditor",
-        cellEditorPopup=True,
-        cellEditorParams={"maxLength": 4000, "rows": 10, "cols": 60},
-        cellEditorSelector="""
-        function(params) {
-            if (params.data.Locked) {
-                return null;  // disables editor if Locked=True
-            }
-            return {
-                component: 'agLargeTextCellEditor'
-            }
+    "User Feedback/Remark",
+    wrapText=True,
+    autoHeight=True,
+    cellEditorSelector="""
+    function(params) {
+        if (params.data.Locked) {
+            return false;  // 🔒 makes cell read-only
         }
-        """
-    )
+        return {
+            component: 'agLargeTextCellEditor',
+            popup: true,
+            params: { maxLength: 4000, rows: 10, cols: 60 }
+        }
+    }
+    """
+)
+
 
     # Hide helper ID + Locked columns
     gb.configure_column("_original_sheet_index", hide=True)
@@ -800,6 +799,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
