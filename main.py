@@ -590,6 +590,7 @@ st.markdown(
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 import pandas as pd
 import streamlit as st
+import datetime as dt
 
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
@@ -601,18 +602,39 @@ if not editable_filtered.empty:
     if "_sheet_row" not in editable_filtered.columns:
         editable_filtered["_sheet_row"] = editable_filtered.index + 2  # sheet row (header + 1)
 
+    # ---------------- LOCKING RULE ----------------
+    cutoff_date = dt.date.today() - dt.timedelta(days=30)
+
+    recent_pending = (
+        filtered[filtered["Date of Inspection"].dt.date >= cutoff_date]
+        .groupby("Head")["Status"]
+        .apply(lambda x: (x == "Pending").sum())
+        .to_dict()
+    )
+
+    locked_heads = [head for head, count in recent_pending.items() if count > 90]
+
+    if locked_heads:
+        st.warning(
+            f"🚫 Feedback entry is locked for {', '.join(locked_heads)} "
+            f"because they have more than 90 pending deficiencies in the last 30 days."
+        )
+
+    editable_filtered["Locked"] = editable_filtered["Head"].isin(locked_heads)
+
+    # ---------------- BUILD DISPLAY DF ----------------
     display_cols = [
         "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
         "Deficiencies Noted", "Inspection By", "Action By", "Feedback",
         "User Feedback/Remark"
     ]
-    editable_df = editable_filtered[display_cols].copy()
+    editable_df = editable_filtered[display_cols + ["Locked"]].copy()
 
     # Show only date part
     if "Date of Inspection" in editable_df.columns:
         editable_df["Date of Inspection"] = pd.to_datetime(
             editable_df["Date of Inspection"], errors="coerce"
-        ).dt.strftime("%Y-%m-%d")  # convert to string in YYYY-MM-DD format
+        ).dt.strftime("%Y-%m-%d")
 
     # Status column
     editable_df.insert(
@@ -626,11 +648,11 @@ if not editable_filtered.empty:
     editable_df["_original_sheet_index"] = editable_filtered["_original_sheet_index"].values
     editable_df["_sheet_row"] = editable_filtered["_sheet_row"].values
 
-    # -------- AG GRID CONFIG (wrap + auto height, only remarks editable) --------
+    # ---------------- AG GRID CONFIG ----------------
     gb = GridOptionsBuilder.from_dataframe(editable_df)
     gb.configure_default_column(editable=False, wrapText=True, autoHeight=True)
 
-    # Make ONLY "User Feedback/Remark" editable with a large text editor popup
+    # Make ONLY "User Feedback/Remark" editable if not locked
     gb.configure_column(
         "User Feedback/Remark",
         editable=True,
@@ -638,12 +660,23 @@ if not editable_filtered.empty:
         autoHeight=True,
         cellEditor="agLargeTextCellEditor",
         cellEditorPopup=True,
-        cellEditorParams={"maxLength": 4000, "rows": 10, "cols": 60}
+        cellEditorParams={"maxLength": 4000, "rows": 10, "cols": 60},
+        cellEditorSelector="""
+        function(params) {
+            if (params.data.Locked) {
+                return null;  // disables editor if row is locked
+            }
+            return {
+                component: 'agLargeTextCellEditor'
+            }
+        }
+        """
     )
 
-    # Hide helper ID columns
+    # Hide helper ID & Locked columns
     gb.configure_column("_original_sheet_index", hide=True)
     gb.configure_column("_sheet_row", hide=True)
+    gb.configure_column("Locked", hide=True)
 
     # Easier editing UX
     gb.configure_grid_options(singleClickEdit=True)
@@ -661,26 +694,25 @@ if not editable_filtered.empty:
 
     edited_df = pd.DataFrame(grid_response["data"])
 
+    # ---------------- ACTION BUTTONS ----------------
     c1, c2, _ = st.columns([1, 1, 1])
     submitted = c1.button("✅ Submit Feedback")
     if c2.button("🔄 Refresh Data"):
         st.session_state.df = load_data()
         st.success("✅ Data refreshed successfully!")
 
+    # ---------------- SAVE CHANGES ----------------
     if submitted:
-        # Validate needed columns
         need_cols = {"_original_sheet_index", "User Feedback/Remark"}
         if not need_cols.issubset(edited_df.columns) or "Feedback" not in editable_filtered.columns:
             st.error("⚠️ Required columns are missing from the data.")
         else:
-            # Compare remarks using the stable ID to find changes
             orig = editable_filtered.set_index("_original_sheet_index")
             new = edited_df.set_index("_original_sheet_index")
 
             old_remarks = orig["User Feedback/Remark"].fillna("").astype(str)
             new_remarks = new["User Feedback/Remark"].fillna("").astype(str)
 
-            # 🔧 Fix: Align indexes before comparing
             common_ids = new_remarks.index.intersection(old_remarks.index)
             diff_mask = new_remarks.loc[common_ids] != old_remarks.loc[common_ids]
             changed_ids = diff_mask[diff_mask].index.tolist()
@@ -690,6 +722,10 @@ if not editable_filtered.empty:
                 diffs["_sheet_row"] = orig.loc[changed_ids, "_sheet_row"].values
 
                 for oid in changed_ids:
+                    # If the row belongs to a locked head → skip saving
+                    if orig.loc[oid, "Locked"]:
+                        continue
+
                     user_remark = new.loc[oid, "User Feedback/Remark"].strip()
                     if not user_remark:
                         continue
@@ -722,13 +758,16 @@ if not editable_filtered.empty:
                     st.session_state.df.at[oid, "Feedback"] = user_remark
                     st.session_state.df.at[oid, "User Feedback/Remark"] = ""
 
-                # Persist to storage (expects _sheet_row in diffs)
-                update_feedback_column(diffs.reset_index().rename(columns={"index": "_original_sheet_index"}))
+                # Persist to storage
+                update_feedback_column(
+                    diffs.reset_index().rename(columns={"index": "_original_sheet_index"})
+                )
                 st.success(f"✅ Updated {len(changed_ids)} Feedback row(s) with new remarks.")
             else:
                 st.info("ℹ️ No changes detected to save.")
 else:
     st.info("Deficiencies will be updated soon !")
+
 
 # -------------------- FOOTER --------------------
 st.markdown(
@@ -755,6 +794,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
