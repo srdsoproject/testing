@@ -599,7 +599,7 @@ if not editable_filtered.empty:
     if "_original_sheet_index" not in editable_filtered.columns:
         editable_filtered["_original_sheet_index"] = editable_filtered.index
     if "_sheet_row" not in editable_filtered.columns:
-        editable_filtered["_sheet_row"] = editable_filtered.index + 2  # excel row index
+        editable_filtered["_sheet_row"] = editable_filtered.index + 2
 
     display_cols = [
         "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
@@ -608,13 +608,13 @@ if not editable_filtered.empty:
     ]
     editable_df = editable_filtered[display_cols].copy()
 
-    # Format inspection date (show only YYYY-MM-DD)
+    # Format inspection date
     if "Date of Inspection" in editable_df.columns:
         editable_df["Date of Inspection"] = pd.to_datetime(
             editable_df["Date of Inspection"], errors="coerce"
         ).dt.strftime("%Y-%m-%d")
 
-    # Add Status column
+    # Status column
     editable_df.insert(
         editable_df.columns.get_loc("User Feedback/Remark") + 1,
         "Status",
@@ -630,7 +630,6 @@ if not editable_filtered.empty:
     gb = GridOptionsBuilder.from_dataframe(editable_df)
     gb.configure_default_column(editable=False, wrapText=True, autoHeight=True)
 
-    # Only "User Feedback/Remark" editable
     gb.configure_column(
         "User Feedback/Remark",
         editable=True,
@@ -641,16 +640,13 @@ if not editable_filtered.empty:
         cellEditorParams={"maxLength": 4000, "rows": 10, "cols": 60}
     )
 
-    # Hide helper ID cols
     gb.configure_column("_original_sheet_index", hide=True)
     gb.configure_column("_sheet_row", hide=True)
 
-    # Easier editing UX
     gb.configure_grid_options(singleClickEdit=True)
 
     grid_options = gb.build()
 
-    # Render grid
     grid_response = AgGrid(
         editable_df,
         gridOptions=grid_options,
@@ -669,7 +665,6 @@ if not editable_filtered.empty:
         st.success("✅ Data refreshed successfully!")
 
     if submitted:
-        # Validate columns
         need_cols = {"_original_sheet_index", "User Feedback/Remark"}
         if not need_cols.issubset(edited_df.columns) or "Feedback" not in editable_filtered.columns:
             st.error("⚠️ Required columns are missing from the data.")
@@ -688,7 +683,6 @@ if not editable_filtered.empty:
                 diffs = new.loc[changed_ids].copy()
                 diffs["_sheet_row"] = orig.loc[changed_ids, "_sheet_row"].values
 
-                # mapping for routing
                 routing = {
                     "Pertains to S&T":        ("SIGNAL & TELECOM", "Sr.DSTE"),
                     "Pertains to OPTG":       ("OPTG", "Sr.DOM"),
@@ -701,7 +695,7 @@ if not editable_filtered.empty:
                     "Pertains to Sr.DEN/Co":  ("ENGINEERING", "Sr.DEN/Co"),
                 }
 
-                triggered_alerts = []  # collect alerts
+                triggered_alerts = []
 
                 for oid in changed_ids:
                     user_remark = new.loc[oid, "User Feedback/Remark"].strip()
@@ -717,22 +711,26 @@ if not editable_filtered.empty:
                             diffs.at[oid, "Action By"] = action_by
                             diffs.at[oid, "Sub Head"] = ""
 
-                            # 🚨 Add alert message
-                            triggered_alerts.append(f"New alert received on **{head}** department")
+                            # 👉 Add detailed alert message
+                            date_str = orig.loc[oid, "Date of Inspection"]
+                            deficiency = orig.loc[oid, "Deficiencies Noted"]
+                            triggered_alerts.append(
+                                f"📌 **{head} Department Alert**\n- Date: {date_str}\n- Deficiency: {deficiency}\n- Forwarded Remark: {user_remark}"
+                            )
 
-                    # replace Feedback with remark
                     diffs.at[oid, "Feedback"] = user_remark
                     diffs.at[oid, "User Feedback/Remark"] = ""
-
                     st.session_state.df.at[oid, "Feedback"] = user_remark
                     st.session_state.df.at[oid, "User Feedback/Remark"] = ""
 
                 update_feedback_column(diffs.reset_index().rename(columns={"index": "_original_sheet_index"}))
                 st.success(f"✅ Updated {len(changed_ids)} Feedback row(s).")
 
-                # show all alerts at bottom
-                for alert in triggered_alerts:
-                    st.warning(alert)
+                # Show detailed alerts
+                if triggered_alerts:
+                    st.subheader("🚨 Attention Passed to Departments")
+                    for alert in triggered_alerts:
+                        st.info(alert)
 
             else:
                 st.info("ℹ️ No changes detected to save.")
@@ -750,8 +748,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-
-
 st.markdown("""
 **Use the following syntax or copy to forward attention to other department:**  
 
@@ -765,15 +761,3 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
-
-
-
-
-
-
-
-
-
-
-
-
