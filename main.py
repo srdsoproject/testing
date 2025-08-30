@@ -726,7 +726,7 @@ if not editable_filtered.empty:
                             )
                 
                             # Add to persistent log
-                            st.session_state.alerts_log.append(alert_msg)
+                            st.session_state.alerts_log.append(0,alert_msg)
 
                     diffs.at[oid, "Feedback"] = user_remark
                     diffs.at[oid, "User Feedback/Remark"] = ""
@@ -771,6 +771,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
