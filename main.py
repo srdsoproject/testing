@@ -493,7 +493,7 @@ with tabs[0]:
     # ---------- EXPORT ----------
     from io import BytesIO
     import pandas as pd
-    from openpyxl.styles import Alignment, Font, Border, Side
+    from openpyxl.styles import Alignment, Font, Border, Side, NamedStyle
     
     # Export dataframe
     export_df = filtered[[
@@ -502,15 +502,27 @@ with tabs[0]:
         "Status"
     ]].copy()
     
+    # 🔹 Ensure date column is only a date (no time part)
+    export_df["Date of Inspection"] = pd.to_datetime(export_df["Date of Inspection"]).dt.date
+    
     towb = BytesIO()
     with pd.ExcelWriter(towb, engine="openpyxl") as writer:
         export_df.to_excel(writer, index=False, sheet_name="Filtered Records")
         ws = writer.sheets["Filtered Records"]
     
-        # Set alignment + wrap text for ALL cells
+        # 🔹 Define date format style
+        date_style = NamedStyle(name="date_style", number_format="DD-MM-YYYY")
+    
+        # Apply alignment + wrap text for ALL cells
         for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
             for cell in row:
                 cell.alignment = Alignment(wrap_text=True, vertical="top")
+    
+        # Apply date format only to "Date of Inspection" column
+        date_col_idx = export_df.columns.get_loc("Date of Inspection") + 1
+        for row in ws.iter_rows(min_row=2, min_col=date_col_idx, max_col=date_col_idx, max_row=len(export_df) + 1):
+            for cell in row:
+                cell.style = date_style
     
         # Auto column widths
         for col in ws.columns:
@@ -743,6 +755,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
