@@ -613,77 +613,51 @@ if not editable_filtered.empty:
     if "Date of Inspection" in editable_df.columns:
         editable_df["Date of Inspection"] = pd.to_datetime(
             editable_df["Date of Inspection"], errors="coerce"
-        ).dt.strftime("%Y-%m-%d")
+        ).dt.strftime("%Y-%m-%d")  # convert to string in YYYY-MM-DD format
 
-    # ---------------- STATUS BEFORE STYLING ----------------
-    raw_status = [
-        get_status(r["Feedback"], r["User Feedback/Remark"])
-        for _, r in editable_df.iterrows()
-    ]
+    # Status column
     editable_df.insert(
         editable_df.columns.get_loc("User Feedback/Remark") + 1,
         "Status",
-        raw_status
+        [get_status(r["Feedback"], r["User Feedback/Remark"]) for _, r in editable_df.iterrows()]
     )
-
-    # Apply color AFTER keeping raw status
     editable_df["Status"] = editable_df["Status"].apply(color_text_status)
 
     # Carry ID columns through grid (hidden)
     editable_df["_original_sheet_index"] = editable_filtered["_original_sheet_index"].values
     editable_df["_sheet_row"] = editable_filtered["_sheet_row"].values
 
-    # ---------------- LOCKING RULE ----------------
-    # Compute pending counts per head (from raw_status, not styled)
-    editable_filtered["__RawStatus__"] = raw_status
+    # --------- 🚨 Show warning if any Head has >90 pending ---------
     pending_counts = (
-        editable_filtered.groupby("Head")["__RawStatus__"]
+        filtered.groupby("Head")["Status"]
         .apply(lambda x: (x == "Pending").sum())
         .to_dict()
     )
+    for head, count in pending_counts.items():
+        if count > 90:
+            st.warning(
+                f"🚫 Head **{head}** has {count} pending deficiencies. "
+                "Please clear these before proceeding with new feedback."
+            )
 
-    # Mark Locked=True if head has >90 pending
-    editable_df["Locked"] = editable_df["Head"].map(
-        lambda h: pending_counts.get(h, 0) > 90
-    )
-
-    # Warning if any locked heads exist
-    locked_heads = [h for h, c in pending_counts.items() if c > 90]
-    if locked_heads:
-        st.warning(
-            f"🚫 Feedback entry is locked for {', '.join(locked_heads)} "
-            f"because they have more than 90 pending deficiencies. "
-            f"Please clear pending items first before adding new feedback."
-        )
-
-    # -------- AG GRID CONFIG (wrap + auto height, conditional edit) --------
+    # -------- AG GRID CONFIG (wrap + auto height, only remarks editable) --------
     gb = GridOptionsBuilder.from_dataframe(editable_df)
     gb.configure_default_column(editable=False, wrapText=True, autoHeight=True)
 
-    # Conditionally editable User Feedback/Remark
+    # Make ONLY "User Feedback/Remark" editable with a large text editor popup
     gb.configure_column(
-    "User Feedback/Remark",
-    wrapText=True,
-    autoHeight=True,
-    cellEditorSelector="""
-    function(params) {
-        if (params.data.Locked) {
-            return false;  // 🔒 makes cell read-only
-        }
-        return {
-            component: 'agLargeTextCellEditor',
-            popup: true,
-            params: { maxLength: 4000, rows: 10, cols: 60 }
-        }
-    }
-    """
-)
+        "User Feedback/Remark",
+        editable=True,
+        wrapText=True,
+        autoHeight=True,
+        cellEditor="agLargeTextCellEditor",
+        cellEditorPopup=True,
+        cellEditorParams={"maxLength": 4000, "rows": 10, "cols": 60}
+    )
 
-
-    # Hide helper ID + Locked columns
+    # Hide helper ID columns
     gb.configure_column("_original_sheet_index", hide=True)
     gb.configure_column("_sheet_row", hide=True)
-    gb.configure_column("Locked", hide=True)
 
     # Easier editing UX
     gb.configure_grid_options(singleClickEdit=True)
@@ -720,7 +694,7 @@ if not editable_filtered.empty:
             old_remarks = orig["User Feedback/Remark"].fillna("").astype(str)
             new_remarks = new["User Feedback/Remark"].fillna("").astype(str)
 
-            # 🔧 Align indexes before comparing
+            # 🔧 Fix: Align indexes before comparing
             common_ids = new_remarks.index.intersection(old_remarks.index)
             diff_mask = new_remarks.loc[common_ids] != old_remarks.loc[common_ids]
             changed_ids = diff_mask[diff_mask].index.tolist()
@@ -799,6 +773,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
