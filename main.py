@@ -714,7 +714,7 @@ if not editable_filtered.empty:
                             # 👉 Collect extra info
                             date_str = orig.loc[oid, "Date of Inspection"]
                             deficiency = orig.loc[oid, "Deficiencies Noted"]
-                            forwarded_by = orig.loc[oid, "Inspection By"]
+                            forwarded_by = orig.loc[oid, "Head"]
                 
                             # 👉 Build alert message (now includes Forwarded By)
                             alert_msg = (
@@ -771,6 +771,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
