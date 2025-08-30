@@ -615,12 +615,18 @@ if not editable_filtered.empty:
             editable_df["Date of Inspection"], errors="coerce"
         ).dt.strftime("%Y-%m-%d")
 
-    # Status column
+    # ---------------- STATUS BEFORE STYLING ----------------
+    raw_status = [
+        get_status(r["Feedback"], r["User Feedback/Remark"])
+        for _, r in editable_df.iterrows()
+    ]
     editable_df.insert(
         editable_df.columns.get_loc("User Feedback/Remark") + 1,
         "Status",
-        [get_status(r["Feedback"], r["User Feedback/Remark"]) for _, r in editable_df.iterrows()]
+        raw_status
     )
+
+    # Apply color AFTER keeping raw status
     editable_df["Status"] = editable_df["Status"].apply(color_text_status)
 
     # Carry ID columns through grid (hidden)
@@ -628,9 +634,10 @@ if not editable_filtered.empty:
     editable_df["_sheet_row"] = editable_filtered["_sheet_row"].values
 
     # ---------------- LOCKING RULE ----------------
-    # Count pending per head
+    # Compute pending counts per head (from raw_status, not styled)
+    editable_filtered["__RawStatus__"] = raw_status
     pending_counts = (
-        editable_filtered.groupby("Head")["Status"]
+        editable_filtered.groupby("Head")["__RawStatus__"]
         .apply(lambda x: (x == "Pending").sum())
         .to_dict()
     )
@@ -658,7 +665,7 @@ if not editable_filtered.empty:
         "User Feedback/Remark",
         wrapText=True,
         autoHeight=True,
-        editable=True,  # base true, but override below
+        editable=True,  # base true
         cellEditor="agLargeTextCellEditor",
         cellEditorPopup=True,
         cellEditorParams={"maxLength": 4000, "rows": 10, "cols": 60},
@@ -714,7 +721,7 @@ if not editable_filtered.empty:
             old_remarks = orig["User Feedback/Remark"].fillna("").astype(str)
             new_remarks = new["User Feedback/Remark"].fillna("").astype(str)
 
-            # 🔧 Fix: Align indexes before comparing
+            # 🔧 Align indexes before comparing
             common_ids = new_remarks.index.intersection(old_remarks.index)
             diff_mask = new_remarks.loc[common_ids] != old_remarks.loc[common_ids]
             changed_ids = diff_mask[diff_mask].index.tolist()
@@ -767,6 +774,7 @@ else:
 
 
 
+
 # -------------------- FOOTER --------------------
 st.markdown(
     """
@@ -792,6 +800,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
