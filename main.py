@@ -590,7 +590,6 @@ st.markdown(
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 import pandas as pd
 import streamlit as st
-import datetime as dt
 
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
@@ -626,19 +625,6 @@ if not editable_filtered.empty:
     # Carry ID columns through grid (hidden)
     editable_df["_original_sheet_index"] = editable_filtered["_original_sheet_index"].values
     editable_df["_sheet_row"] = editable_filtered["_sheet_row"].values
-
-    # --------- 🚨 Show warning if any Head has >90 pending ---------
-    pending_counts = (
-        filtered.groupby("Head")["Status"]
-        .apply(lambda x: (x == "Pending").sum())
-        .to_dict()
-    )
-    for head, count in pending_counts.items():
-        if count > 90:
-            st.warning(
-                f"🚫 Head **{head}** has {count} pending deficiencies. "
-                "Please clear these before proceeding with new feedback."
-            )
 
     # -------- AG GRID CONFIG (wrap + auto height, only remarks editable) --------
     gb = GridOptionsBuilder.from_dataframe(editable_df)
@@ -741,12 +727,34 @@ if not editable_filtered.empty:
                 st.success(f"✅ Updated {len(changed_ids)} Feedback row(s) with new remarks.")
             else:
                 st.info("ℹ️ No changes detected to save.")
+
+    # ---------------- ALERT SYSTEM ----------------
+    alert_mapping = {
+        "Pertains to S&T": "SIGNAL & TELECOM",
+        "Pertains to OPTG": "OPERATING",
+        "Pertains to COMMERCIAL": "COMMERCIAL",
+        "Pertains to ELECT/G": "ELECTRICAL (G)",
+        "Pertains to ELECT/TRD": "ELECTRICAL (TRD)",
+        "Pertains to ELECT/TRO": "ELECTRICAL (TRO)",
+        "Pertains to Sr.DEN/S": "ENGINEERING (Sr.DEN/S)",
+        "Pertains to Sr.DEN/C": "ENGINEERING (Sr.DEN/C)",
+        "Pertains to Sr.DEN/Co": "ENGINEERING (Sr.DEN/Co)",
+    }
+
+    triggered_alerts = []
+    if "User Feedback/Remark" in edited_df.columns:
+        for remark in edited_df["User Feedback/Remark"].dropna():
+            for key, dept in alert_mapping.items():
+                if key in remark:
+                    triggered_alerts.append(dept)
+
+    if triggered_alerts:
+        st.markdown("---")
+        for dept in set(triggered_alerts):
+            st.warning(f"🔔 New alert received on **{dept}** department")
+
 else:
     st.info("Deficiencies will be updated soon !")
-
-
-
-
 
 # -------------------- FOOTER --------------------
 st.markdown(
@@ -773,6 +781,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
