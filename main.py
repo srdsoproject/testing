@@ -590,12 +590,18 @@ st.markdown(
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 import pandas as pd
 import streamlit as st
+import datetime
 
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
+# --- Setup log in session state ---
+today_str = datetime.date.today().strftime("%Y-%m-%d")
+if "alerts_log" not in st.session_state or st.session_state.get("alerts_date") != today_str:
+    st.session_state.alerts_log = []   # reset log for new day
+    st.session_state.alerts_date = today_str
+
 editable_filtered = filtered.copy()
 if not editable_filtered.empty:
-    # Ensure stable IDs exist
     if "_original_sheet_index" not in editable_filtered.columns:
         editable_filtered["_original_sheet_index"] = editable_filtered.index
     if "_sheet_row" not in editable_filtered.columns:
@@ -608,13 +614,11 @@ if not editable_filtered.empty:
     ]
     editable_df = editable_filtered[display_cols].copy()
 
-    # Format inspection date
     if "Date of Inspection" in editable_df.columns:
         editable_df["Date of Inspection"] = pd.to_datetime(
             editable_df["Date of Inspection"], errors="coerce"
         ).dt.strftime("%Y-%m-%d")
 
-    # Status column
     editable_df.insert(
         editable_df.columns.get_loc("User Feedback/Remark") + 1,
         "Status",
@@ -622,11 +626,9 @@ if not editable_filtered.empty:
     )
     editable_df["Status"] = editable_df["Status"].apply(color_text_status)
 
-    # Carry helper IDs
     editable_df["_original_sheet_index"] = editable_filtered["_original_sheet_index"].values
     editable_df["_sheet_row"] = editable_filtered["_sheet_row"].values
 
-    # --- GRID CONFIG ---
     gb = GridOptionsBuilder.from_dataframe(editable_df)
     gb.configure_default_column(editable=False, wrapText=True, autoHeight=True)
 
@@ -695,8 +697,6 @@ if not editable_filtered.empty:
                     "Pertains to Sr.DEN/Co":  ("ENGINEERING", "Sr.DEN/Co"),
                 }
 
-                triggered_alerts = []
-
                 for oid in changed_ids:
                     user_remark = new.loc[oid, "User Feedback/Remark"].strip()
                     if not user_remark:
@@ -711,12 +711,17 @@ if not editable_filtered.empty:
                             diffs.at[oid, "Action By"] = action_by
                             diffs.at[oid, "Sub Head"] = ""
 
-                            # 👉 Add detailed alert message
+                            # 👉 Build alert message
                             date_str = orig.loc[oid, "Date of Inspection"]
                             deficiency = orig.loc[oid, "Deficiencies Noted"]
-                            triggered_alerts.append(
-                                f"📌 **{head} Department Alert**\n- Date: {date_str}\n- Deficiency: {deficiency}\n- Forwarded Remark: {user_remark}"
+                            alert_msg = (
+                                f"📌 **{head} Department Alert**\n"
+                                f"- Date: {date_str}\n"
+                                f"- Deficiency: {deficiency}\n"
+                                f"- Forwarded Remark: {user_remark}"
                             )
+                            # Add to persistent log
+                            st.session_state.alerts_log.append(alert_msg)
 
                     diffs.at[oid, "Feedback"] = user_remark
                     diffs.at[oid, "User Feedback/Remark"] = ""
@@ -725,15 +730,15 @@ if not editable_filtered.empty:
 
                 update_feedback_column(diffs.reset_index().rename(columns={"index": "_original_sheet_index"}))
                 st.success(f"✅ Updated {len(changed_ids)} Feedback row(s).")
-
-                # Show detailed alerts
-                if triggered_alerts:
-                    st.subheader("🚨 Attention Passed to Departments")
-                    for alert in triggered_alerts:
-                        st.info(alert)
-
             else:
                 st.info("ℹ️ No changes detected to save.")
+
+    # --- Always display alerts log (persistent) ---
+    if st.session_state.alerts_log:
+        st.subheader("🚨 Attention Passed to Departments (Log)")
+        for alert in st.session_state.alerts_log:
+            st.info(alert)
+
 else:
     st.info("Deficiencies will be updated soon !")
 
@@ -761,3 +766,4 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
