@@ -758,15 +758,23 @@ if not editable_filtered.empty:
         if len(selected_heads) == 1:
             selected_head = selected_heads[0]
 
+            # Convert dates safely
+            editable_filtered["Date of Inspection"] = pd.to_datetime(
+                editable_filtered["Date of Inspection"], errors="coerce"
+            )
+
+            # Date filter range
+            start_date = pd.to_datetime("2025-07-01")
+            end_date = pd.to_datetime("today")
+
             pending_df = editable_filtered[
                 (editable_filtered["Head"] == selected_head) &
-                (editable_filtered["Feedback"].isna() | (editable_filtered["Feedback"].str.strip() == ""))
+                (editable_filtered["Feedback"].isna() | (editable_filtered["Feedback"].str.strip() == "")) &
+                (editable_filtered["Date of Inspection"].between(start_date, end_date))
             ][["Date of Inspection", "Location"]]
 
             if not pending_df.empty:
-                pending_df["Date of Inspection"] = pd.to_datetime(
-                    pending_df["Date of Inspection"], errors="coerce"
-                ).dt.strftime("%Y-%m-%d")
+                pending_df["Date of Inspection"] = pending_df["Date of Inspection"].dt.strftime("%Y-%m-%d")
 
                 st.markdown(f"### 📅 Pending Compliance for **{selected_head}**")
                 st.dataframe(
@@ -774,9 +782,9 @@ if not editable_filtered.empty:
                     use_container_width=True,
                     height=250
                 )
-
 else:
     st.info("Deficiencies will be updated soon !")
+
 
 
 
@@ -835,6 +843,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
