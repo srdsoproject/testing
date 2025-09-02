@@ -152,7 +152,7 @@ def normalize_str(text):
         return ""
     return re.sub(r'\s+', ' ', text.lower()).strip()
 
-def classify_feedback(feedback, user_remark=""):
+def classify_feedback(feedback):
     # Empty backtick = clear
     if isinstance(feedback, str) and feedback.strip() == "`":
         return ""
@@ -904,6 +904,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
