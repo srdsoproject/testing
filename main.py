@@ -563,6 +563,18 @@ with tabs[1]:
         if col not in pending_df.columns:
             pending_df[col] = ""
 
+    # -------------------- FILTERS --------------------
+    c1, c2 = st.columns(2)
+    c1.multiselect("Head", HEAD_LIST[1:], key="pending_head_filter")
+    sub_opts = sorted({s for h in st.session_state.pending_head_filter for s in SUBHEAD_LIST.get(h, [])})
+    c2.multiselect("Sub Head", sub_opts, key="pending_sub_filter")
+
+    # Apply head/subhead filters
+    if st.session_state.pending_head_filter:
+        pending_df = pending_df[pending_df["Head"].isin(st.session_state.pending_head_filter)]
+    if st.session_state.pending_sub_filter:
+        pending_df = pending_df[pending_df["Sub Head"].isin(st.session_state.pending_sub_filter)]
+
     # Remove duplicate columns if any
     pending_df = pending_df.loc[:, ~pending_df.columns.duplicated()]
 
@@ -588,6 +600,7 @@ with tabs[1]:
         file_name="pending_records.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
 
 
 # -------------------- STATUS UTILS --------------------
@@ -831,6 +844,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
