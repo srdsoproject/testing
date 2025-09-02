@@ -91,10 +91,7 @@ except FileNotFoundError:
     st.write("No responses submitted yet.")
 
 # ---------- OPTIONAL: Clear Responses Button ----------
-if st.button("🗑️ Clear All Responses"):
-    df = pd.DataFrame(columns=["Name"])
-    df.to_excel("responses.xlsx", index=False)
-    st.success("✅ All responses have been cleared.")
+
 
 # ---------- OPTIONAL: Clear Responses Button ----------
 if st.button("🗑️ Clear All Responses"):
@@ -864,6 +861,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
