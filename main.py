@@ -751,35 +751,31 @@ if not editable_filtered.empty:
                 st.info("ℹ️ No changes detected to save.")
 
     # ----------------- PENDING COMPLIANCE TABLE -----------------
-    st.markdown("### 📅 Pending Compliance by Department")
+    st.markdown("### 📅 Pending Compliance")
 
-    # Select Head
-    available_heads = sorted(editable_filtered["Head"].dropna().unique())
-    selected_head = st.selectbox("Select Department Head", options=available_heads)
-
-    if selected_head:
+    # Use the currently selected Head(s) in editable_filtered
+    current_heads = editable_filtered["Head"].dropna().unique()
+    for head in current_heads:
         pending_df = editable_filtered[
-            (editable_filtered["Head"] == selected_head) &
+            (editable_filtered["Head"] == head) &
             (editable_filtered["Feedback"].isna() | (editable_filtered["Feedback"].str.strip() == ""))
-        ][["Date of Inspection", "Location", "Deficiencies Noted", "Action By"]]
+        ][["Date of Inspection", "Location"]]
 
         if not pending_df.empty:
-            # Ensure clean date formatting
             pending_df["Date of Inspection"] = pd.to_datetime(
                 pending_df["Date of Inspection"], errors="coerce"
             ).dt.strftime("%Y-%m-%d")
 
-            st.markdown(f"#### Pending Compliance for **{selected_head}**")
+            st.markdown(f"#### Pending Compliance for **{head}**")
             st.dataframe(
                 pending_df.reset_index(drop=True),
                 use_container_width=True,
-                height=400
+                height=250
             )
-        else:
-            st.success(f"✅ No pending compliance for **{selected_head}**")
 
 else:
     st.info("Deficiencies will be updated soon !")
+
 
 
 # ---------------- ALERT LOG SECTION ----------------
@@ -836,6 +832,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
