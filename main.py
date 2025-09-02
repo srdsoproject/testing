@@ -45,13 +45,12 @@ if not st.session_state.logged_in:
 # POST-LOGIN: Pending Deficiencies Acknowledgment
 st.title("📢 Pending Deficiencies Compliance")
 
-# Show a modal or expander with acknowledgment
 with st.expander("⚠️ Pending Deficiencies Notice", expanded=True):
     st.info("""
     The pending deficiencies compliance are pending and will be completed at the earliest.  
     I hereby declare that I have read this notice and will ensure compliance.
     """)
-    
+
     with st.form("ack_form"):
         responder_name = st.text_input("✍️ Your Name")
         ack_submitted = st.form_submit_button("Submit Acknowledgment")
@@ -63,9 +62,9 @@ with st.expander("⚠️ Pending Deficiencies Notice", expanded=True):
             else:
                 st.error("❌ Please enter your name before submitting.")
 
-# Display all responses at the end
+# ---------- DISPLAY RESPONSES ----------
 st.markdown("### 📝 Responses Received")
-if st.session_state.responses:
+if "responses" in st.session_state and st.session_state.responses:
     for i, name in enumerate(st.session_state.responses, start=1):
         st.write(f"{i}. {name}")
 else:
@@ -833,6 +832,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
