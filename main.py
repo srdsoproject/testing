@@ -548,58 +548,91 @@ with tabs[0]:
 
 # -------------------- TAB 2: Pending Records --------------------
 with tabs[1]:
-    st.markdown("### ⏳ Pending Records (All Time)")
-    pending_df = df.copy()
-    pending_df["Date of Inspection"] = pd.to_datetime(pending_df["Date of Inspection"], errors="coerce")
-    pending_df = pending_df[pending_df["Status"] == "Pending"]
+    st.markdown("### ⏳ Pending Records (Editable)")
 
+    pending_df = df[df["Status"] == "Pending"].copy()
     if pending_df.empty:
         st.warning("No pending deficiencies found!")
         st.stop()
 
-    # Ensure required columns exist
-    for col in ["Type of Inspection", "Location", "Head", "Sub Head", "Deficiencies Noted",
-                "Inspection By", "Action By", "Feedback", "User Feedback/Remark"]:
-        if col not in pending_df.columns:
-            pending_df[col] = ""
-
-    # -------------------- FILTERS --------------------
+    # -------------------- HEAD & SUB HEAD FILTERS --------------------
     c1, c2 = st.columns(2)
     c1.multiselect("Head", HEAD_LIST[1:], key="pending_head_filter")
     sub_opts = sorted({s for h in st.session_state.pending_head_filter for s in SUBHEAD_LIST.get(h, [])})
     c2.multiselect("Sub Head", sub_opts, key="pending_sub_filter")
 
-    # Apply head/subhead filters
     if st.session_state.pending_head_filter:
         pending_df = pending_df[pending_df["Head"].isin(st.session_state.pending_head_filter)]
     if st.session_state.pending_sub_filter:
         pending_df = pending_df[pending_df["Sub Head"].isin(st.session_state.pending_sub_filter)]
 
-    # Remove duplicate columns if any
-    pending_df = pending_df.loc[:, ~pending_df.columns.duplicated()]
+    if pending_df.empty:
+        st.warning("No pending records after applying filters!")
+        st.stop()
 
-    # Convert date column to string for AgGrid
-    pending_df["Date of Inspection"] = pending_df["Date of Inspection"].dt.strftime("%Y-%m-%d")
+    # -------------------- EDITABLE AG GRID --------------------
+    from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 
-    st.write(f"🔹 Showing {len(pending_df)} pending record(s) from **{pending_df['Date of Inspection'].min()}** "
-             f"to **{pending_df['Date of Inspection'].max()}**")
+    display_cols = [
+        "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
+        "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "User Feedback/Remark"
+    ]
+    table_df = pending_df[display_cols].copy()
+    table_df["Date of Inspection"] = table_df["Date of Inspection"].dt.strftime("%Y-%m-%d")
 
-    # AgGrid display
-    gb2 = GridOptionsBuilder.from_dataframe(pending_df)
-    gb2.configure_default_column(wrapText=True, autoHeight=True, editable=False)
-    grid_options2 = gb2.build()
-    AgGrid(pending_df, gridOptions=grid_options2, height=600, fit_columns_on_grid_load=True)
-
-    # Export pending
-    towb_pending = BytesIO()
-    pending_df.to_excel(towb_pending, index=False, sheet_name="Pending Records")
-    towb_pending.seek(0)
-    st.download_button(
-        "📥 Export Pending Records to Excel",
-        data=towb_pending,
-        file_name="pending_records.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    # Status column
+    table_df.insert(
+        table_df.columns.get_loc("User Feedback/Remark") + 1,
+        "Status",
+        [color_text_status(get_status(r["Feedback"], r["User Feedback/Remark"])) for _, r in table_df.iterrows()]
     )
+
+    # AG Grid setup
+    gb = GridOptionsBuilder.from_dataframe(table_df)
+    gb.configure_default_column(editable=False, wrapText=True, autoHeight=True)
+    gb.configure_column(
+        "User Feedback/Remark",
+        editable=True,
+        wrapText=True,
+        autoHeight=True,
+        cellEditor="agLargeTextCellEditor",
+        cellEditorPopup=True,
+        cellEditorParams={"maxLength": 4000, "rows": 10, "cols": 60}
+    )
+    grid_options = gb.build()
+
+    grid_response = AgGrid(
+        table_df,
+        gridOptions=grid_options,
+        update_mode=GridUpdateMode.VALUE_CHANGED,
+        height=600,
+        fit_columns_on_grid_load=True,
+        allow_unsafe_jscode=True
+    )
+
+    # Save changes
+    edited_df = pd.DataFrame(grid_response["data"])
+    if st.button("✅ Submit Feedback (Pending)"):
+        orig = pending_df.set_index("_original_sheet_index")
+        new = edited_df.set_index("_original_sheet_index", drop=False)
+        old_remarks = orig["User Feedback/Remark"].fillna("").astype(str)
+        new_remarks = new["User Feedback/Remark"].fillna("").astype(str)
+        common_ids = new_remarks.index.intersection(old_remarks.index)
+        diff_mask = new_remarks.loc[common_ids] != old_remarks.loc[common_ids]
+        changed_ids = diff_mask[diff_mask].index.tolist()
+
+        if changed_ids:
+            for oid in changed_ids:
+                user_remark = new_remarks[oid].strip()
+                if user_remark:
+                    pending_df.at[oid, "Feedback"] = user_remark
+                    pending_df.at[oid, "User Feedback/Remark"] = ""
+            update_feedback_column(
+                pending_df.loc[changed_ids].reset_index().rename(columns={"index": "_original_sheet_index"})
+            )
+            st.success(f"✅ Updated {len(changed_ids)} Feedback row(s).")
+        else:
+            st.info("ℹ️ No changes detected to save.")
 
 
 
@@ -844,6 +877,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
