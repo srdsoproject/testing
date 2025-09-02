@@ -590,6 +590,7 @@ st.markdown(
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 import pandas as pd
 import streamlit as st
+from datetime import datetime
 
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
@@ -612,11 +613,11 @@ if not editable_filtered.empty:
     ]
     editable_df = editable_filtered[display_cols].copy()
 
-    # Show only date part
+    # Show only date part (YYYY-MM-DD)
     if "Date of Inspection" in editable_df.columns:
         editable_df["Date of Inspection"] = pd.to_datetime(
             editable_df["Date of Inspection"], errors="coerce"
-        ).dt.strftime("%Y-%m-%d")  # convert to string in YYYY-MM-DD format
+        ).dt.strftime("%Y-%m-%d")
 
     # Status column
     editable_df.insert(
@@ -750,42 +751,33 @@ if not editable_filtered.empty:
             else:
                 st.info("ℹ️ No changes detected to save.")
 
-    # ----------------- PENDING COMPLIANCE TABLE -----------------
-    if "Head" in editable_filtered.columns:
-        selected_heads = editable_filtered["Head"].dropna().unique()
+    # ---------------- PENDING COMPLIANCE DATES ----------------
+    head_selected = editable_filtered["Head"].dropna().unique()
+    if len(head_selected) == 1:  # only when exactly one head is selected
+        head_selected = head_selected[0]
 
-        # ✅ Show only if exactly one Head is selected
-        if len(selected_heads) == 1:
-            selected_head = selected_heads[0]
+        # ✅ Ensure dates are parsed
+        editable_filtered["Date of Inspection"] = pd.to_datetime(
+            editable_filtered["Date of Inspection"], format="%Y-%m-%d", errors="coerce"
+        )
 
-            # Convert dates safely
-            editable_filtered["Date of Inspection"] = pd.to_datetime(
-                editable_filtered["Date of Inspection"], errors="coerce"
-            )
+        start_date = datetime(2025, 7, 1)
+        end_date = datetime.today()
 
-            # Date filter range
-            from datetime import datetime
-            start_date = datetime(2025, 7, 1)
-            end_date = pd.to_datetime("today")
+        pending_df = editable_filtered[
+            (editable_filtered["Head"] == head_selected)
+            & (editable_filtered["Date of Inspection"].between(start_date, end_date))
+        ][["Date of Inspection"]].copy()
 
-            pending_df = editable_filtered[
-                (editable_filtered["Head"] == selected_head) &
-                (editable_filtered["Feedback"].isna() | (editable_filtered["Feedback"].str.strip() == "")) &
-                (editable_filtered["Date of Inspection"].between(start_date, end_date))
-            ][["Date of Inspection", "Location"]]
+        if not pending_df.empty:
+            pending_df["Date of Inspection"] = pending_df["Date of Inspection"].dt.strftime("%Y-%m-%d")
+            st.markdown("#### 📅 Pending Compliance Dates")
+            st.table(pending_df)
+        else:
+            st.info("ℹ️ No pending compliance dates found in the given range.")
 
-            if not pending_df.empty:
-                pending_df["Date of Inspection"] = pending_df["Date of Inspection"].dt.strftime("%Y-%m-%d")
-
-                st.markdown(f"### 📅 Pending Compliance for **{selected_head}**")
-                st.dataframe(
-                    pending_df.reset_index(drop=True),
-                    use_container_width=True,
-                    height=250
-                )
 else:
     st.info("Deficiencies will be updated soon !")
-
 
 
 
@@ -844,6 +836,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
