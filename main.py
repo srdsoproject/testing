@@ -9,6 +9,16 @@ from matplotlib import pyplot as plt
 st.set_page_config(page_title="Inspection App", layout="wide")
 
 # ---------- LOGIN ----------
+# ---------- SESSION STATE INITIALIZATION ----------
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+if "user" not in st.session_state:
+    st.session_state.user = {}
+# Initialize responses list safely
+if "responses" not in st.session_state:
+    st.session_state.responses = []
+
+# ---------- LOGIN ----------
 def login(email, password):
     try:
         users = st.secrets["users"]
@@ -19,11 +29,6 @@ def login(email, password):
     except KeyError:
         st.error("⚠️ No users found in secrets.toml — please check your [[users]] block.")
         st.stop()
-
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if "user" not in st.session_state:
-    st.session_state.user = {}
 
 if not st.session_state.logged_in:
     st.title("🔐 Login to S.A.R.A.L (Safety Abnormality Report & Action List)")
@@ -42,7 +47,8 @@ if not st.session_state.logged_in:
             else:
                 st.error("❌ Invalid email or password.")
     st.stop()
-# POST-LOGIN: Pending Deficiencies Acknowledgment
+
+# ---------- POST-LOGIN: Pending Deficiencies Acknowledgment ----------
 st.title("📢 Pending Deficiencies Compliance")
 
 with st.expander("⚠️ Pending Deficiencies Notice", expanded=True):
@@ -61,6 +67,15 @@ with st.expander("⚠️ Pending Deficiencies Notice", expanded=True):
                 st.success(f"✅ Thank you, {responder_name}, for acknowledging.")
             else:
                 st.error("❌ Please enter your name before submitting.")
+
+# ---------- DISPLAY RESPONSES ----------
+st.markdown("### 📝 Responses Received")
+if st.session_state.responses:
+    for i, name in enumerate(st.session_state.responses, start=1):
+        st.write(f"{i}. {name}")
+else:
+    st.write("No responses submitted yet.")
+
 
 # ---------- DISPLAY RESPONSES ----------
 st.markdown("### 📝 Responses Received")
@@ -832,6 +847,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
