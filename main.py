@@ -594,29 +594,26 @@ import datetime
 
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
-# ---------- CALCULATE PENDING DEFICIENCIES (LAST 60 DAYS) ----------
+# ---------- CALCULATE PENDING DEFICIENCIES FROM 1st JULY ----------
 if 'filtered' in locals() and not filtered.empty:
     today = datetime.date.today()
+    start_date = datetime.date(today.year, 7, 1)  # 1st July this year
 
     # Convert Date of Inspection to datetime.date
     filtered['Date of Inspection'] = pd.to_datetime(
         filtered['Date of Inspection'], errors='coerce'
     ).dt.date
 
-    # Calculate days pending
-    filtered['Days Pending'] = (today - filtered['Date of Inspection']).apply(lambda x: x.days if pd.notnull(x) else 0)
-
-    # Filter deficiencies pending within last 60 days
-    last_60_days_pending = filtered[filtered['Days Pending'] <= 60]
+    # Filter deficiencies between 1st July and today
+    pending_df = filtered[(filtered['Date of Inspection'] >= start_date) & 
+                          (filtered['Date of Inspection'] <= today)]
 
     # Count of pending deficiencies
-    pending_count = len(last_60_days_pending)
+    pending_count = len(pending_df)
 
     if pending_count > 0:
-        earliest_date = last_60_days_pending['Date of Inspection'].min()
         st.warning(
-            f"⚠️ There are {pending_count} pending deficiencies from {earliest_date.strftime('%d %b %Y')} "
-            f"(last 60 days)."
+            f"⚠️ There are {pending_count} pending deficiencies from {start_date.strftime('%d %b %Y')} till today."
         )
 else:
     pending_count = 0
@@ -713,7 +710,7 @@ if not editable_filtered.empty:
             old_remarks = orig["User Feedback/Remark"].fillna("").astype(str)
             new_remarks = new["User Feedback/Remark"].fillna("").astype(str)
 
-            # 🔧 Fix: Align indexes before comparing
+            # 🔧 Align indexes before comparing
             common_ids = new_remarks.index.intersection(old_remarks.index)
             diff_mask = new_remarks.loc[common_ids] != old_remarks.loc[common_ids]
             changed_ids = diff_mask[diff_mask].index.tolist()
@@ -749,12 +746,12 @@ if not editable_filtered.empty:
                             diffs.at[oid, "Action By"] = action_by
                             diffs.at[oid, "Sub Head"] = ""
 
-                            # 👉 Collect extra info
+                            # Collect extra info
                             date_str = orig.loc[oid, "Date of Inspection"]
                             deficiency = orig.loc[oid, "Deficiencies Noted"]
                             forwarded_by = orig.loc[oid, "Head"]
 
-                            # 👉 Build alert message
+                            # Build alert message
                             alert_msg = (
                                 f"📌 **{head} Department Alert**\n"
                                 f"- Date: {date_str}\n"
@@ -765,7 +762,7 @@ if not editable_filtered.empty:
 
                             st.session_state.alerts_log.insert(0, alert_msg)
 
-                    # ✅ Replace Feedback with new remark
+                    # Replace Feedback with new remark
                     diffs.at[oid, "Feedback"] = user_remark
                     diffs.at[oid, "User Feedback/Remark"] = ""
 
@@ -835,6 +832,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
