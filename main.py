@@ -751,30 +751,33 @@ if not editable_filtered.empty:
                 st.info("ℹ️ No changes detected to save.")
 
     # ----------------- PENDING COMPLIANCE TABLE -----------------
-    st.markdown("### 📅 Pending Compliance")
+    if "Head" in editable_filtered.columns:
+        selected_heads = editable_filtered["Head"].dropna().unique()
 
-    # Use the currently selected Head(s) in editable_filtered
-    current_heads = editable_filtered["Head"].dropna().unique()
-    for head in current_heads:
-        pending_df = editable_filtered[
-            (editable_filtered["Head"] == head) &
-            (editable_filtered["Feedback"].isna() | (editable_filtered["Feedback"].str.strip() == ""))
-        ][["Date of Inspection", "Location"]]
+        # ✅ Show only if exactly one Head is selected
+        if len(selected_heads) == 1:
+            selected_head = selected_heads[0]
 
-        if not pending_df.empty:
-            pending_df["Date of Inspection"] = pd.to_datetime(
-                pending_df["Date of Inspection"], errors="coerce"
-            ).dt.strftime("%Y-%m-%d")
+            pending_df = editable_filtered[
+                (editable_filtered["Head"] == selected_head) &
+                (editable_filtered["Feedback"].isna() | (editable_filtered["Feedback"].str.strip() == ""))
+            ][["Date of Inspection", "Location"]]
 
-            st.markdown(f"#### Pending Compliance for **{head}**")
-            st.dataframe(
-                pending_df.reset_index(drop=True),
-                use_container_width=True,
-                height=250
-            )
+            if not pending_df.empty:
+                pending_df["Date of Inspection"] = pd.to_datetime(
+                    pending_df["Date of Inspection"], errors="coerce"
+                ).dt.strftime("%Y-%m-%d")
+
+                st.markdown(f"### 📅 Pending Compliance for **{selected_head}**")
+                st.dataframe(
+                    pending_df.reset_index(drop=True),
+                    use_container_width=True,
+                    height=250
+                )
 
 else:
     st.info("Deficiencies will be updated soon !")
+
 
 
 
@@ -832,6 +835,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
