@@ -594,24 +594,32 @@ import datetime
 
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
-# ---------- SHOW PENDING DEFICIENCIES ALERT (LAST 60 DAYS) ----------
+# ---------- CALCULATE PENDING DEFICIENCIES (LAST 60 DAYS) ----------
 if 'filtered' in locals() and not filtered.empty:
     today = datetime.date.today()
-    sixty_days_ago = today - datetime.timedelta(days=60)
 
-    # Ensure Date of Inspection is datetime
-    filtered['Date of Inspection'] = pd.to_datetime(filtered['Date of Inspection'], errors='coerce').dt.date
+    # Convert Date of Inspection to datetime.date
+    filtered['Date of Inspection'] = pd.to_datetime(
+        filtered['Date of Inspection'], errors='coerce'
+    ).dt.date
 
-    # Filter for last 60 days
-    pending_df = filtered[filtered['Date of Inspection'] >= sixty_days_ago]
+    # Calculate days pending
+    filtered['Days Pending'] = (today - filtered['Date of Inspection']).apply(lambda x: x.days if pd.notnull(x) else 0)
 
-    pending_count = len(pending_df)
+    # Filter deficiencies pending within last 60 days
+    last_60_days_pending = filtered[filtered['Days Pending'] <= 60]
+
+    # Count of pending deficiencies
+    pending_count = len(last_60_days_pending)
+
     if pending_count > 0:
-        earliest_date = pending_df['Date of Inspection'].min()
+        earliest_date = last_60_days_pending['Date of Inspection'].min()
         st.warning(
-            f"⚠️ There are {pending_count} pending deficiencies from {earliest_date.strftime('%d %b %Y')} (last 60 days)."
+            f"⚠️ There are {pending_count} pending deficiencies from {earliest_date.strftime('%d %b %Y')} "
+            f"(last 60 days)."
         )
 else:
+    pending_count = 0
     st.info("No data available for pending deficiencies.")
 
 # Initialize alerts log
@@ -746,7 +754,7 @@ if not editable_filtered.empty:
                             deficiency = orig.loc[oid, "Deficiencies Noted"]
                             forwarded_by = orig.loc[oid, "Head"]
 
-                            # 👉 Build alert message (now includes Forwarded By)
+                            # 👉 Build alert message
                             alert_msg = (
                                 f"📌 **{head} Department Alert**\n"
                                 f"- Date: {date_str}\n"
@@ -755,17 +763,16 @@ if not editable_filtered.empty:
                                 f"- Forwarded Remark: {user_remark}"
                             )
 
-                            # Insert at top of log
                             st.session_state.alerts_log.insert(0, alert_msg)
 
-                    # ✅ Replace Feedback with new remark (no append)
+                    # ✅ Replace Feedback with new remark
                     diffs.at[oid, "Feedback"] = user_remark
                     diffs.at[oid, "User Feedback/Remark"] = ""
 
                     st.session_state.df.at[oid, "Feedback"] = user_remark
                     st.session_state.df.at[oid, "User Feedback/Remark"] = ""
 
-                # Persist to storage (expects _sheet_row in diffs)
+                # Persist to storage
                 update_feedback_column(diffs.reset_index().rename(columns={"index": "_original_sheet_index"}))
                 st.success(f"✅ Updated {len(changed_ids)} Feedback row(s) with new remarks.")
             else:
@@ -828,6 +835,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
