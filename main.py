@@ -89,14 +89,9 @@ try:
         st.write("No responses submitted yet.")
 except FileNotFoundError:
     st.write("No responses submitted yet.")
-
-# ---------- OPTIONAL: Clear Responses Button ----------
-
-
-# ---------- OPTIONAL: Clear Responses Button ----------
-if st.button("🗑️ Clear All Responses"):
+if st.button("🗑️ Clear All Responses", key="clear_responses_btn"):
     df = pd.DataFrame(columns=["Name"])
-    df.to_csv("responses.csv", index=False)
+    df.to_excel("responses.xlsx", index=False)
     st.success("✅ All responses have been cleared.")
 # ---------- GOOGLE SHEETS CONNECTION ----------
 import streamlit as st
@@ -861,6 +856,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
