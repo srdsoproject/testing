@@ -75,7 +75,9 @@ if st.session_state.responses:
         st.write(f"{i}. {name}")
 else:
     st.write("No responses submitted yet.")
-
+if st.button("🗑️ Clear All Responses"):
+    st.session_state.responses = []  # Reset the list
+    st.success("✅ All responses have been cleared.")
 # ---------- GOOGLE SHEETS CONNECTION ----------
 import streamlit as st
 import pandas as pd
@@ -839,6 +841,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
