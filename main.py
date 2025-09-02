@@ -753,18 +753,26 @@ if not editable_filtered.empty:
             else:
                 st.info("ℹ️ No changes detected to save.")
 
-    # ---------------- PENDING COMPLIANCE DATES ----------------
+    # ---------------- PENDING COMPLIANCE DATES (MESSAGE ONLY) ----------------
     head_selected = editable_filtered["Head"].dropna().unique()
-    if len(head_selected) == 1:  
+    if len(head_selected) == 1:
         head_selected = head_selected[0]
-        pending_df = editable_filtered[editable_filtered["Head"] == head_selected][["Date of Inspection"]].copy()
+
+        # Get only rows with empty Feedback (pending)
+        pending_df = editable_filtered[
+            (editable_filtered["Head"] == head_selected)
+            & (editable_filtered["Feedback"].isna() | (editable_filtered["Feedback"].str.strip() == ""))
+        ][["Date of Inspection"]].copy()
 
         if not pending_df.empty:
-            pending_df["Date of Inspection"] = pending_df["Date of Inspection"].dt.strftime("%Y-%m-%d")
-            st.markdown("#### 📅 Pending Compliance Dates")
-            st.table(pending_df)
+            # Format dates and show as a single message
+            dates_list = pending_df["Date of Inspection"].dt.strftime("%Y-%m-%d").tolist()
+            st.success(f"📅 Pending Compliance Dates for **{head_selected}**: {', '.join(dates_list)}")
         else:
-            st.info("ℹ️ No pending compliance dates found in the given range.")
+            st.info(f"✅ No pending compliance dates for **{head_selected}** in the given range.")
+    else:
+        st.info("ℹ️ Please select exactly one Head to see pending compliance dates.")
+
 
 else:
     st.info("Deficiencies will be updated soon !")
@@ -823,6 +831,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
