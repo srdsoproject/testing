@@ -645,8 +645,6 @@ else:
     st.info("ℹ️ No records available.")
 
 
-else:
-    st.info("Deficiencies will be updated soon !")
 
 # ---------------- ALERT LOG SECTION ----------------
 st.markdown("## 📋 Alerts Log")
@@ -702,6 +700,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
