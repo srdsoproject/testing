@@ -557,15 +557,22 @@ with tabs[1]:
         st.warning("No pending deficiencies found!")
         st.stop()
 
+    # Ensure required columns exist
     for col in ["Type of Inspection", "Location", "Head", "Sub Head", "Deficiencies Noted",
                 "Inspection By", "Action By", "Feedback", "User Feedback/Remark"]:
         if col not in pending_df.columns:
             pending_df[col] = ""
-    pending_df["_original_sheet_index"] = pending_df.index
 
-    st.write(f"🔹 Showing {len(pending_df)} pending record(s) from **{pending_df['Date of Inspection'].min().strftime('%d.%m.%Y')}** "
-             f"to **{pending_df['Date of Inspection'].max().strftime('%d.%m.%Y')}**")
+    # Remove duplicate columns if any
+    pending_df = pending_df.loc[:, ~pending_df.columns.duplicated()]
 
+    # Convert date column to string for AgGrid
+    pending_df["Date of Inspection"] = pending_df["Date of Inspection"].dt.strftime("%Y-%m-%d")
+
+    st.write(f"🔹 Showing {len(pending_df)} pending record(s) from **{pending_df['Date of Inspection'].min()}** "
+             f"to **{pending_df['Date of Inspection'].max()}**")
+
+    # AgGrid display
     gb2 = GridOptionsBuilder.from_dataframe(pending_df)
     gb2.configure_default_column(wrapText=True, autoHeight=True, editable=False)
     grid_options2 = gb2.build()
@@ -581,6 +588,7 @@ with tabs[1]:
         file_name="pending_records.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
 
 # -------------------- STATUS UTILS --------------------
 def get_status(feedback, remark):
@@ -823,6 +831,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
