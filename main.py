@@ -764,7 +764,7 @@ if not editable_filtered.empty:
             )
 
             # Date filter range
-            start_date = pd.to_datetime("2025-07-01")
+            start_date = datetime(2025, 7, 1)
             end_date = pd.to_datetime("today")
 
             pending_df = editable_filtered[
@@ -843,6 +843,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
