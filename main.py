@@ -76,14 +76,6 @@ if st.session_state.responses:
 else:
     st.write("No responses submitted yet.")
 
-
-# ---------- DISPLAY RESPONSES ----------
-st.markdown("### 📝 Responses Received")
-if "responses" in st.session_state and st.session_state.responses:
-    for i, name in enumerate(st.session_state.responses, start=1):
-        st.write(f"{i}. {name}")
-else:
-    st.write("No responses submitted yet.")
 # ---------- GOOGLE SHEETS CONNECTION ----------
 import streamlit as st
 import pandas as pd
@@ -847,6 +839,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
