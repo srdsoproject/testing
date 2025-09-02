@@ -373,18 +373,18 @@ with tabs[0]:
     df["_original_sheet_index"] = df.index
     df["Status"] = df["Feedback"].apply(classify_feedback)
 
-    # ---------- FILTERS (no date pickers) ----------
+    # ---------- FILTERS ----------
     start_date = df["Date of Inspection"].min()
     end_date   = df["Date of Inspection"].max()
 
     c1, c2 = st.columns(2)
     c1.multiselect("Type of Inspection", VALID_INSPECTIONS, key="view_type_filter")
-    c2.multiselect("Location", FOOTPLATE_LIST, key="view_location_filter")   # ⬅️ changed to multiselect
+    c2.multiselect("Location", FOOTPLATE_LIST, key="view_location_filter")
 
     c3, c4 = st.columns(2)
     c3.multiselect("Head", HEAD_LIST[1:], key="view_head_filter")
     sub_opts = sorted({s for h in st.session_state.view_head_filter for s in SUBHEAD_LIST.get(h, [])})
-    c4.multiselect("Sub Head", sub_opts, key="view_sub_filter")   # ⬅️ changed to multiselect
+    c4.multiselect("Sub Head", sub_opts, key="view_sub_filter")
 
     selected_status = st.selectbox("🔘 Status", ["All", "Pending", "Resolved"], key="view_status_filter")
 
@@ -407,7 +407,8 @@ with tabs[0]:
 
     st.write(f"🔹 Showing {len(filtered)} record(s) from **{start_date.strftime('%d.%m.%Y')}** "
              f"to **{end_date.strftime('%d.%m.%Y')}**")
-    # Summary metrics
+
+    # ---------- SUMMARY METRICS ----------
     col_a, col_b, col_c, col_d = st.columns(4)    
     pending_count     = (filtered["Status"] == "Pending").sum()
     no_response_count = filtered["Feedback"].isna().sum() + (filtered["Feedback"].astype(str).str.strip() == "").sum()
@@ -418,10 +419,27 @@ with tabs[0]:
     col_c.metric("🟩 Resolved", resolved_count)
     col_d.metric("📊 Total Records", len(filtered))
 
+    # ---------- PENDING DEFICIENCY DATES ----------
+    if st.session_state.view_head_filter:
+        pending_dates = (
+            filtered[(filtered["Status"] == "Pending") &
+                     (filtered["Head"].isin(st.session_state.view_head_filter))]
+        )
+        if not pending_dates.empty:
+            st.markdown("### 📅 Pending Deficiencies (by Date)")
+            pending_summary = (
+                pending_dates.groupby(["Head", "Date of Inspection"])
+                .size()
+                .reset_index(name="Pending Count")
+                .sort_values("Date of Inspection")
+            )
+            st.table(pending_summary[["Head", "Date of Inspection", "Pending Count"]])
+        else:
+            st.info("✅ No pending deficiencies for the selected Head(s).")
+
     # ---------- SUB HEAD DISTRIBUTION CHART ----------
     if st.session_state.view_head_filter and not filtered.empty:
         st.markdown("### 📊 Sub Head Distribution")
-
         subhead_summary = (
             filtered.groupby("Sub Head")["Sub Head"]
             .count()
@@ -431,7 +449,6 @@ with tabs[0]:
         if not subhead_summary.empty:
             total_subs = subhead_summary["Count"].sum()
             display_data = subhead_summary.copy()
-
             # group very small into Others
             thresh = 0.02
             display_data["Percent"] = display_data["Count"] / total_subs
@@ -440,21 +457,17 @@ with tabs[0]:
             if not minor.empty:
                 major = pd.concat([major, pd.DataFrame([{"Sub Head":"Others","Count": minor["Count"].sum()}])],
                                   ignore_index=True)
-
             # one figure, two axes
             fig, axes = plt.subplots(1, 2, figsize=(16, 8))
-
             # Pie
             wedges, texts, autotexts = axes[0].pie(
                 major["Count"], startangle=90, autopct='%1.1f%%',
                 textprops=dict(color='black', fontsize=8)
             )
-
             # Label fan-out
             for i, (wedge, (_, row)) in enumerate(zip(wedges, major.iterrows())):
                 ang = (wedge.theta2 + wedge.theta1) / 2.0
-                x = np.cos(np.deg2rad(ang))
-                y = np.sin(np.deg2rad(ang))
+                x = np.cos(np.deg2rad(ang)); y = np.sin(np.deg2rad(ang))
                 place_right = (i % 2 == 0)
                 lx = 1.5 if place_right else -1.5
                 ly = 1.2 * y
@@ -464,13 +477,11 @@ with tabs[0]:
                              bbox=dict(facecolor="white", edgecolor="gray", alpha=0.7, pad=1))
                 axes[0].annotate("", xy=(0.9*x, 0.9*y), xytext=(lx, ly),
                                  arrowprops=dict(arrowstyle="-", lw=0.8, color="black"))
-
             # Table
             table_data = [["Sub Head", "Count"]] + subhead_summary.values.tolist() + [["Total", total_subs]]
             axes[1].axis('off')
             tbl = axes[1].table(cellText=table_data, loc='center')
             tbl.auto_set_font_size(False); tbl.set_fontsize(10); tbl.scale(1, 1.5)
-
             # Title & context
             fig.suptitle("📊 Sub Head Breakdown", fontsize=14, fontweight="bold")
             dr = f"{start_date.strftime('%d-%m-%Y')} to {end_date.strftime('%d-%m-%Y')}"
@@ -483,7 +494,6 @@ with tabs[0]:
             if st.session_state.view_sub_filter:
                 fig.text(0.5, 0.02, f"Sub Head Filter: {st.session_state.view_sub_filter}",
                          ha='center', fontsize=9, color='black', fontweight='bold')
-
             plt.tight_layout(rect=[0, 0.06, 1, 0.94])
             buf = BytesIO(); plt.savefig(buf, format="png", dpi=200, bbox_inches="tight"); buf.seek(0); plt.close()
             st.image(buf, use_column_width=True)
@@ -491,77 +501,42 @@ with tabs[0]:
                                file_name="subhead_distribution.png", mime="image/png")
 
     # ---------- EXPORT ----------
-    from io import BytesIO
-    import pandas as pd
-    from openpyxl.styles import Alignment, Font, Border, Side, NamedStyle
-    
-    # Export dataframe
     export_df = filtered[[
         "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
         "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "User Feedback/Remark",
         "Status"
     ]].copy()
-    
-    # 🔹 Ensure date column is only a date (no time part)
     export_df["Date of Inspection"] = pd.to_datetime(export_df["Date of Inspection"]).dt.date
-    
     towb = BytesIO()
     with pd.ExcelWriter(towb, engine="openpyxl") as writer:
         export_df.to_excel(writer, index=False, sheet_name="Filtered Records")
         ws = writer.sheets["Filtered Records"]
-    
-        # 🔹 Define date format style
         date_style = NamedStyle(name="date_style", number_format="DD-MM-YYYY")
-    
-        # Apply alignment + wrap text for ALL cells
         for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
-            for cell in row:
-                cell.alignment = Alignment(wrap_text=True, vertical="top")
-    
-        # Apply date format only to "Date of Inspection" column
+            for cell in row: cell.alignment = Alignment(wrap_text=True, vertical="top")
         date_col_idx = export_df.columns.get_loc("Date of Inspection") + 1
         for row in ws.iter_rows(min_row=2, min_col=date_col_idx, max_col=date_col_idx, max_row=len(export_df) + 1):
-            for cell in row:
-                cell.style = date_style
-    
-        # Auto column widths
+            for cell in row: cell.style = date_style
         for col in ws.columns:
-            max_length = 0
-            col_letter = col[0].column_letter
+            max_length = 0; col_letter = col[0].column_letter
             for cell in col:
                 try:
-                    if cell.value:
-                        max_length = max(max_length, len(str(cell.value)))
-                except:
-                    pass
-            adjusted_width = (max_length + 2) if max_length < 50 else 50  # cap width
+                    if cell.value: max_length = max(max_length, len(str(cell.value)))
+                except: pass
+            adjusted_width = (max_length + 2) if max_length < 50 else 50
             ws.column_dimensions[col_letter].width = adjusted_width
-    
-        # Apply border to all cells
-        thin_border = Border(left=Side(style='thin'),
-                             right=Side(style='thin'),
-                             top=Side(style='thin'),
-                             bottom=Side(style='thin'))
+        thin_border = Border(left=Side(style='thin'), right=Side(style='thin'),
+                             top=Side(style='thin'), bottom=Side(style='thin'))
         for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
-            for cell in row:
-                cell.border = thin_border
-    
-        # Apply color formatting to Status column
+            for cell in row: cell.border = thin_border
         status_col_idx = export_df.columns.get_loc("Status") + 1
         for row in ws.iter_rows(min_row=2, min_col=status_col_idx, max_col=status_col_idx, max_row=len(export_df) + 1):
             for cell in row:
-                if str(cell.value).strip().lower() == "pending":
-                    cell.font = Font(color="FF0000")  # Red
-                elif str(cell.value).strip().lower() == "resolved":
-                    cell.font = Font(color="008000")  # Green
-    
+                if str(cell.value).strip().lower() == "pending": cell.font = Font(color="FF0000")
+                elif str(cell.value).strip().lower() == "resolved": cell.font = Font(color="008000")
     towb.seek(0)
-    
-    # Streamlit download button
-    st.download_button(
-        "📥 Export Filtered Records to Excel", 
-        data=towb,
-        file_name="filtered_records.xlsx",
+    st.download_button("📥 Export Filtered Records to Excel", 
+        data=towb, file_name="filtered_records.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
@@ -572,186 +547,99 @@ def get_status(feedback, remark):
 def color_text_status(status):
     return "🔴 Pending" if status == "Pending" else ("🟢 Resolved" if status == "Resolved" else status)
 
-# -------------------- SCROLLBAR & CELL WRAP CSS --------------------
-st.markdown(
-    """
-    <style>
-    ::-webkit-scrollbar { width:16px; height:16px; }
-    ::-webkit-scrollbar-track { background:#f1f1f1; border-radius:8px; }
-    ::-webkit-scrollbar-thumb { background:#888; border-radius:8px; border:3px solid #f1f1f1; }
-    ::-webkit-scrollbar-thumb:hover { background:#555; }
-    * { scrollbar-width:auto; scrollbar-color:#888 #f1f1f1; }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
 # -------------------- EDITOR --------------------
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
-import pandas as pd
-import streamlit as st
-
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
-
-# Initialize alerts log
-if "alerts_log" not in st.session_state:
-    st.session_state.alerts_log = []
-
+if "alerts_log" not in st.session_state: st.session_state.alerts_log = []
 editable_filtered = filtered.copy()
 if not editable_filtered.empty:
-    # Ensure stable IDs exist for reliable updates
     if "_original_sheet_index" not in editable_filtered.columns:
         editable_filtered["_original_sheet_index"] = editable_filtered.index
     if "_sheet_row" not in editable_filtered.columns:
-        editable_filtered["_sheet_row"] = editable_filtered.index + 2  # sheet row (header + 1)
-
+        editable_filtered["_sheet_row"] = editable_filtered.index + 2
     display_cols = [
-        "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
-        "Deficiencies Noted", "Inspection By", "Action By", "Feedback",
-        "User Feedback/Remark"
+        "Date of Inspection","Type of Inspection","Location","Head","Sub Head",
+        "Deficiencies Noted","Inspection By","Action By","Feedback","User Feedback/Remark"
     ]
     editable_df = editable_filtered[display_cols].copy()
-
-    # Show only date part
     if "Date of Inspection" in editable_df.columns:
-        editable_df["Date of Inspection"] = pd.to_datetime(
-            editable_df["Date of Inspection"], errors="coerce"
-        ).dt.strftime("%Y-%m-%d")  # convert to string in YYYY-MM-DD format
-
-    # Status column
-    editable_df.insert(
-        editable_df.columns.get_loc("User Feedback/Remark") + 1,
-        "Status",
-        [get_status(r["Feedback"], r["User Feedback/Remark"]) for _, r in editable_df.iterrows()]
-    )
+        editable_df["Date of Inspection"] = pd.to_datetime(editable_df["Date of Inspection"], errors="coerce").dt.strftime("%Y-%m-%d")
+    editable_df.insert(editable_df.columns.get_loc("User Feedback/Remark")+1,"Status",
+        [get_status(r["Feedback"], r["User Feedback/Remark"]) for _,r in editable_df.iterrows()])
     editable_df["Status"] = editable_df["Status"].apply(color_text_status)
-
-    # Carry ID columns through grid (hidden)
     editable_df["_original_sheet_index"] = editable_filtered["_original_sheet_index"].values
     editable_df["_sheet_row"] = editable_filtered["_sheet_row"].values
-
-    # -------- AG GRID CONFIG (wrap + auto height, only remarks editable) --------
     gb = GridOptionsBuilder.from_dataframe(editable_df)
     gb.configure_default_column(editable=False, wrapText=True, autoHeight=True)
-
-    # Make ONLY "User Feedback/Remark" editable with a large text editor popup
-    gb.configure_column(
-        "User Feedback/Remark",
-        editable=True,
-        wrapText=True,
-        autoHeight=True,
-        cellEditor="agLargeTextCellEditor",
-        cellEditorPopup=True,
-        cellEditorParams={"maxLength": 4000, "rows": 10, "cols": 60}
-    )
-
-    # Hide helper ID columns
+    gb.configure_column("User Feedback/Remark", editable=True, wrapText=True, autoHeight=True,
+        cellEditor="agLargeTextCellEditor", cellEditorPopup=True,
+        cellEditorParams={"maxLength":4000,"rows":10,"cols":60})
     gb.configure_column("_original_sheet_index", hide=True)
     gb.configure_column("_sheet_row", hide=True)
-
-    # Easier editing UX
     gb.configure_grid_options(singleClickEdit=True)
-
-    grid_options = gb.build()
-
-    grid_response = AgGrid(
-        editable_df,
-        gridOptions=grid_options,
-        update_mode=GridUpdateMode.VALUE_CHANGED,
-        height=600,
-        fit_columns_on_grid_load=True,
-        allow_unsafe_jscode=True
-    )
-
+    grid_response = AgGrid(editable_df, gridOptions=gb.build(),
+        update_mode=GridUpdateMode.VALUE_CHANGED, height=600,
+        fit_columns_on_grid_load=True, allow_unsafe_jscode=True)
     edited_df = pd.DataFrame(grid_response["data"])
-
-    c1, c2, _ = st.columns([1, 1, 1])
+    c1, c2, _ = st.columns([1,1,1])
     submitted = c1.button("✅ Submit Feedback")
     if c2.button("🔄 Refresh Data"):
-        st.session_state.df = load_data()
-        st.success("✅ Data refreshed successfully!")
-
+        st.session_state.df = load_data(); st.success("✅ Data refreshed successfully!")
     if submitted:
-        # Validate needed columns
-        need_cols = {"_original_sheet_index", "User Feedback/Remark"}
+        need_cols = {"_original_sheet_index","User Feedback/Remark"}
         if not need_cols.issubset(edited_df.columns) or "Feedback" not in editable_filtered.columns:
             st.error("⚠️ Required columns are missing from the data.")
         else:
-            # Compare remarks using the stable ID to find changes
             orig = editable_filtered.set_index("_original_sheet_index")
             new = edited_df.set_index("_original_sheet_index")
-
             old_remarks = orig["User Feedback/Remark"].fillna("").astype(str)
             new_remarks = new["User Feedback/Remark"].fillna("").astype(str)
-
-            # 🔧 Fix: Align indexes before comparing
             common_ids = new_remarks.index.intersection(old_remarks.index)
             diff_mask = new_remarks.loc[common_ids] != old_remarks.loc[common_ids]
             changed_ids = diff_mask[diff_mask].index.tolist()
-
             if changed_ids:
                 diffs = new.loc[changed_ids].copy()
                 diffs["_sheet_row"] = orig.loc[changed_ids, "_sheet_row"].values
-
-                # Routing dictionary
                 routing = {
-                    "Pertains to S&T":        ("SIGNAL & TELECOM", "Sr.DSTE"),
-                    "Pertains to OPTG":       ("OPTG", "Sr.DOM"),
-                    "Pertains to COMMERCIAL": ("COMMERCIAL", "Sr.DCM"),
-                    "Pertains to ELECT/G":    ("ELECT/G", "Sr.DEE/G"),
-                    "Pertains to ELECT/TRD":  ("ELECT/TRD", "Sr.DEE/TRD"),
-                    "Pertains to ELECT/TRO":  ("ELECT/TRO", "Sr.DEE/TRO"),
-                    "Pertains to Sr.DEN/S":   ("ENGINEERING", "Sr.DEN/S"),
-                    "Pertains to Sr.DEN/C":   ("ENGINEERING", "Sr.DEN/C"),
-                    "Pertains to Sr.DEN/Co":  ("ENGINEERING", "Sr.DEN/Co"),
+                    "Pertains to S&T":("SIGNAL & TELECOM","Sr.DSTE"),
+                    "Pertains to OPTG":("OPTG","Sr.DOM"),
+                    "Pertains to COMMERCIAL":("COMMERCIAL","Sr.DCM"),
+                    "Pertains to ELECT/G":("ELECT/G","Sr.DEE/G"),
+                    "Pertains to ELECT/TRD":("ELECT/TRD","Sr.DEE/TRD"),
+                    "Pertains to ELECT/TRO":("ELECT/TRO","Sr.DEE/TRO"),
+                    "Pertains to Sr.DEN/S":("ENGINEERING","Sr.DEN/S"),
+                    "Pertains to Sr.DEN/C":("ENGINEERING","Sr.DEN/C"),
+                    "Pertains to Sr.DEN/Co":("ENGINEERING","Sr.DEN/Co"),
                 }
-
                 for oid in changed_ids:
-                    user_remark = new.loc[oid, "User Feedback/Remark"].strip()
-                    if not user_remark:
-                        continue
-
-                    for key, (head, action_by) in routing.items():
+                    user_remark = new.loc[oid,"User Feedback/Remark"].strip()
+                    if not user_remark: continue
+                    for key,(head,action_by) in routing.items():
                         if key in user_remark:
-                            st.session_state.df.at[oid, "Head"] = head
-                            st.session_state.df.at[oid, "Action By"] = action_by
-                            st.session_state.df.at[oid, "Sub Head"] = ""
-                            diffs.at[oid, "Head"] = head
-                            diffs.at[oid, "Action By"] = action_by
-                            diffs.at[oid, "Sub Head"] = ""
-
-                            # 👉 Collect extra info
-                            date_str = orig.loc[oid, "Date of Inspection"]
-                            deficiency = orig.loc[oid, "Deficiencies Noted"]
-                            forwarded_by = orig.loc[oid, "Head"]
-
-                            # 👉 Build alert message (now includes Forwarded By)
-                            alert_msg = (
-                                f"📌 **{head} Department Alert**\n"
+                            st.session_state.df.at[oid,"Head"] = head
+                            st.session_state.df.at[oid,"Action By"] = action_by
+                            st.session_state.df.at[oid,"Sub Head"] = ""
+                            diffs.at[oid,"Head"] = head
+                            diffs.at[oid,"Action By"] = action_by
+                            diffs.at[oid,"Sub Head"] = ""
+                            date_str = orig.loc[oid,"Date of Inspection"]
+                            deficiency = orig.loc[oid,"Deficiencies Noted"]
+                            forwarded_by = orig.loc[oid,"Head"]
+                            alert_msg = (f"📌 **{head} Department Alert**\n"
                                 f"- Date: {date_str}\n"
                                 f"- Deficiency: {deficiency}\n"
                                 f"- Forwarded By: {forwarded_by}\n"
-                                f"- Forwarded Remark: {user_remark}"
-                            )
-
-                            # Insert at top of log
+                                f"- Forwarded Remark: {user_remark}")
                             st.session_state.alerts_log.insert(0, alert_msg)
-
-                    # ✅ Replace Feedback with new remark (no append)
-                    diffs.at[oid, "Feedback"] = user_remark
-                    diffs.at[oid, "User Feedback/Remark"] = ""
-
-                    st.session_state.df.at[oid, "Feedback"] = user_remark
-                    st.session_state.df.at[oid, "User Feedback/Remark"] = ""
-
-                # Persist to storage (expects _sheet_row in diffs)
-                update_feedback_column(diffs.reset_index().rename(columns={"index": "_original_sheet_index"}))
+                    diffs.at[oid,"Feedback"] = user_remark
+                    diffs.at[oid,"User Feedback/Remark"] = ""
+                    st.session_state.df.at[oid,"Feedback"] = user_remark
+                    st.session_state.df.at[oid,"User Feedback/Remark"] = ""
+                update_feedback_column(diffs.reset_index().rename(columns={"index":"_original_sheet_index"}))
                 st.success(f"✅ Updated {len(changed_ids)} Feedback row(s) with new remarks.")
             else:
                 st.info("ℹ️ No changes detected to save.")
 else:
     st.info("Deficiencies will be updated soon !")
-
 # ---------------- ALERT LOG SECTION ----------------
 st.markdown("## 📋 Alerts Log")
 
@@ -806,6 +694,4 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
-
-
 
