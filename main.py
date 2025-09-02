@@ -51,6 +51,8 @@ if not st.session_state.logged_in:
 # ---------- POST-LOGIN: Pending Deficiencies Acknowledgment ----------
 st.title("📢 Pending Deficiencies Compliance")
 
+st.title("📢 Pending Deficiencies Compliance")
+
 with st.expander("⚠️ Pending Deficiencies Notice", expanded=True):
     st.info("""
     The pending deficiencies compliance are pending and will be completed at the earliest.  
@@ -63,15 +65,15 @@ with st.expander("⚠️ Pending Deficiencies Notice", expanded=True):
         
         if ack_submitted:
             if responder_name.strip():
-                # --- Save response to CSV ---
+                # --- Save response to Excel ---
                 new_entry = {"Name": responder_name.strip()}
                 try:
-                    df = pd.read_csv("responses.csv")
+                    df = pd.read_excel("responses.xlsx")
                 except FileNotFoundError:
                     df = pd.DataFrame(columns=["Name"])
                 
                 df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
-                df.to_csv("responses.csv", index=False)
+                df.to_excel("responses.xlsx", index=False)
                 
                 st.success(f"✅ Thank you, {responder_name}, for acknowledging.")
             else:
@@ -80,13 +82,19 @@ with st.expander("⚠️ Pending Deficiencies Notice", expanded=True):
 # ---------- DISPLAY ALL RESPONSES ----------
 st.markdown("### 📝 Responses Received")
 try:
-    df = pd.read_csv("responses.csv")
+    df = pd.read_excel("responses.xlsx")
     if not df.empty:
         st.dataframe(df)
     else:
         st.write("No responses submitted yet.")
 except FileNotFoundError:
     st.write("No responses submitted yet.")
+
+# ---------- OPTIONAL: Clear Responses Button ----------
+if st.button("🗑️ Clear All Responses"):
+    df = pd.DataFrame(columns=["Name"])
+    df.to_excel("responses.xlsx", index=False)
+    st.success("✅ All responses have been cleared.")
 
 # ---------- OPTIONAL: Clear Responses Button ----------
 if st.button("🗑️ Clear All Responses"):
@@ -856,6 +864,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
