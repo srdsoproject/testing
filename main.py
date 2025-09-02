@@ -590,8 +590,18 @@ st.markdown(
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 import pandas as pd
 import streamlit as st
+import datetime
 
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
+
+# ---------- SHOW PENDING DEFICIENCIES ALERT ----------
+pending_count = len(filtered) if 'filtered' in locals() else 0
+pending_start_date = datetime.date(2025, 7, 1)  # Assuming 01 July
+
+if pending_count > 0:
+    st.warning(
+        f"⚠️ There are {pending_count} pending deficiencies since {pending_start_date.strftime('%d %b %Y')}."
+    )
 
 # Initialize alerts log
 if "alerts_log" not in st.session_state:
@@ -806,6 +816,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
