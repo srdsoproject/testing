@@ -548,7 +548,20 @@ with tabs[0]:
 
 # -------------------- TAB 2: Pending Records --------------------
 with tabs[1]:
-   if "df" not in st.session_state:
+   # -------------------- STATUS UTILITIES --------------------
+def classify_feedback(feedback):
+    if not feedback or str(feedback).strip() == "":
+        return "Pending"
+    return "Resolved"
+
+def get_status(feedback, remark):
+    return classify_feedback(feedback)
+
+def color_text_status(status):
+    return "🔴 Pending" if status == "Pending" else ("🟢 Resolved" if status == "Resolved" else status)
+
+# -------------------- LOAD DATA --------------------
+if "df" not in st.session_state:
     st.session_state.df = load_data()
 df = st.session_state.df
 
@@ -558,7 +571,6 @@ for col in ["Type of Inspection", "Location", "Head", "Sub Head", "Deficiencies 
     if col not in df.columns:
         df[col] = ""
 
-# Convert date
 df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], format="%d.%m.%y", errors="coerce")
 df["_original_sheet_index"] = df.index
 df["Status"] = df["Feedback"].apply(classify_feedback)
@@ -596,7 +608,7 @@ display_cols = [
 table_df = pending_df[display_cols].copy()
 table_df["Date of Inspection"] = table_df["Date of Inspection"].dt.strftime("%Y-%m-%d")
 
-# Status column (optional visual aid)
+# Status column
 table_df.insert(
     table_df.columns.get_loc("User Feedback/Remark") + 1,
     "Status",
@@ -892,6 +904,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
