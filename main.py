@@ -594,20 +594,31 @@ import datetime
 
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
-# ---------- SHOW PENDING DEFICIENCIES ALERT ----------
-pending_count = len(filtered) if 'filtered' in locals() else 0
-pending_start_date = datetime.date(2025, 7, 1)  # Assuming 01 July
+# ---------- SHOW PENDING DEFICIENCIES ALERT (LAST 60 DAYS) ----------
+if 'filtered' in locals() and not filtered.empty:
+    today = datetime.date.today()
+    sixty_days_ago = today - datetime.timedelta(days=60)
 
-if pending_count > 0:
-    st.warning(
-        f"⚠️ There are {pending_count} pending deficiencies since {pending_start_date.strftime('%d %b %Y')}."
-    )
+    # Ensure Date of Inspection is datetime
+    filtered['Date of Inspection'] = pd.to_datetime(filtered['Date of Inspection'], errors='coerce').dt.date
+
+    # Filter for last 60 days
+    pending_df = filtered[filtered['Date of Inspection'] >= sixty_days_ago]
+
+    pending_count = len(pending_df)
+    if pending_count > 0:
+        earliest_date = pending_df['Date of Inspection'].min()
+        st.warning(
+            f"⚠️ There are {pending_count} pending deficiencies from {earliest_date.strftime('%d %b %Y')} (last 60 days)."
+        )
+else:
+    st.info("No data available for pending deficiencies.")
 
 # Initialize alerts log
 if "alerts_log" not in st.session_state:
     st.session_state.alerts_log = []
 
-editable_filtered = filtered.copy()
+editable_filtered = filtered.copy() if 'filtered' in locals() else pd.DataFrame()
 if not editable_filtered.empty:
     # Ensure stable IDs exist for reliable updates
     if "_original_sheet_index" not in editable_filtered.columns:
@@ -762,6 +773,7 @@ if not editable_filtered.empty:
 else:
     st.info("Deficiencies will be updated soon !")
 
+
 # ---------------- ALERT LOG SECTION ----------------
 st.markdown("## 📋 Alerts Log")
 
@@ -816,6 +828,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
