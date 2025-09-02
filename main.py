@@ -356,7 +356,7 @@ if "df" not in st.session_state:
     st.session_state.df = load_data()
 df = st.session_state.df
 
-tabs = st.tabs(["📊 View Records"])
+tabs = st.tabs(["📊 View Records", "⏳ Pending Records"])
 with tabs[0]:
     if df.empty:
         st.warning("Deficiencies will be updated soon !")
@@ -839,6 +839,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
