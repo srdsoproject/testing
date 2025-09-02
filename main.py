@@ -564,7 +564,40 @@ with tabs[0]:
         file_name="filtered_records.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+with tabs[1]:
+    st.markdown("### ⏳ Pending Records (All Time)")
+    pending_df = df.copy()
+    pending_df["Date of Inspection"] = pd.to_datetime(pending_df["Date of Inspection"], errors="coerce")
+    pending_df = pending_df[pending_df["Status"] == "Pending"]
 
+    if pending_df.empty:
+        st.warning("No pending deficiencies found!")
+        st.stop()
+
+    for col in ["Type of Inspection", "Location", "Head", "Sub Head", "Deficiencies Noted",
+                "Inspection By", "Action By", "Feedback", "User Feedback/Remark"]:
+        if col not in pending_df.columns:
+            pending_df[col] = ""
+    pending_df["_original_sheet_index"] = pending_df.index
+
+    st.write(f"🔹 Showing {len(pending_df)} pending record(s) from **{pending_df['Date of Inspection'].min().strftime('%d.%m.%Y')}** "
+             f"to **{pending_df['Date of Inspection'].max().strftime('%d.%m.%Y')}**")
+
+    gb2 = GridOptionsBuilder.from_dataframe(pending_df)
+    gb2.configure_default_column(wrapText=True, autoHeight=True, editable=False)
+    grid_options2 = gb2.build()
+    AgGrid(pending_df, gridOptions=grid_options2, height=600, fit_columns_on_grid_load=True)
+
+    # Export pending
+    towb_pending = BytesIO()
+    pending_df.to_excel(towb_pending, index=False, sheet_name="Pending Records")
+    towb_pending.seek(0)
+    st.download_button(
+        "📥 Export Pending Records to Excel",
+        data=towb_pending,
+        file_name="pending_records.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 # -------------------- STATUS UTILS --------------------
 def get_status(feedback, remark):
     return classify_feedback(feedback, remark)
@@ -809,45 +842,3 @@ st.markdown("""
 
 
 
-
-with tabs[1]:
-    st.markdown("### ⏳ Pending Records (All Time)")
-
-    # Filter only pending records from start to today
-    pending_df = df.copy()
-    pending_df["Date of Inspection"] = pd.to_datetime(pending_df["Date of Inspection"], errors="coerce")
-    pending_df = pending_df[pending_df["Status"] == "Pending"]
-
-    if pending_df.empty:
-        st.warning("No pending deficiencies found!")
-        st.stop()
-
-    # Ensure required columns exist
-    for col in ["Type of Inspection", "Location", "Head", "Sub Head", "Deficiencies Noted",
-                "Inspection By", "Action By", "Feedback", "User Feedback/Remark"]:
-        if col not in pending_df.columns:
-            pending_df[col] = ""
-
-    pending_df["_original_sheet_index"] = pending_df.index
-
-    # Show count
-    st.write(f"🔹 Showing {len(pending_df)} pending record(s) from **{pending_df['Date of Inspection'].min().strftime('%d.%m.%Y')}** "
-             f"to **{pending_df['Date of Inspection'].max().strftime('%d.%m.%Y')}**")
-
-    # Display table using AgGrid (optional: editable)
-    from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
-    gb2 = GridOptionsBuilder.from_dataframe(pending_df)
-    gb2.configure_default_column(wrapText=True, autoHeight=True, editable=False)
-    grid_options2 = gb2.build()
-    AgGrid(pending_df, gridOptions=grid_options2, height=600, fit_columns_on_grid_load=True)
-
-    # Download option
-    towb_pending = BytesIO()
-    pending_df.to_excel(towb_pending, index=False, sheet_name="Pending Records")
-    towb_pending.seek(0)
-    st.download_button(
-        "📥 Export Pending Records to Excel",
-        data=towb_pending,
-        file_name="pending_records.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
