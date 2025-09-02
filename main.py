@@ -63,20 +63,35 @@ with st.expander("⚠️ Pending Deficiencies Notice", expanded=True):
         
         if ack_submitted:
             if responder_name.strip():
-                st.session_state.responses.append(responder_name.strip())
+                # --- Save response to CSV ---
+                new_entry = {"Name": responder_name.strip()}
+                try:
+                    df = pd.read_csv("responses.csv")
+                except FileNotFoundError:
+                    df = pd.DataFrame(columns=["Name"])
+                
+                df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
+                df.to_csv("responses.csv", index=False)
+                
                 st.success(f"✅ Thank you, {responder_name}, for acknowledging.")
             else:
                 st.error("❌ Please enter your name before submitting.")
 
-# ---------- DISPLAY RESPONSES ----------
+# ---------- DISPLAY ALL RESPONSES ----------
 st.markdown("### 📝 Responses Received")
-if st.session_state.responses:
-    for i, name in enumerate(st.session_state.responses, start=1):
-        st.write(f"{i}. {name}")
-else:
+try:
+    df = pd.read_csv("responses.csv")
+    if not df.empty:
+        st.dataframe(df)
+    else:
+        st.write("No responses submitted yet.")
+except FileNotFoundError:
     st.write("No responses submitted yet.")
+
+# ---------- OPTIONAL: Clear Responses Button ----------
 if st.button("🗑️ Clear All Responses"):
-    st.session_state.responses = []  # Reset the list
+    df = pd.DataFrame(columns=["Name"])
+    df.to_csv("responses.csv", index=False)
     st.success("✅ All responses have been cleared.")
 # ---------- GOOGLE SHEETS CONNECTION ----------
 import streamlit as st
@@ -841,6 +856,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
