@@ -549,16 +549,16 @@ with tabs[0]:
 # -------------------- TAB 2: Pending Records --------------------
 with tabs[1]:
    # -------------------- STATUS UTILITIES --------------------
-def classify_feedback(feedback):
-    if not feedback or str(feedback).strip() == "":
-        return "Pending"
-    return "Resolved"
-
-def get_status(feedback, remark):
-    return classify_feedback(feedback)
-
-def color_text_status(status):
-    return "🔴 Pending" if status == "Pending" else ("🟢 Resolved" if status == "Resolved" else status)
+    def classify_feedback(feedback):
+        if not feedback or str(feedback).strip() == "":
+            return "Pending"
+        return "Resolved"
+    
+    def get_status(feedback, remark):
+        return classify_feedback(feedback)
+    
+    def color_text_status(status):
+        return "🔴 Pending" if status == "Pending" else ("🟢 Resolved" if status == "Resolved" else status)
 
 # -------------------- LOAD DATA --------------------
 if "df" not in st.session_state:
@@ -904,6 +904,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
