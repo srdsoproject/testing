@@ -590,40 +590,14 @@ st.markdown(
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 import pandas as pd
 import streamlit as st
-import datetime
 
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
-
-# ---------- CALCULATE PENDING DEFICIENCIES FROM 1st JULY ----------
-if 'filtered' in locals() and not filtered.empty:
-    today = datetime.date.today()
-    start_date = datetime.date(today.year, 7, 1)  # 1st July this year
-
-    # Convert Date of Inspection to datetime.date
-    filtered['Date of Inspection'] = pd.to_datetime(
-        filtered['Date of Inspection'], errors='coerce'
-    ).dt.date
-
-    # Filter deficiencies between 1st July and today
-    pending_df = filtered[(filtered['Date of Inspection'] >= start_date) & 
-                          (filtered['Date of Inspection'] <= today)]
-
-    # Count of pending deficiencies
-    pending_count = len(pending_df)
-
-    if pending_count > 0:
-        st.warning(
-            f"⚠️ There are {pending_count} pending deficiencies from {start_date.strftime('%d %b %Y')} till today."
-        )
-else:
-    pending_count = 0
-    st.info("No data available for pending deficiencies.")
 
 # Initialize alerts log
 if "alerts_log" not in st.session_state:
     st.session_state.alerts_log = []
 
-editable_filtered = filtered.copy() if 'filtered' in locals() else pd.DataFrame()
+editable_filtered = filtered.copy()
 if not editable_filtered.empty:
     # Ensure stable IDs exist for reliable updates
     if "_original_sheet_index" not in editable_filtered.columns:
@@ -710,7 +684,7 @@ if not editable_filtered.empty:
             old_remarks = orig["User Feedback/Remark"].fillna("").astype(str)
             new_remarks = new["User Feedback/Remark"].fillna("").astype(str)
 
-            # 🔧 Align indexes before comparing
+            # 🔧 Fix: Align indexes before comparing
             common_ids = new_remarks.index.intersection(old_remarks.index)
             diff_mask = new_remarks.loc[common_ids] != old_remarks.loc[common_ids]
             changed_ids = diff_mask[diff_mask].index.tolist()
@@ -746,12 +720,12 @@ if not editable_filtered.empty:
                             diffs.at[oid, "Action By"] = action_by
                             diffs.at[oid, "Sub Head"] = ""
 
-                            # Collect extra info
+                            # 👉 Collect extra info
                             date_str = orig.loc[oid, "Date of Inspection"]
                             deficiency = orig.loc[oid, "Deficiencies Noted"]
                             forwarded_by = orig.loc[oid, "Head"]
 
-                            # Build alert message
+                            # 👉 Build alert message (now includes Forwarded By)
                             alert_msg = (
                                 f"📌 **{head} Department Alert**\n"
                                 f"- Date: {date_str}\n"
@@ -760,23 +734,23 @@ if not editable_filtered.empty:
                                 f"- Forwarded Remark: {user_remark}"
                             )
 
+                            # Insert at top of log
                             st.session_state.alerts_log.insert(0, alert_msg)
 
-                    # Replace Feedback with new remark
+                    # ✅ Replace Feedback with new remark (no append)
                     diffs.at[oid, "Feedback"] = user_remark
                     diffs.at[oid, "User Feedback/Remark"] = ""
 
                     st.session_state.df.at[oid, "Feedback"] = user_remark
                     st.session_state.df.at[oid, "User Feedback/Remark"] = ""
 
-                # Persist to storage
+                # Persist to storage (expects _sheet_row in diffs)
                 update_feedback_column(diffs.reset_index().rename(columns={"index": "_original_sheet_index"}))
                 st.success(f"✅ Updated {len(changed_ids)} Feedback row(s) with new remarks.")
             else:
                 st.info("ℹ️ No changes detected to save.")
 else:
     st.info("Deficiencies will be updated soon !")
-
 
 # ---------------- ALERT LOG SECTION ----------------
 st.markdown("## 📋 Alerts Log")
@@ -832,10 +806,6 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
-
-
-
-
 
 
 
