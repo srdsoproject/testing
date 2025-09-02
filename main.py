@@ -352,11 +352,23 @@ st.markdown(
 )
 
 # -------------------- SESSION DATA --------------------
+import streamlit as st
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+from io import BytesIO
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+from openpyxl.styles import Alignment, Font, Border, Side, NamedStyle
+
+# -------------------- LOAD DATA --------------------
 if "df" not in st.session_state:
     st.session_state.df = load_data()
 df = st.session_state.df
 
+# -------------------- TABS --------------------
 tabs = st.tabs(["📊 View Records", "⏳ Pending Records"])
+
+# -------------------- TAB 1: View Records --------------------
 with tabs[0]:
     if df.empty:
         st.warning("Deficiencies will be updated soon !")
@@ -373,18 +385,18 @@ with tabs[0]:
     df["_original_sheet_index"] = df.index
     df["Status"] = df["Feedback"].apply(classify_feedback)
 
-    # ---------- FILTERS (no date pickers) ----------
+    # ---------- FILTERS ----------
     start_date = df["Date of Inspection"].min()
     end_date   = df["Date of Inspection"].max()
 
     c1, c2 = st.columns(2)
     c1.multiselect("Type of Inspection", VALID_INSPECTIONS, key="view_type_filter")
-    c2.multiselect("Location", FOOTPLATE_LIST, key="view_location_filter")   # ⬅️ changed to multiselect
+    c2.multiselect("Location", FOOTPLATE_LIST, key="view_location_filter")
 
     c3, c4 = st.columns(2)
     c3.multiselect("Head", HEAD_LIST[1:], key="view_head_filter")
     sub_opts = sorted({s for h in st.session_state.view_head_filter for s in SUBHEAD_LIST.get(h, [])})
-    c4.multiselect("Sub Head", sub_opts, key="view_sub_filter")   # ⬅️ changed to multiselect
+    c4.multiselect("Sub Head", sub_opts, key="view_sub_filter")
 
     selected_status = st.selectbox("🔘 Status", ["All", "Pending", "Resolved"], key="view_status_filter")
 
@@ -407,8 +419,9 @@ with tabs[0]:
 
     st.write(f"🔹 Showing {len(filtered)} record(s) from **{start_date.strftime('%d.%m.%Y')}** "
              f"to **{end_date.strftime('%d.%m.%Y')}**")
+
     # Summary metrics
-    col_a, col_b, col_c, col_d = st.columns(4)    
+    col_a, col_b, col_c, col_d = st.columns(4)
     pending_count     = (filtered["Status"] == "Pending").sum()
     no_response_count = filtered["Feedback"].isna().sum() + (filtered["Feedback"].astype(str).str.strip() == "").sum()
     resolved_count    = (filtered["Status"] == "Resolved").sum()
@@ -421,7 +434,6 @@ with tabs[0]:
     # ---------- SUB HEAD DISTRIBUTION CHART ----------
     if st.session_state.view_head_filter and not filtered.empty:
         st.markdown("### 📊 Sub Head Distribution")
-
         subhead_summary = (
             filtered.groupby("Sub Head")["Sub Head"]
             .count()
@@ -431,26 +443,19 @@ with tabs[0]:
         if not subhead_summary.empty:
             total_subs = subhead_summary["Count"].sum()
             display_data = subhead_summary.copy()
-
-            # group very small into Others
             thresh = 0.02
             display_data["Percent"] = display_data["Count"] / total_subs
             major = display_data[display_data["Percent"] >= thresh][["Sub Head","Count"]]
             minor = display_data[display_data["Percent"] <  thresh]
             if not minor.empty:
-                major = pd.concat([major, pd.DataFrame([{"Sub Head":"Others","Count": minor["Count"].sum()}])],
-                                  ignore_index=True)
+                major = pd.concat([major, pd.DataFrame([{"Sub Head":"Others","Count": minor["Count"].sum()}])], ignore_index=True)
 
-            # one figure, two axes
             fig, axes = plt.subplots(1, 2, figsize=(16, 8))
-
-            # Pie
             wedges, texts, autotexts = axes[0].pie(
                 major["Count"], startangle=90, autopct='%1.1f%%',
                 textprops=dict(color='black', fontsize=8)
             )
 
-            # Label fan-out
             for i, (wedge, (_, row)) in enumerate(zip(wedges, major.iterrows())):
                 ang = (wedge.theta2 + wedge.theta1) / 2.0
                 x = np.cos(np.deg2rad(ang))
@@ -465,13 +470,11 @@ with tabs[0]:
                 axes[0].annotate("", xy=(0.9*x, 0.9*y), xytext=(lx, ly),
                                  arrowprops=dict(arrowstyle="-", lw=0.8, color="black"))
 
-            # Table
             table_data = [["Sub Head", "Count"]] + subhead_summary.values.tolist() + [["Total", total_subs]]
             axes[1].axis('off')
             tbl = axes[1].table(cellText=table_data, loc='center')
             tbl.auto_set_font_size(False); tbl.set_fontsize(10); tbl.scale(1, 1.5)
 
-            # Title & context
             fig.suptitle("📊 Sub Head Breakdown", fontsize=14, fontweight="bold")
             dr = f"{start_date.strftime('%d-%m-%Y')} to {end_date.strftime('%d-%m-%Y')}"
             heads = ", ".join(st.session_state.view_head_filter)
@@ -491,40 +494,25 @@ with tabs[0]:
                                file_name="subhead_distribution.png", mime="image/png")
 
     # ---------- EXPORT ----------
-    from io import BytesIO
-    import pandas as pd
-    from openpyxl.styles import Alignment, Font, Border, Side, NamedStyle
-    
-    # Export dataframe
     export_df = filtered[[
         "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
         "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "User Feedback/Remark",
         "Status"
     ]].copy()
-    
-    # 🔹 Ensure date column is only a date (no time part)
     export_df["Date of Inspection"] = pd.to_datetime(export_df["Date of Inspection"]).dt.date
     
     towb = BytesIO()
     with pd.ExcelWriter(towb, engine="openpyxl") as writer:
         export_df.to_excel(writer, index=False, sheet_name="Filtered Records")
         ws = writer.sheets["Filtered Records"]
-    
-        # 🔹 Define date format style
         date_style = NamedStyle(name="date_style", number_format="DD-MM-YYYY")
-    
-        # Apply alignment + wrap text for ALL cells
         for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
             for cell in row:
                 cell.alignment = Alignment(wrap_text=True, vertical="top")
-    
-        # Apply date format only to "Date of Inspection" column
         date_col_idx = export_df.columns.get_loc("Date of Inspection") + 1
         for row in ws.iter_rows(min_row=2, min_col=date_col_idx, max_col=date_col_idx, max_row=len(export_df) + 1):
             for cell in row:
                 cell.style = date_style
-    
-        # Auto column widths
         for col in ws.columns:
             max_length = 0
             col_letter = col[0].column_letter
@@ -534,10 +522,8 @@ with tabs[0]:
                         max_length = max(max_length, len(str(cell.value)))
                 except:
                     pass
-            adjusted_width = (max_length + 2) if max_length < 50 else 50  # cap width
+            adjusted_width = (max_length + 2) if max_length < 50 else 50
             ws.column_dimensions[col_letter].width = adjusted_width
-    
-        # Apply border to all cells
         thin_border = Border(left=Side(style='thin'),
                              right=Side(style='thin'),
                              top=Side(style='thin'),
@@ -545,25 +531,22 @@ with tabs[0]:
         for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
             for cell in row:
                 cell.border = thin_border
-    
-        # Apply color formatting to Status column
         status_col_idx = export_df.columns.get_loc("Status") + 1
         for row in ws.iter_rows(min_row=2, min_col=status_col_idx, max_col=status_col_idx, max_row=len(export_df) + 1):
             for cell in row:
                 if str(cell.value).strip().lower() == "pending":
-                    cell.font = Font(color="FF0000")  # Red
+                    cell.font = Font(color="FF0000")
                 elif str(cell.value).strip().lower() == "resolved":
-                    cell.font = Font(color="008000")  # Green
-    
+                    cell.font = Font(color="008000")
     towb.seek(0)
-    
-    # Streamlit download button
     st.download_button(
         "📥 Export Filtered Records to Excel", 
         data=towb,
         file_name="filtered_records.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
+# -------------------- TAB 2: Pending Records --------------------
 with tabs[1]:
     st.markdown("### ⏳ Pending Records (All Time)")
     pending_df = df.copy()
@@ -598,6 +581,7 @@ with tabs[1]:
         file_name="pending_records.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
 # -------------------- STATUS UTILS --------------------
 def get_status(feedback, remark):
     return classify_feedback(feedback, remark)
@@ -839,6 +823,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
