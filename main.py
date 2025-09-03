@@ -80,11 +80,6 @@ if not st.session_state.ack_done:
                     st.error("❌ Please enter your name before submitting.")
     st.stop()
 
-# ---------- MAIN PAGE ----------
-st.title("🎯 Main Dashboard")
-st.write("✅ Now you can access the main application features here...")
-
-
 # ---------- DISPLAY ALL RESPONSES ----------
 st.markdown("### 📝 Responses Received")
 try:
@@ -862,19 +857,5 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
