@@ -52,7 +52,7 @@ if not st.session_state.logged_in:
 st.title("📢 Pending Deficiencies Compliance")
 with st.expander("⚠️ Pending Deficiencies Notice", expanded=True):
     st.info("""
-    The pending deficiencies compliance are pending and will be completed at the earliest.  
+   The compliance of deficiencies of previous dates are pending & needs to be completed immediately.  
     I hereby declare that I have read this notice and will ensure compliance.
     """)
 
@@ -853,6 +853,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
