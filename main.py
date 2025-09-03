@@ -6,17 +6,18 @@ from io import BytesIO
 from matplotlib import pyplot as plt
 
 # ---------- CONFIG ----------
+import streamlit as st
+import pandas as pd
+
 st.set_page_config(page_title="Inspection App", layout="wide")
 
-# ---------- LOGIN ----------
 # ---------- SESSION STATE INITIALIZATION ----------
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "user" not in st.session_state:
     st.session_state.user = {}
-# Initialize responses list safely
-if "responses" not in st.session_state:
-    st.session_state.responses = []
+if "ack_done" not in st.session_state:
+    st.session_state.ack_done = False
 
 # ---------- LOGIN ----------
 def login(email, password):
@@ -48,33 +49,41 @@ if not st.session_state.logged_in:
                 st.error("❌ Invalid email or password.")
     st.stop()
 
-# ---------- POST-LOGIN: Pending Deficiencies Acknowledgment ----------
-st.title("📢 Pending Deficiencies Compliance")
-with st.expander("⚠️ Pending Deficiencies Notice", expanded=True):
-    st.info("""
-   The compliance of deficiencies of previous dates are pending & needs to be completed immediately.  
-    I hereby declare that I have read this notice and will ensure compliance.
-    """)
+# ---------- ACKNOWLEDGMENT ----------
+if not st.session_state.ack_done:
+    st.title("📢 Pending Deficiencies Compliance")
+    with st.expander("⚠️ Pending Deficiencies Notice", expanded=True):
+        st.info("""
+        The compliance of deficiencies of previous dates are pending & needs to be completed immediately.  
+        I hereby declare that I have read this notice and will ensure compliance.
+        """)
 
-    with st.form("ack_form"):
-        responder_name = st.text_input("✍️ Your Name")
-        ack_submitted = st.form_submit_button("Submit Acknowledgment")
-        
-        if ack_submitted:
-            if responder_name.strip():
-                # --- Save response to Excel ---
-                new_entry = {"Name": responder_name.strip()}
-                try:
-                    df = pd.read_excel("responses.xlsx")
-                except FileNotFoundError:
-                    df = pd.DataFrame(columns=["Name"])
-                
-                df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
-                df.to_excel("responses.xlsx", index=False)
-                
-                st.success(f"✅ Thank you, {responder_name}, for acknowledging.")
-            else:
-                st.error("❌ Please enter your name before submitting.")
+        with st.form("ack_form"):
+            responder_name = st.text_input("✍️ Your Name")
+            ack_submitted = st.form_submit_button("Submit Acknowledgment")
+            
+            if ack_submitted:
+                if responder_name.strip():
+                    # Save acknowledgment
+                    new_entry = {"Name": responder_name.strip()}
+                    try:
+                        df = pd.read_excel("responses.xlsx")
+                    except FileNotFoundError:
+                        df = pd.DataFrame(columns=["Name"])
+                    df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
+                    df.to_excel("responses.xlsx", index=False)
+
+                    st.session_state.ack_done = True
+                    st.success(f"✅ Thank you, {responder_name}, for acknowledging.")
+                    st.rerun()
+                else:
+                    st.error("❌ Please enter your name before submitting.")
+    st.stop()
+
+# ---------- MAIN PAGE ----------
+st.title("🎯 Main Dashboard")
+st.write("✅ Now you can access the main application features here...")
+
 
 # ---------- DISPLAY ALL RESPONSES ----------
 st.markdown("### 📝 Responses Received")
@@ -853,6 +862,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
