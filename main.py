@@ -20,16 +20,12 @@ if "ack_done" not in st.session_state:
     st.session_state.ack_done = False
 
 # ---------- LOGIN ----------
-def login(email, password):
-    try:
-        users = st.secrets["users"]
-        for user in users:
-            if user["email"] == email and user["password"] == password:
-                return user
-        return None
-    except KeyError:
-        st.error("⚠️ No users found in secrets.toml — please check your [[users]] block.")
-        st.stop()
+import streamlit as st
+import pandas as pd
+
+# ---------- LOGIN ----------
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
 
 if not st.session_state.logged_in:
     st.title("🔐 Login to S.A.R.A.L (Safety Abnormality Report & Action List)")
@@ -39,7 +35,7 @@ if not st.session_state.logged_in:
         submitted = st.form_submit_button("Login")
 
         if submitted:
-            user = login(email, password)
+            user = login(email, password)  # your existing login() function
             if user:
                 st.session_state.logged_in = True
                 st.session_state.user = user
@@ -50,7 +46,18 @@ if not st.session_state.logged_in:
     st.stop()
 
 # ---------- ACKNOWLEDGMENT ----------
-if not st.session_state.ack_done:
+user_id = st.session_state.user["email"]  # use email (or other unique ID)
+
+# Load existing acknowledgments
+try:
+    ack_df = pd.read_excel("responses.xlsx")
+except FileNotFoundError:
+    ack_df = pd.DataFrame(columns=["UserID", "Name"])
+
+# Check if THIS user already acknowledged
+user_ack_done = user_id in ack_df["UserID"].values
+
+if not user_ack_done:
     st.title("📢 Pending Deficiencies Compliance")
     with st.expander("⚠️ Pending Deficiencies Notice", expanded=True):
         st.info("""
@@ -64,16 +71,11 @@ if not st.session_state.ack_done:
             
             if ack_submitted:
                 if responder_name.strip():
-                    # Save acknowledgment
-                    new_entry = {"Name": responder_name.strip()}
-                    try:
-                        df = pd.read_excel("responses.xlsx")
-                    except FileNotFoundError:
-                        df = pd.DataFrame(columns=["Name"])
-                    df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
-                    df.to_excel("responses.xlsx", index=False)
+                    # Save acknowledgment (per user)
+                    new_entry = {"UserID": user_id, "Name": responder_name.strip()}
+                    ack_df = pd.concat([ack_df, pd.DataFrame([new_entry])], ignore_index=True)
+                    ack_df.to_excel("responses.xlsx", index=False)
 
-                    st.session_state.ack_done = True
                     st.success(f"✅ Thank you, {responder_name}, for acknowledging.")
                     st.rerun()
                 else:
@@ -857,5 +859,6 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
