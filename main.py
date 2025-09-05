@@ -27,6 +27,13 @@ import pandas as pd
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
+def login(email, password):
+    """Check credentials against st.secrets['users']"""
+    for user in st.secrets["users"]:
+        if user["email"] == email and user["password"] == password:
+            return user
+    return None
+
 if not st.session_state.logged_in:
     st.title("🔐 Login to S.A.R.A.L (Safety Abnormality Report & Action List)")
     with st.form("login_form", clear_on_submit=True):
@@ -35,7 +42,7 @@ if not st.session_state.logged_in:
         submitted = st.form_submit_button("Login")
 
         if submitted:
-            user = login(email, password)  # your existing login() function
+            user = login(email, password)
             if user:
                 st.session_state.logged_in = True
                 st.session_state.user = user
@@ -46,11 +53,14 @@ if not st.session_state.logged_in:
     st.stop()
 
 # ---------- ACKNOWLEDGMENT ----------
-user_id = st.session_state.user["email"]  # use email (or other unique ID)
+user_id = st.session_state.user["email"]  # use email as unique ID
 
-# Load existing acknowledgments
+# Load acknowledgments safely
 try:
     ack_df = pd.read_excel("responses.xlsx")
+    # Ensure correct columns exist
+    if "UserID" not in ack_df.columns or "Name" not in ack_df.columns:
+        ack_df = pd.DataFrame(columns=["UserID", "Name"])
 except FileNotFoundError:
     ack_df = pd.DataFrame(columns=["UserID", "Name"])
 
@@ -81,6 +91,7 @@ if not user_ack_done:
                 else:
                     st.error("❌ Please enter your name before submitting.")
     st.stop()
+
 
 # ---------- DISPLAY ALL RESPONSES ----------
 st.markdown("### 📝 Responses Received")
@@ -859,6 +870,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
