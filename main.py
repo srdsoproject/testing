@@ -696,35 +696,38 @@ if not editable_filtered.empty:
 
     # -------- AG GRID CONFIG (wrap + auto height, only remarks editable) --------
     gb = GridOptionsBuilder.from_dataframe(editable_df)
-    gb.configure_default_column(editable=False, wrapText=True, autoHeight=True)
-
-    # Make ONLY "User Feedback/Remark" editable with a large text editor popup
+    gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True)
+    
+    # User Feedback column (inline small editor)
     gb.configure_column(
-    "User Feedback/Remark",
-    editable=True,
-    wrapText=True,
-    autoHeight=True,
-    cellEditor="agTextCellEditor",   # small inline editor
-    cellEditorPopup=False,
-    cellEditorParams={"maxLength": 4000}
+        "User Feedback/Remark",
+        editable=True,
+        wrapText=True,
+        autoHeight=True,
+        cellEditor="agTextCellEditor",   # small inline editor
+        cellEditorPopup=False,
+        cellEditorParams={"maxLength": 4000}
     )
-
+    
     # Hide helper ID columns
     gb.configure_column("_original_sheet_index", hide=True)
     gb.configure_column("_sheet_row", hide=True)
-
-    # Easier editing UX
+    
+    # Easier UX
     gb.configure_grid_options(singleClickEdit=True)
-
+    
+    # Build with auto-size layout
     grid_options = gb.build()
-
+    grid_options["domLayout"] = "autoHeight"
+    
+    # Render grid
     grid_response = AgGrid(
         editable_df,
         gridOptions=grid_options,
         update_mode=GridUpdateMode.VALUE_CHANGED,
-        height=600,
-        fit_columns_on_grid_load=True,
-        allow_unsafe_jscode=True
+        fit_columns_on_grid_load=True,  # auto-fit columns
+        allow_unsafe_jscode=True,
+        height=600
     )
 
     edited_df = pd.DataFrame(grid_response["data"])
@@ -870,6 +873,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
