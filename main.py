@@ -664,20 +664,42 @@ if "alerts_log" not in st.session_state:
 
 editable_filtered = filtered.copy()
 if not editable_filtered.empty:
-    # ✅ Search box with clear button
-    c1, c2 = st.columns([5, 1])
-    with c1:
-        search_text = st.text_input(
-            "🔍 Search Deficiencies",
-            st.session_state.get("search_text", "")
-        )
-    with c2:
-        if st.button("❌ Clear"):
-            search_text = ""
-            st.session_state.search_text = ""  # reset stored value
+    # ---------- 🔍 Custom Search Box with ❌ inside ----------
+    search_value = st.session_state.get("search_text", "")
 
-    # Save current search
-    st.session_state.search_text = search_text.strip()
+    search_html = f'''
+    <div style="display:flex; align-items:center; position:relative; width:100%;">
+      <input 
+        type="text" 
+        id="search-box" 
+        value="{search_value}" 
+        placeholder="🔍 Search Deficiencies"
+        style="
+          width:100%; padding:8px 30px 8px 10px; 
+          border:1px solid #555; border-radius:5px; 
+          background-color:#111; color:white;
+        "
+        oninput="var clearBtn = document.getElementById('search-clear'); 
+                 if(this.value){{clearBtn.style.display='block';}} else {{clearBtn.style.display='none';}}
+                 window.parent.postMessage({{type: 'search_text', value: this.value}}, '*');"
+      />
+      <span 
+        id="search-clear" 
+        style="
+          position:absolute; right:8px; cursor:pointer; color:#aaa; 
+          display:{'block' if search_value else 'none'};
+        "
+        onclick="var box=document.getElementById('search-box'); 
+                 box.value=''; this.style.display='none'; 
+                 window.parent.postMessage({{type: 'search_text', value: ''}}, '*');"
+      >❌</span>
+    </div>
+    '''
+
+    st.markdown(search_html, unsafe_allow_html=True)
+
+    if "search_text" not in st.session_state:
+        st.session_state.search_text = ""
 
     # Apply filter
     if st.session_state.search_text:
@@ -688,11 +710,11 @@ if not editable_filtered.empty:
             .str.contains(st.session_state.search_text.lower())
         ]
 
-    # Ensure stable IDs exist for reliable updates
+    # ---------- AG Grid Setup ----------
     if "_original_sheet_index" not in editable_filtered.columns:
         editable_filtered["_original_sheet_index"] = editable_filtered.index
     if "_sheet_row" not in editable_filtered.columns:
-        editable_filtered["_sheet_row"] = editable_filtered.index + 2  # sheet row (header + 1)
+        editable_filtered["_sheet_row"] = editable_filtered.index + 2
 
     display_cols = [
         "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
@@ -715,7 +737,7 @@ if not editable_filtered.empty:
     )
     editable_df["Status"] = editable_df["Status"].apply(color_text_status)
 
-    # Carry ID columns through grid (hidden)
+    # Carry ID columns
     editable_df["_original_sheet_index"] = editable_filtered["_original_sheet_index"].values
     editable_df["_sheet_row"] = editable_filtered["_sheet_row"].values
 
@@ -723,7 +745,7 @@ if not editable_filtered.empty:
     gb = GridOptionsBuilder.from_dataframe(editable_df)
     gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True)
 
-    # Make ONLY "User Feedback/Remark" editable (small inline editor)
+    # Make ONLY "User Feedback/Remark" editable
     gb.configure_column(
         "User Feedback/Remark",
         editable=True,
@@ -742,15 +764,17 @@ if not editable_filtered.empty:
     gb.configure_grid_options(singleClickEdit=True)
 
     # ✅ Auto-size all columns on load
-    auto_size_js = JsCode("""
-    function(params) {
-        let allColumnIds = [];
-        params.columnApi.getAllColumns().forEach(function(column) {
-            allColumnIds.push(column.getColId());
-        });
-        params.columnApi.autoSizeColumns(allColumnIds);
-    }
-    """)
+    auto_size_js = JsCode(
+        """
+        function(params) {
+            let allColumnIds = [];
+            params.columnApi.getAllColumns().forEach(function(column) {
+                allColumnIds.push(column.getColId());
+            });
+            params.columnApi.autoSizeColumns(allColumnIds);
+        }
+        """
+    )
     gb.configure_grid_options(onFirstDataRendered=auto_size_js)
 
     grid_options = gb.build()
@@ -778,14 +802,13 @@ if not editable_filtered.empty:
         if not need_cols.issubset(edited_df.columns) or "Feedback" not in editable_filtered.columns:
             st.error("⚠️ Required columns are missing from the data.")
         else:
-            # Compare remarks using the stable ID to find changes
             orig = editable_filtered.set_index("_original_sheet_index")
             new = edited_df.set_index("_original_sheet_index")
 
             old_remarks = orig["User Feedback/Remark"].fillna("").astype(str)
             new_remarks = new["User Feedback/Remark"].fillna("").astype(str)
 
-            # 🔧 Align indexes before comparing
+            # Compare only changed rows
             common_ids = new_remarks.index.intersection(old_remarks.index)
             diff_mask = new_remarks.loc[common_ids] != old_remarks.loc[common_ids]
             changed_ids = diff_mask[diff_mask].index.tolist()
@@ -794,7 +817,6 @@ if not editable_filtered.empty:
                 diffs = new.loc[changed_ids].copy()
                 diffs["_sheet_row"] = orig.loc[changed_ids, "_sheet_row"].values
 
-                # Routing dictionary
                 routing = {
                     "Pertains to S&T":        ("SIGNAL & TELECOM", "Sr.DSTE"),
                     "Pertains to OPTG":       ("OPTG", "Sr.DOM"),
@@ -821,12 +843,10 @@ if not editable_filtered.empty:
                             diffs.at[oid, "Action By"] = action_by
                             diffs.at[oid, "Sub Head"] = ""
 
-                            # 👉 Collect extra info
+                            # Alert message
                             date_str = orig.loc[oid, "Date of Inspection"]
                             deficiency = orig.loc[oid, "Deficiencies Noted"]
                             forwarded_by = orig.loc[oid, "Head"]
-
-                            # 👉 Build alert message (includes Forwarded By)
                             alert_msg = (
                                 f"📌 **{head} Department Alert**\n"
                                 f"- Date: {date_str}\n"
@@ -834,18 +854,15 @@ if not editable_filtered.empty:
                                 f"- Forwarded By: {forwarded_by}\n"
                                 f"- Forwarded Remark: {user_remark}"
                             )
-
-                            # Insert at top of log
                             st.session_state.alerts_log.insert(0, alert_msg)
 
-                    # ✅ Replace Feedback with new remark (no append)
+                    # Replace feedback with remark
                     diffs.at[oid, "Feedback"] = user_remark
                     diffs.at[oid, "User Feedback/Remark"] = ""
 
                     st.session_state.df.at[oid, "Feedback"] = user_remark
                     st.session_state.df.at[oid, "User Feedback/Remark"] = ""
 
-                # Persist to storage (expects _sheet_row in diffs)
                 update_feedback_column(
                     diffs.reset_index().rename(columns={"index": "_original_sheet_index"})
                 )
@@ -854,6 +871,7 @@ if not editable_filtered.empty:
                 st.info("ℹ️ No changes detected to save.")
 else:
     st.info("Deficiencies will be updated soon !")
+
 
 
 
@@ -911,6 +929,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
