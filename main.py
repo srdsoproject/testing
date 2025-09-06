@@ -665,7 +665,7 @@ if "alerts_log" not in st.session_state:
 editable_filtered = filtered.copy()
 if not editable_filtered.empty:
     # ✅ Search box with clear button
-    c1, c2 = st.columns([4, 2])
+    c1, c2 = st.columns([5, 1])
     with c1:
         search_text = st.text_input(
             "🔍 Search Deficiencies",
@@ -911,6 +911,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
