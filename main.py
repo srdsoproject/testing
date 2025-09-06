@@ -652,9 +652,9 @@ st.markdown(
 
 # -------------------- EDITOR --------------------
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+from st_aggrid.shared import JsCode
 import pandas as pd
 import streamlit as st
-from st_aggrid.shared import JsCode   # 👈 for autoSizeAllColumns
 
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
@@ -664,11 +664,28 @@ if "alerts_log" not in st.session_state:
 
 editable_filtered = filtered.copy()
 if not editable_filtered.empty:
-    # ✅ Search box for Deficiency
-    search_text = st.text_input("🔍 Search Deficiencies", "").strip().lower()
-    if search_text:
+    # ✅ Search box with clear button
+    c1, c2 = st.columns([4, 1])
+    with c1:
+        search_text = st.text_input(
+            "🔍 Search Deficiencies",
+            st.session_state.get("search_text", "")
+        )
+    with c2:
+        if st.button("❌ Clear"):
+            search_text = ""
+            st.session_state.search_text = ""  # reset stored value
+
+    # Save current search
+    st.session_state.search_text = search_text.strip()
+
+    # Apply filter
+    if st.session_state.search_text:
         editable_filtered = editable_filtered[
-            editable_filtered["Deficiencies Noted"].astype(str).str.lower().str.contains(search_text)
+            editable_filtered["Deficiencies Noted"]
+            .astype(str)
+            .str.lower()
+            .str.contains(st.session_state.search_text.lower())
         ]
 
     # Ensure stable IDs exist for reliable updates
@@ -755,9 +772,89 @@ if not editable_filtered.empty:
         st.session_state.df = load_data()
         st.success("✅ Data refreshed successfully!")
 
-    # ... (rest of your submit/save logic remains the same)
+    if submitted:
+        # Validate needed columns
+        need_cols = {"_original_sheet_index", "User Feedback/Remark"}
+        if not need_cols.issubset(edited_df.columns) or "Feedback" not in editable_filtered.columns:
+            st.error("⚠️ Required columns are missing from the data.")
+        else:
+            # Compare remarks using the stable ID to find changes
+            orig = editable_filtered.set_index("_original_sheet_index")
+            new = edited_df.set_index("_original_sheet_index")
+
+            old_remarks = orig["User Feedback/Remark"].fillna("").astype(str)
+            new_remarks = new["User Feedback/Remark"].fillna("").astype(str)
+
+            # 🔧 Align indexes before comparing
+            common_ids = new_remarks.index.intersection(old_remarks.index)
+            diff_mask = new_remarks.loc[common_ids] != old_remarks.loc[common_ids]
+            changed_ids = diff_mask[diff_mask].index.tolist()
+
+            if changed_ids:
+                diffs = new.loc[changed_ids].copy()
+                diffs["_sheet_row"] = orig.loc[changed_ids, "_sheet_row"].values
+
+                # Routing dictionary
+                routing = {
+                    "Pertains to S&T":        ("SIGNAL & TELECOM", "Sr.DSTE"),
+                    "Pertains to OPTG":       ("OPTG", "Sr.DOM"),
+                    "Pertains to COMMERCIAL": ("COMMERCIAL", "Sr.DCM"),
+                    "Pertains to ELECT/G":    ("ELECT/G", "Sr.DEE/G"),
+                    "Pertains to ELECT/TRD":  ("ELECT/TRD", "Sr.DEE/TRD"),
+                    "Pertains to ELECT/TRO":  ("ELECT/TRO", "Sr.DEE/TRO"),
+                    "Pertains to Sr.DEN/S":   ("ENGINEERING", "Sr.DEN/S"),
+                    "Pertains to Sr.DEN/C":   ("ENGINEERING", "Sr.DEN/C"),
+                    "Pertains to Sr.DEN/Co":  ("ENGINEERING", "Sr.DEN/Co"),
+                }
+
+                for oid in changed_ids:
+                    user_remark = new.loc[oid, "User Feedback/Remark"].strip()
+                    if not user_remark:
+                        continue
+
+                    for key, (head, action_by) in routing.items():
+                        if key in user_remark:
+                            st.session_state.df.at[oid, "Head"] = head
+                            st.session_state.df.at[oid, "Action By"] = action_by
+                            st.session_state.df.at[oid, "Sub Head"] = ""
+                            diffs.at[oid, "Head"] = head
+                            diffs.at[oid, "Action By"] = action_by
+                            diffs.at[oid, "Sub Head"] = ""
+
+                            # 👉 Collect extra info
+                            date_str = orig.loc[oid, "Date of Inspection"]
+                            deficiency = orig.loc[oid, "Deficiencies Noted"]
+                            forwarded_by = orig.loc[oid, "Head"]
+
+                            # 👉 Build alert message (includes Forwarded By)
+                            alert_msg = (
+                                f"📌 **{head} Department Alert**\n"
+                                f"- Date: {date_str}\n"
+                                f"- Deficiency: {deficiency}\n"
+                                f"- Forwarded By: {forwarded_by}\n"
+                                f"- Forwarded Remark: {user_remark}"
+                            )
+
+                            # Insert at top of log
+                            st.session_state.alerts_log.insert(0, alert_msg)
+
+                    # ✅ Replace Feedback with new remark (no append)
+                    diffs.at[oid, "Feedback"] = user_remark
+                    diffs.at[oid, "User Feedback/Remark"] = ""
+
+                    st.session_state.df.at[oid, "Feedback"] = user_remark
+                    st.session_state.df.at[oid, "User Feedback/Remark"] = ""
+
+                # Persist to storage (expects _sheet_row in diffs)
+                update_feedback_column(
+                    diffs.reset_index().rename(columns={"index": "_original_sheet_index"})
+                )
+                st.success(f"✅ Updated {len(changed_ids)} Feedback row(s) with new remarks.")
+            else:
+                st.info("ℹ️ No changes detected to save.")
 else:
     st.info("Deficiencies will be updated soon !")
+
 
 
 # ---------------- ALERT LOG SECTION ----------------
@@ -814,6 +911,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
