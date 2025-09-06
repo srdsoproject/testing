@@ -693,7 +693,18 @@ if not editable_filtered.empty:
     # Carry ID columns through grid (hidden)
     editable_df["_original_sheet_index"] = editable_filtered["_original_sheet_index"].values
     editable_df["_sheet_row"] = editable_filtered["_sheet_row"].values
+    from st_aggrid.shared import JsCode
 
+    # Auto-size all columns after grid is rendered
+    auto_size_js = JsCode("""
+    function(params) {
+        let allColumnIds = [];
+        params.columnApi.getAllColumns().forEach(function(column) {
+            allColumnIds.push(column.getColId());
+        });
+        params.columnApi.autoSizeColumns(allColumnIds);
+    }
+    """)
     # -------- AG GRID CONFIG (wrap + auto height, only remarks editable) --------
     gb = GridOptionsBuilder.from_dataframe(editable_df)
     gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True)
@@ -873,6 +884,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
