@@ -700,12 +700,12 @@ if not editable_filtered.empty:
 
     # Make ONLY "User Feedback/Remark" editable with a large text editor popup
     gb.configure_column(
-        "User Feedback/Remark",
+    "User Feedback/Remark",
     editable=True,
     wrapText=True,
     autoHeight=True,
-    cellEditor="agTextCellEditor",   # <-- normal small editor
-    cellEditorPopup=False,           # <-- disable popup
+    cellEditor="agTextCellEditor",   # small inline editor
+    cellEditorPopup=False,
     cellEditorParams={"maxLength": 4000}
     )
 
@@ -870,6 +870,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
