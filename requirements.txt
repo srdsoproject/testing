@@ -10,3 +10,4 @@ python-dateutil>=2.9,<3.0
 matplotlib==3.9.2
 scikit-learn
 openpyxl
+openai>=1.0.0
