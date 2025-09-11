@@ -214,7 +214,7 @@ FOOTPLATE_LIST = STATION_LIST + GATE_LIST + FOOTPLATE_ROUTES
 import re
 import requests
 
-HF_API_KEY = "YOUR_HF_API_KEY"  # Hugging Face free tier API key
+HF_API_KEY = "HF_API_KEY"  # Hugging Face free tier API key
 
 def normalize_str(text):
     if not isinstance(text, str):
@@ -927,6 +927,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
