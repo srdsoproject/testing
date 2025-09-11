@@ -213,10 +213,14 @@ FOOTPLATE_LIST = STATION_LIST + GATE_LIST + FOOTPLATE_ROUTES
 # -------------------- HELPERS --------------------
 import streamlit as st
 import re
-from openai import OpenAI
+from transformers import pipeline
 
-# 🔑 Safely load API key
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+# Load Hugging Face zero-shot classification model
+@st.cache_resource  # cache so it doesn't reload every time
+def load_classifier():
+    return pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+
+classifier = load_classifier()
 
 # -------------------- HELPERS --------------------
 def normalize_str(text):
@@ -226,7 +230,7 @@ def normalize_str(text):
 
 def classify_feedback(feedback, user_remark=""):
     """
-    Classifies feedback into 'Resolved' or 'Pending' using AI.
+    Classifies feedback into 'Resolved' or 'Pending' using Hugging Face zero-shot classifier.
     Supports:
       - Empty backtick (`) meaning clear
       - Marker overrides (! = Pending, # = Resolved)
@@ -244,22 +248,11 @@ def classify_feedback(feedback, user_remark=""):
     if m:
         return "Resolved" if m[-1] == "#" else "Pending"
 
-    # --- AI-driven classification ---
-    text = f"""
-    You are a classifier. 
-    Decide if the following feedback indicates a 'Resolved' or 'Pending' status.
-
-    Feedback: {feedback}
-    Remark: {user_remark}
-
-    Answer only with 'Resolved' or 'Pending'.
-    """
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",  # fast + cost efficient
-        messages=[{"role": "user", "content": text}],
-        temperature=0
-    )
-    return response.choices[0].message.content.strip()
+    # --- Hugging Face classification ---
+    text = f"{feedback} {user_remark}".strip()
+    labels = ["Resolved", "Pending"]
+    result = classifier(text, candidate_labels=labels)
+    return result["labels"][0]  # highest confidence label
 
 
 
@@ -875,6 +868,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
