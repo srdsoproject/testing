@@ -211,58 +211,28 @@ VALID_INSPECTIONS = [
 FOOTPLATE_LIST = STATION_LIST + GATE_LIST + FOOTPLATE_ROUTES
 
 # -------------------- HELPERS --------------------
+import re
+from openai import OpenAI
+
+client = OpenAI()
+
+# -------------------- HELPERS --------------------
 def normalize_str(text):
     if not isinstance(text, str):
         return ""
     return re.sub(r'\s+', ' ', text.lower()).strip()
 
 def classify_feedback(feedback, user_remark=""):
+    """
+    Classifies feedback into 'Resolved' or 'Pending' using AI.
+    Supports:
+      - Empty backtick (`) meaning clear
+      - Marker overrides (! = Pending, # = Resolved)
+    """
+
     # Empty backtick = clear
     if isinstance(feedback, str) and feedback.strip() == "`":
         return ""
-
-    def _classify(text_normalized):
-        if not text_normalized:
-            return None
-        date_found = bool(re.search(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', text_normalized))
-
-        resolved_kw = [
-            "attended", "solved", "done", "completed", "confirmed by", "message given",
-            "tdc work completed", "replaced", "msg given", "msg sent", "counseled", "info shared",
-            "communicated", "sent successfully", "counselled", "gate will be closed soon",
-            "attending at the time", "handled", "resolved", "action taken", "spoken to", "warned",
-            "counselling", "hubli", "working normal", "met", "discussion held", "report sent",
-            "notified", "explained", "nil", "na", "tlc", "work completed", "acknowledged", "visited",
-            "briefed", "guided", "handover", "working properly", "checked found working", "supply restored",
-            "noted please", "updated by", "adv to", "counselled the staff", "complied", "checked and found",
-            "maintained", "for needful action", "provided at", "in working condition", "is working",
-            "found working", "equipment is working", "item is working", "as per plan", "putright", "put right",
-            "operational feasibility", "will be provided", "will be supplied shortly", "advised to ubl", "updated"
-        ]
-
-        pending_kw = [
-            "work is going on", "tdc given", "target date", "expected by", "likely by", "planned by",
-            "will be", "needful", "to be", "pending", "not done", "awaiting", "waiting", "yet to", "next time",
-            "follow up", "tdc.", "tdc", "t d c", "will attend", "will be attended", "scheduled", "reminder",
-            "to inform", "to counsel", "to submit", "to do", "to replace", "prior", "remains", "still",
-            "under process", "not yet", "to be done", "will ensure", "during next", "action will be taken",
-            "will be supplied shortly", "not available", "not updated", "progress", "under progress",
-            "to arrange", "awaited", "material awaited", "approval awaited", "to procure", "yet pending",
-            "incomplete", "tentative", "ongoing", "in progress", "being done", "arranging", "waiting for",
-            "subject to", "awaiting approval", "awaiting material", "awaiting confirmation", "next schedule",
-            "planned for", "will arrange", "proposed date", "to complete", "to be completed",
-            "likely completion", "expected completion", "not received", "awaiting response"
-        ]
-
-        if "tdc" in text_normalized and any(k in text_normalized for k in resolved_kw):
-            return "Resolved"
-        if any(k in text_normalized for k in pending_kw):
-            return "Pending"
-        if date_found:
-            return "Pending" if "tdc" in text_normalized else "Resolved"
-        if any(k in text_normalized for k in resolved_kw):
-            return "Resolved"
-        return None
 
     fb = normalize_str(feedback)
     rm = normalize_str(user_remark)
@@ -272,13 +242,23 @@ def classify_feedback(feedback, user_remark=""):
     if m:
         return "Resolved" if m[-1] == "#" else "Pending"
 
-    a = _classify(fb)
-    b = _classify(rm)
-    if a == "Resolved" or b == "Resolved":
-        return "Resolved"
-    if a == "Pending" or b == "Pending":
-        return "Pending"
-    return "Pending"
+    # --- AI-driven classification ---
+    text = f"""
+    You are a classifier. 
+    Decide if the following feedback indicates a 'Resolved' or 'Pending' status.
+
+    Feedback: {feedback}
+    Remark: {user_remark}
+
+    Answer only with 'Resolved' or 'Pending'.
+    """
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",  # or "gpt-4o" for higher accuracy
+        messages=[{"role": "user", "content": text}],
+        temperature=0
+    )
+    return response.choices[0].message.content.strip()
+
 
 # ---------- LOAD DATA ----------
 @st.cache_data(ttl=0)
@@ -892,4 +872,5 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
