@@ -211,10 +211,40 @@ VALID_INSPECTIONS = [
 FOOTPLATE_LIST = STATION_LIST + GATE_LIST + FOOTPLATE_ROUTES
 
 # -------------------- HELPERS --------------------
+import re
+import requests
+
+HF_API_KEY = "YOUR_HF_API_KEY"  # Hugging Face free tier API key
+
 def normalize_str(text):
     if not isinstance(text, str):
         return ""
     return re.sub(r'\s+', ' ', text.lower()).strip()
+
+def ai_classify(text):
+    """
+    Cloud AI fallback using Hugging Face Zero-Shot Classification.
+    Returns 'Resolved' or 'Pending'.
+    """
+    if not text:
+        return None
+    url = "https://api-inference.huggingface.co/models/facebook/bart-large-mnli"
+    headers = {"Authorization": f"Bearer {HF_API_KEY}"}
+    payload = {
+        "inputs": text,
+        "parameters": {"candidate_labels": ["Resolved", "Pending"]}
+    }
+
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=10)
+        result = response.json()
+        if isinstance(result, list) and result:
+            label = result[0]["label"]
+            if label in ["Resolved", "Pending"]:
+                return label
+    except Exception:
+        pass
+    return "Pending"  # fallback if API fails
 
 def classify_feedback(feedback, user_remark=""):
     # Empty backtick = clear
@@ -267,18 +297,23 @@ def classify_feedback(feedback, user_remark=""):
     fb = normalize_str(feedback)
     rm = normalize_str(user_remark)
 
-    # marker override
+    # Marker override
     m = re.findall(r"[!#]", f"{fb} {rm}".strip())
     if m:
         return "Resolved" if m[-1] == "#" else "Pending"
 
+    # Keyword-based classification
     a = _classify(fb)
     b = _classify(rm)
     if a == "Resolved" or b == "Resolved":
         return "Resolved"
     if a == "Pending" or b == "Pending":
         return "Pending"
-    return "Pending"
+
+    # AI fallback for ambiguous cases
+    combined_text = f"{fb} {rm}".strip()
+    return ai_classify(combined_text)
+
 
 # ---------- LOAD DATA ----------
 @st.cache_data(ttl=0)
@@ -892,5 +927,6 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
