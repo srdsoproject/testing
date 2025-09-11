@@ -215,12 +215,15 @@ import streamlit as st
 import re
 from transformers import pipeline
 
-# Load a smaller, faster model
+# -------------------- LOAD SMALL MODEL --------------------
 @st.cache_resource
 def load_classifier():
-    return pipeline("zero-shot-classification", model="valhalla/distilbart-mnli-12-3")
+    # Tiny model (~60 MB) for instant load
+    return pipeline("zero-shot-classification", model="valhalla/distilbart-mnli-12-1")
 
-classifier = load_classifier()
+# Force load immediately with spinner
+with st.spinner("Loading AI model... Please wait."):
+    classifier = load_classifier()
 
 # -------------------- HELPERS --------------------
 def normalize_str(text):
@@ -229,21 +232,13 @@ def normalize_str(text):
     return re.sub(r'\s+', ' ', text.lower()).strip()
 
 def classify_feedback(feedback, user_remark=""):
-    """
-    Classifies feedback into 'Resolved' or 'Pending' using Hugging Face zero-shot classifier.
-    Supports:
-      - Empty backtick (`) meaning clear
-      - Marker overrides (! = Pending, # = Resolved)
-    """
-
-    # Empty backtick = clear
     if isinstance(feedback, str) and feedback.strip() == "`":
         return ""
 
     fb = normalize_str(feedback)
     rm = normalize_str(user_remark)
 
-    # marker override
+    # Marker override (! = Pending, # = Resolved)
     m = re.findall(r"[!#]", f"{fb} {rm}".strip())
     if m:
         return "Resolved" if m[-1] == "#" else "Pending"
@@ -252,7 +247,21 @@ def classify_feedback(feedback, user_remark=""):
     text = f"{feedback} {user_remark}".strip()
     labels = ["Resolved", "Pending"]
     result = classifier(text, candidate_labels=labels)
-    return result["labels"][0]  # highest confidence label
+    return result["labels"][0]
+
+# -------------------- STREAMLIT APP --------------------
+st.title("⚡ Instant Feedback Classifier")
+
+feedback = st.text_area("Enter Feedback:")
+remark = st.text_area("Enter Remark (optional):")
+
+if st.button("Classify"):
+    if feedback.strip() == "":
+        st.warning("Please enter some feedback first.")
+    else:
+        status = classify_feedback(feedback, remark)
+        st.success(f"Classification Result: **{status}**")
+
 
 
 
@@ -868,6 +877,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
