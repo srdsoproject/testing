@@ -211,10 +211,12 @@ VALID_INSPECTIONS = [
 FOOTPLATE_LIST = STATION_LIST + GATE_LIST + FOOTPLATE_ROUTES
 
 # -------------------- HELPERS --------------------
+import streamlit as st
 import re
 from openai import OpenAI
 
-client = OpenAI()
+# 🔑 Safely load API key
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 # -------------------- HELPERS --------------------
 def normalize_str(text):
@@ -253,11 +255,25 @@ def classify_feedback(feedback, user_remark=""):
     Answer only with 'Resolved' or 'Pending'.
     """
     response = client.chat.completions.create(
-        model="gpt-4o-mini",  # or "gpt-4o" for higher accuracy
+        model="gpt-4o-mini",  # fast + cost efficient
         messages=[{"role": "user", "content": text}],
         temperature=0
     )
     return response.choices[0].message.content.strip()
+
+# -------------------- STREAMLIT APP --------------------
+st.title("Feedback Classifier (AI-driven)")
+
+feedback = st.text_area("Enter Feedback:")
+remark = st.text_area("Enter Remark (optional):")
+
+if st.button("Classify"):
+    if feedback.strip() == "":
+        st.warning("Please enter some feedback first.")
+    else:
+        status = classify_feedback(feedback, remark)
+        st.success(f"Classification Result: **{status}**")
+
 
 
 # ---------- LOAD DATA ----------
@@ -872,5 +888,6 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
