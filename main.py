@@ -215,10 +215,10 @@ import streamlit as st
 import re
 from transformers import pipeline
 
-# Load Hugging Face zero-shot classification model
-@st.cache_resource  # cache so it doesn't reload every time
+# Load a smaller, faster model
+@st.cache_resource
 def load_classifier():
-    return pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+    return pipeline("zero-shot-classification", model="valhalla/distilbart-mnli-12-3")
 
 classifier = load_classifier()
 
@@ -868,6 +868,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
