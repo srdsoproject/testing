@@ -261,19 +261,6 @@ def classify_feedback(feedback, user_remark=""):
     )
     return response.choices[0].message.content.strip()
 
-# -------------------- STREAMLIT APP --------------------
-st.title("Feedback Classifier (AI-driven)")
-
-feedback = st.text_area("Enter Feedback:")
-remark = st.text_area("Enter Remark (optional):")
-
-if st.button("Classify"):
-    if feedback.strip() == "":
-        st.warning("Please enter some feedback first.")
-    else:
-        status = classify_feedback(feedback, remark)
-        st.success(f"Classification Result: **{status}**")
-
 
 
 # ---------- LOAD DATA ----------
@@ -888,6 +875,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
