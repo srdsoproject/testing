@@ -235,7 +235,7 @@ def classify_feedback(feedback, user_remark=""):
             "counselling", "hubli", "working normal", "met", "discussion held", "report sent",
             "notified", "explained", "nil", "na", "tlc", "work completed", "acknowledged", "visited",
             "briefed", "guided", "handover", "working properly", "checked found working", "supply restored",
-            "noted please", "updated by", "adv to", "counselled the staff", "complied", "checked and found",
+            "updated by", "adv to", "counselled the staff", "complied", "checked and found",
             "maintained", "for needful action", "provided at", "in working condition", "is working",
             "found working", "equipment is working", "item is working", "as per plan", "putright", "put right",
             "operational feasibility", "will be provided", "will be supplied shortly", "advised to ubl", "updated"
@@ -246,7 +246,7 @@ def classify_feedback(feedback, user_remark=""):
             "will be", "needful", "to be", "pending", "not done", "awaiting", "waiting", "yet to", "next time",
             "follow up", "tdc.", "tdc", "t d c", "will attend", "will be attended", "scheduled", "reminder",
             "to inform", "to counsel", "to submit", "to do", "to replace", "prior", "remains", "still",
-            "under process", "not yet", "to be done", "will ensure", "during next", "action will be taken",
+            "under process", "not yet", "to be done", "will ensure", "during next", "action will be taken",'noted please tdc',
             "will be supplied shortly", "not available", "not updated", "progress", "under progress",
             "to arrange", "awaited", "material awaited", "approval awaited", "to procure", "yet pending",
             "incomplete", "tentative", "ongoing", "in progress", "being done", "arranging", "waiting for",
@@ -893,6 +893,7 @@ st.markdown("""
 - For Engineering North: Pertains to **Sr.DEN/C**
 
 """)
+
 
 
 
