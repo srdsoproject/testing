@@ -960,10 +960,18 @@ with tabs[1]:
             .sort_values(ascending=False)
         )
 
+        total_pending = dept_counts.sum()
+
         for head, count in dept_counts.items():
             st.markdown(f"- **{head}** : {count}")
+
+        # 🔹 Add total line at the end
+        st.markdown(f"**Total Pending : {total_pending}**")
+
     else:
         st.info("No pending deficiencies to summarize.")
+
+
 
 
 
