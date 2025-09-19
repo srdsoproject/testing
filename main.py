@@ -790,6 +790,9 @@ if not editable_filtered.empty:
                     "Pertains to Sr.DEN/S":   ("ENGINEERING", "Sr.DEN/S"),
                     "Pertains to Sr.DEN/C":   ("ENGINEERING", "Sr.DEN/C"),
                     "Pertains to Sr.DEN/Co":  ("ENGINEERING", "Sr.DEN/Co"),
+                    "Pertains to FINAINCE": ("FINANCE","Sr.DFM"),
+                    "Pertains to STORE" : ("STORE","Sr.DMM"),
+                    "Pertains to MEDICAL" : ("MEDICAL", "CMS"),
                 }
 
                 for oid in changed_ids:
@@ -891,8 +894,12 @@ st.markdown("""
 - For ELECT/TRO: Pertains to **ELECT/TRO**
 - For Engineering South: Pertains to **Sr.DEN/S**
 - For Engineering North: Pertains to **Sr.DEN/C**
+- For Finance Department: Pertains to **FINAINCE**
+- For Store Department: Pertains to **STORE**
+- For Medical Department: Pertains to **MEDICAL**
 
 """)
+
 
 
 
