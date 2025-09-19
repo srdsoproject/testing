@@ -4,7 +4,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 from io import BytesIO
 from matplotlib import pyplot as plt
-
+import altair as alt
 # ---------- CONFIG ----------
 import streamlit as st
 import pandas as pd
@@ -933,6 +933,7 @@ with tabs[1]:
             st.info("No pending deficiencies to display.")
     else:
         st.info("No data available for analytics.")
+
 
 
 
