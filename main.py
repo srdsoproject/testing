@@ -907,23 +907,32 @@ with tabs[1]:
 
     # ✅ Ensure Status column exists
     if "Status" not in df.columns:
-        # if classify_feedback takes only feedback
         df["Status"] = df["Feedback"].apply(classify_feedback)
 
     if not df.empty:
         df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
 
         pending = df[
-            df["Status"].eq("Pending") |
-            df["Feedback"].isna() |
-            (df["Feedback"].astype(str).str.strip() == "")
+            df["Status"].eq("Pending")
+            | df["Feedback"].isna()
+            | (df["Feedback"].astype(str).str.strip() == "")
         ]
+
+        # 🔹 Normalize department names to avoid duplicates
+        pending["Head"] = (
+            pending["Head"]
+            .astype(str)
+            .str.strip()
+            .str.upper()
+        )
+
         trend = (
             pending
             .groupby([pd.Grouper(key="Date of Inspection", freq="M"), "Head"])
             .size()
             .reset_index(name="PendingCount")
         )
+
         if not trend.empty:
             chart = (
                 alt.Chart(trend)
@@ -932,7 +941,7 @@ with tabs[1]:
                     x="Date of Inspection:T",
                     y="PendingCount:Q",
                     color="Head:N",
-                    tooltip=["Date of Inspection", "Head", "PendingCount"]
+                    tooltip=["Date of Inspection", "Head", "PendingCount"],
                 )
             )
             st.altair_chart(chart, use_container_width=True)
@@ -940,21 +949,22 @@ with tabs[1]:
             st.info("No pending deficiencies to display.")
     else:
         st.info("No data available for analytics.")
-# --- Department-wise Pending Summary (plain text) ---
+
+    # --- Department-wise Pending Summary (plain text) ---
     st.markdown("### 🏢 Department-wise Pending Counts")
-    
+
     if not pending.empty:
         dept_counts = (
             pending.groupby("Head")
             .size()
             .sort_values(ascending=False)
         )
-    
-        # Print each department with its count
+
         for head, count in dept_counts.items():
             st.markdown(f"- **{head}** : {count}")
     else:
         st.info("No pending deficiencies to summarize.")
+
 
 
 
