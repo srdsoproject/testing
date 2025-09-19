@@ -904,8 +904,15 @@ st.markdown("""
 with tabs[1]:
     st.markdown("### 📈 Pending Deficiencies Trend by Head")
     df = st.session_state.df.copy()
+
+    # ✅ Ensure Status column exists
+    if "Status" not in df.columns:
+        # if classify_feedback takes only feedback
+        df["Status"] = df["Feedback"].apply(classify_feedback)
+
     if not df.empty:
         df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
+
         pending = df[
             df["Status"].eq("Pending") |
             df["Feedback"].isna() |
@@ -933,6 +940,7 @@ with tabs[1]:
             st.info("No pending deficiencies to display.")
     else:
         st.info("No data available for analytics.")
+
 
 
 
