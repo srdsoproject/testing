@@ -421,7 +421,7 @@ if "df" not in st.session_state:
     st.session_state.df = load_data()
 df = st.session_state.df
 
-tabs = st.tabs(["📊 View Records"])
+tabs = st.tabs(["📊 View Records", "📈 Analytics"])
 with tabs[0]:
     if df.empty:
         st.warning("Deficiencies will be updated soon !")
@@ -901,6 +901,38 @@ st.markdown("""
 """)
 
 
+with tabs[1]:
+    st.markdown("### 📈 Pending Deficiencies Trend by Head")
+    df = st.session_state.df.copy()
+    if not df.empty:
+        df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
+        pending = df[
+            df["Status"].eq("Pending") |
+            df["Feedback"].isna() |
+            (df["Feedback"].astype(str).str.strip() == "")
+        ]
+        trend = (
+            pending
+            .groupby([pd.Grouper(key="Date of Inspection", freq="M"), "Head"])
+            .size()
+            .reset_index(name="PendingCount")
+        )
+        if not trend.empty:
+            chart = (
+                alt.Chart(trend)
+                .mark_line(point=True)
+                .encode(
+                    x="Date of Inspection:T",
+                    y="PendingCount:Q",
+                    color="Head:N",
+                    tooltip=["Date of Inspection", "Head", "PendingCount"]
+                )
+            )
+            st.altair_chart(chart, use_container_width=True)
+        else:
+            st.info("No pending deficiencies to display.")
+    else:
+        st.info("No data available for analytics.")
 
 
 
