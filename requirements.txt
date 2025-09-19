@@ -12,3 +12,4 @@ scikit-learn
 openpyxl
 transformers
 torch
+altair
