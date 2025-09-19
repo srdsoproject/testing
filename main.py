@@ -934,15 +934,24 @@ with tabs[1]:
         )
 
         if not trend.empty:
+            # 🎨 Highly distinct color scheme (Tableau 20 colors)
+            distinct_colors = [
+                "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
+                "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf",
+                "#393b79", "#637939", "#8c6d31", "#843c39", "#7b4173",
+                "#5254a3", "#9c9ede", "#6b6ecf", "#b5cf6b", "#e7ba52"
+            ]
+
             chart = (
                 alt.Chart(trend)
-                .mark_line(point=True)
+                .mark_line(point=True, strokeWidth=2)
                 .encode(
                     x="Date of Inspection:T",
                     y="PendingCount:Q",
-                    color="Head:N",
+                    color=alt.Color("Head:N", scale=alt.Scale(range=distinct_colors)),
                     tooltip=["Date of Inspection", "Head", "PendingCount"],
                 )
+                .properties(height=400)
             )
             st.altair_chart(chart, use_container_width=True)
         else:
@@ -967,9 +976,10 @@ with tabs[1]:
 
         # 🔹 Add total line at the end
         st.markdown(f"**Total Pending : {total_pending}**")
-
     else:
         st.info("No pending deficiencies to summarize.")
+
+
 
 
 
