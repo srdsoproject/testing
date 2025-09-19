@@ -940,6 +940,22 @@ with tabs[1]:
             st.info("No pending deficiencies to display.")
     else:
         st.info("No data available for analytics.")
+# --- Department-wise Pending Summary (plain text) ---
+    st.markdown("### 🏢 Department-wise Pending Counts")
+    
+    if not pending.empty:
+        dept_counts = (
+            pending.groupby("Head")
+            .size()
+            .sort_values(ascending=False)
+        )
+    
+        # Print each department with its count
+        for head, count in dept_counts.items():
+            st.markdown(f"- **{head}** : {count}")
+    else:
+        st.info("No pending deficiencies to summarize.")
+
 
 
 
