@@ -902,7 +902,7 @@ st.markdown("""
 
 
 with tabs[1]:
-    st.markdown("### 📈 Pending Deficiencies Trend by Head")
+    st.markdown("### 📊 Pending Deficiencies Trend by Head (Bar Trend)")
     df = st.session_state.df.copy()
 
     # ✅ Ensure Status column exists
@@ -942,14 +942,29 @@ with tabs[1]:
                 "#5254a3", "#9c9ede", "#6b6ecf", "#b5cf6b", "#e7ba52"
             ]
 
+            # ✅ Bar chart showing monthly trend of pending deficiencies
             chart = (
                 alt.Chart(trend)
-                .mark_line(point=True, strokeWidth=2)
+                .mark_bar()
                 .encode(
-                    x="Date of Inspection:T",
-                    y="PendingCount:Q",
-                    color=alt.Color("Head:N", scale=alt.Scale(range=distinct_colors)),
-                    tooltip=["Date of Inspection", "Head", "PendingCount"],
+                    x=alt.X(
+                        "yearmonth(Date of Inspection):T",
+                        title="Inspection Month"
+                    ),
+                    y=alt.Y(
+                        "PendingCount:Q",
+                        title="Pending Deficiencies"
+                    ),
+                    color=alt.Color(
+                        "Head:N",
+                        scale=alt.Scale(range=distinct_colors),
+                        title="Department Head"
+                    ),
+                    tooltip=[
+                        "yearmonth(Date of Inspection):T",
+                        "Head",
+                        "PendingCount"
+                    ],
                 )
                 .properties(height=400)
             )
@@ -978,6 +993,8 @@ with tabs[1]:
         st.markdown(f"**Total Pending : {total_pending}**")
     else:
         st.info("No pending deficiencies to summarize.")
+
+
 
 
 
