@@ -902,7 +902,7 @@ st.markdown("""
 
 
 with tabs[1]:
-    st.markdown("### 📊 Pending Deficiencies Trend by Head (Bar Trend)")
+    st.markdown("### 📊 Pending Deficiencies Trend by Head (Bar + Trend Line)")
     df = st.session_state.df.copy()
 
     # ✅ Ensure Status column exists
@@ -918,81 +918,63 @@ with tabs[1]:
             | (df["Feedback"].astype(str).str.strip() == "")
         ]
 
-        # 🔹 Normalize department names to avoid duplicates
+        # 🔹 Normalize department names
         pending["Head"] = (
-            pending["Head"]
-            .astype(str)
-            .str.strip()
-            .str.upper()
+            pending["Head"].astype(str).str.strip().str.upper()
         )
 
         trend = (
             pending
-            .groupby([pd.Grouper(key="Date of Inspection", freq="M"), "Head"])
+            .groupby([pd.Grouper(key="Date of Inspection", freq="M")])
             .size()
             .reset_index(name="PendingCount")
         )
 
         if not trend.empty:
-            # 🎨 Highly distinct color scheme (Tableau 20 colors)
-            distinct_colors = [
-                "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
-                "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf",
-                "#393b79", "#637939", "#8c6d31", "#843c39", "#7b4173",
-                "#5254a3", "#9c9ede", "#6b6ecf", "#b5cf6b", "#e7ba52"
-            ]
-
-            # ✅ Bar chart showing monthly trend of pending deficiencies
-            chart = (
-                alt.Chart(trend)
-                .mark_bar()
-                .encode(
-                    x=alt.X(
-                        "yearmonth(Date of Inspection):T",
-                        title="Inspection Month"
-                    ),
-                    y=alt.Y(
-                        "PendingCount:Q",
-                        title="Pending Deficiencies"
-                    ),
-                    color=alt.Color(
-                        "Head:N",
-                        scale=alt.Scale(range=distinct_colors),
-                        title="Department Head"
-                    ),
-                    tooltip=[
-                        "yearmonth(Date of Inspection):T",
-                        "Head",
-                        "PendingCount"
-                    ],
-                )
-                .properties(height=400)
+            # --- Bar Chart ---
+            bars = alt.Chart(trend).mark_bar(color="#1f77b4").encode(
+                x=alt.X("yearmonth(Date of Inspection):T", title="Inspection Month"),
+                y=alt.Y("PendingCount:Q", title="Pending Deficiencies"),
+                tooltip=[
+                    "yearmonth(Date of Inspection):T",
+                    "PendingCount"
+                ],
             )
-            st.altair_chart(chart, use_container_width=True)
+
+            # --- Linear Trend Line ---
+            line = alt.Chart(trend).transform_regression(
+                "yearmonth(Date of Inspection)", "PendingCount"
+            ).mark_line(
+                color="red",
+                strokeDash=[5, 5],   # dotted line
+                strokeWidth=2
+            ).encode(
+                x="yearmonth(Date of Inspection):T",
+                y="PendingCount:Q"
+            )
+
+            st.altair_chart(bars + line, use_container_width=True)
         else:
             st.info("No pending deficiencies to display.")
     else:
         st.info("No data available for analytics.")
 
-    # --- Department-wise Pending Summary (plain text) ---
+    # --- Department-wise Pending Summary ---
     st.markdown("### 🏢 Department-wise Pending Counts")
-
     if not pending.empty:
         dept_counts = (
             pending.groupby("Head")
             .size()
             .sort_values(ascending=False)
         )
-
         total_pending = dept_counts.sum()
-
         for head, count in dept_counts.items():
             st.markdown(f"- **{head}** : {count}")
-
-        # 🔹 Add total line at the end
         st.markdown(f"**Total Pending : {total_pending}**")
     else:
         st.info("No pending deficiencies to summarize.")
+
+
 
 
 
