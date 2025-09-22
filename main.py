@@ -913,7 +913,7 @@ with tabs[1]:
         # Parse dates safely
         df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
 
-        # --- 🌟 Add Date Range Filter ---
+        # --- 🌟 Date Range Filter ---
         min_date = df["Date of Inspection"].min()
         max_date = df["Date of Inspection"].max()
 
@@ -924,11 +924,10 @@ with tabs[1]:
             max_value=max_date
         )
 
-        # Ensure they are Timestamps for comparison
         start_date = pd.to_datetime(start_date)
         end_date   = pd.to_datetime(end_date)
 
-        # Filter the dataframe by the selected range
+        # Filter by selected range
         df = df[
             (df["Date of Inspection"] >= start_date) &
             (df["Date of Inspection"] <= end_date)
@@ -941,11 +940,9 @@ with tabs[1]:
         ].copy()
 
         # 🔹 Normalize department names
-        pending["Head"] = (
-            pending["Head"].astype(str).str.strip().str.upper()
-        )
+        pending["Head"] = pending["Head"].astype(str).str.strip().str.upper()
 
-        # ---- Aggregate monthly totals (all heads combined) ----
+        # ---- Monthly trend ----
         trend = (
             pending
             .groupby(pd.Grouper(key="Date of Inspection", freq="M"))
@@ -954,23 +951,20 @@ with tabs[1]:
         )
 
         if not trend.empty:
-            # Add a numeric index for regression (0,1,2,...)
             trend = trend.sort_values("Date of Inspection").reset_index(drop=True)
-            trend["MonthIndex"] = trend.index  # simple integer for regression
+            trend["MonthIndex"] = trend.index
 
-            # --- Bar Chart ---
             bars = alt.Chart(trend).mark_bar(color="#1f77b4").encode(
                 x=alt.X("yearmonth(Date of Inspection):T", title="Inspection Month"),
                 y=alt.Y("PendingCount:Q", title="Pending Deficiencies"),
                 tooltip=["yearmonth(Date of Inspection):T", "PendingCount"],
             )
 
-            # --- Dotted Linear Trend Line ---
             line = alt.Chart(trend).transform_regression(
                 "MonthIndex", "PendingCount"
             ).mark_line(
                 color="red",
-                strokeDash=[5, 5],   # dotted
+                strokeDash=[5, 5],
                 strokeWidth=2
             ).encode(
                 x=alt.X("yearmonth(Date of Inspection):T"),
@@ -990,13 +984,30 @@ with tabs[1]:
             pending.groupby("Head")
             .size()
             .sort_values(ascending=False)
+            .reset_index(name="PendingCount")
         )
-        total_pending = dept_counts.sum()
-        for head, count in dept_counts.items():
-            st.markdown(f"- **{head}** : {count}")
+        total_pending = dept_counts["PendingCount"].sum()
+
+        # Text summary
+        for _, row in dept_counts.iterrows():
+            st.markdown(f"- **{row['Head']}** : {row['PendingCount']}")
         st.markdown(f"**Total Pending : {total_pending}**")
+
+        # --- 📈 Department-wise Bar Graph ---
+        dept_chart = alt.Chart(dept_counts).mark_bar(color="#1f77b4").encode(
+            x=alt.X("PendingCount:Q", title="Pending Deficiencies"),
+            y=alt.Y("Head:N", sort='-x', title="Department"),
+            tooltip=["Head", "PendingCount"]
+        ).properties(
+            width="container",
+            height=400
+        )
+
+        st.altair_chart(dept_chart, use_container_width=True)
+
     else:
         st.info("No pending deficiencies to summarize.")
+
 
 
 
