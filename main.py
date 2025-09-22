@@ -910,7 +910,7 @@ with tabs[1]:
         df["Status"] = df["Feedback"].apply(classify_feedback)
 
     if not df.empty:
-        # Convert to datetime
+        # Parse dates safely
         df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
 
         pending = df[
@@ -919,10 +919,12 @@ with tabs[1]:
             | (df["Feedback"].astype(str).str.strip() == "")
         ].copy()
 
-        # Normalize department names
-        pending["Head"] = pending["Head"].astype(str).str.strip().str.upper()
+        # 🔹 Normalize department names
+        pending["Head"] = (
+            pending["Head"].astype(str).str.strip().str.upper()
+        )
 
-        # ---- Monthly totals (all heads) ----
+        # ---- Aggregate monthly totals (all heads combined) ----
         trend = (
             pending
             .groupby(pd.Grouper(key="Date of Inspection", freq="M"))
@@ -931,27 +933,27 @@ with tabs[1]:
         )
 
         if not trend.empty:
-            # Sort and add numeric index for regression fit
+            # Add a numeric index for regression (0,1,2,...)
             trend = trend.sort_values("Date of Inspection").reset_index(drop=True)
-            trend["MonthIndex"] = trend.index  # numeric sequence
+            trend["MonthIndex"] = trend.index  # simple integer for regression
 
-            # --- Bars ---
+            # --- Bar Chart ---
             bars = alt.Chart(trend).mark_bar(color="#1f77b4").encode(
-                x=alt.X("Date of Inspection:T", title="Inspection Month"),
+                x=alt.X("yearmonth(Date of Inspection):T", title="Inspection Month"),
                 y=alt.Y("PendingCount:Q", title="Pending Deficiencies"),
                 tooltip=["yearmonth(Date of Inspection):T", "PendingCount"],
             )
 
-            # --- Dotted Trend Line ---
-            line = (
-                alt.Chart(trend)
-                .transform_regression("MonthIndex", "PendingCount")
-                .mark_line(color="red", strokeDash=[5, 5], strokeWidth=2)
-                # Map regression’s numeric x back to Date for plotting
-                .encode(
-                    x=alt.X("Date of Inspection:T"),
-                    y="PendingCount:Q"
-                )
+            # --- Dotted Linear Trend Line ---
+            line = alt.Chart(trend).transform_regression(
+                "MonthIndex", "PendingCount"
+            ).mark_line(
+                color="red",
+                strokeDash=[5, 5],   # dotted
+                strokeWidth=2
+            ).encode(
+                x=alt.X("yearmonth(Date of Inspection):T"),
+                y="PendingCount:Q"
             )
 
             st.altair_chart(bars + line, use_container_width=True)
@@ -974,20 +976,3 @@ with tabs[1]:
         st.markdown(f"**Total Pending : {total_pending}**")
     else:
         st.info("No pending deficiencies to summarize.")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
