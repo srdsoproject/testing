@@ -913,6 +913,27 @@ with tabs[1]:
         # Parse dates safely
         df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
 
+        # --- 🌟 Add Date Range Filter ---
+        min_date = df["Date of Inspection"].min()
+        max_date = df["Date of Inspection"].max()
+
+        start_date, end_date = st.date_input(
+            "Select Inspection Date Range",
+            value=(min_date, max_date),
+            min_value=min_date,
+            max_value=max_date
+        )
+
+        # Ensure they are Timestamps for comparison
+        start_date = pd.to_datetime(start_date)
+        end_date   = pd.to_datetime(end_date)
+
+        # Filter the dataframe by the selected range
+        df = df[
+            (df["Date of Inspection"] >= start_date) &
+            (df["Date of Inspection"] <= end_date)
+        ]
+
         pending = df[
             df["Status"].eq("Pending")
             | df["Feedback"].isna()
@@ -976,6 +997,7 @@ with tabs[1]:
         st.markdown(f"**Total Pending : {total_pending}**")
     else:
         st.info("No pending deficiencies to summarize.")
+
 
 
 
