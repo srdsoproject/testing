@@ -13,3 +13,4 @@ openpyxl
 transformers
 torch
 altair
+python-docx==0.8.12
