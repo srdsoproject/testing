@@ -74,13 +74,33 @@ def load_data_from_github():
         return pd.DataFrame(columns=REQUIRED_COLS)
 
 def load_data():
-    if os.path.exists(LOCAL_FILE):
+     if os.path.exists(LOCAL_FILE):
         df = pd.read_excel(LOCAL_FILE)
-        df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
-        if "_sheet_row" not in df.columns:
-            df["_sheet_row"] = df.index + 2
-        if "_original_sheet_index" not in df.columns:
-            df["_original_sheet_index"] = df.index
+    else:
+        resp = requests.get(GITHUB_RAW_URL)
+        resp.raise_for_status()
+        df = pd.read_excel(BytesIO(resp.content))
+    
+    # Ensure required columns
+    REQUIRED_COLS = [
+        "Date of Inspection", "Type of Inspection", "Location",
+        "Head", "Sub Head", "Deficiencies Noted",
+        "Inspection By", "Action By", "Feedback",
+        "User Feedback/Remark"
+    ]
+    for col in REQUIRED_COLS:
+        if col not in df.columns:
+            df[col] = ""
+
+    df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
+    df["Location"] = df["Location"].astype(str).str.strip().str.upper()
+
+    # 🔹 Ensure ID columns exist for AG-Grid
+    if "_sheet_row" not in df.columns:
+        df["_sheet_row"] = df.index + 2
+    if "_original_sheet_index" not in df.columns:
+        df["_original_sheet_index"] = df.index
+
         return df
     else:
         return load_data_from_github()
@@ -269,6 +289,7 @@ st.markdown("""
     For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
 </marquee>
 """, unsafe_allow_html=True)
+
 
 
 
