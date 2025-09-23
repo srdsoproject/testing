@@ -6,7 +6,6 @@ from io import BytesIO
 from matplotlib import pyplot as plt
 import altair as alt
 # ---------- CONFIG ----------
-import streamlit as st
 import pandas as pd
 
 st.set_page_config(page_title="Inspection App", layout="wide")
@@ -20,7 +19,6 @@ if "ack_done" not in st.session_state:
     st.session_state.ack_done = False
 
 # ---------- LOGIN ----------
-import streamlit as st
 import pandas as pd
 
 # ---------- LOGIN ----------
@@ -108,7 +106,6 @@ if st.button("🗑️ Clear All Responses", key="clear_responses_btn"):
     df.to_excel("responses.xlsx", index=False)
     st.success("✅ All responses have been cleared.")
 # ---------- GOOGLE SHEETS CONNECTION ----------
-import streamlit as st
 import pandas as pd
 import gspread
 import re
@@ -151,7 +148,6 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from openpyxl.styles import Alignment
-import streamlit as st
 
 # -------------------- CONSTANTS (DEDUPED) --------------------
 # Use dict.fromkeys(...) to preserve order while removing duplicates
@@ -654,7 +650,6 @@ st.markdown(
 # -------------------- EDITOR --------------------
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 import pandas as pd
-import streamlit as st
 from st_aggrid.shared import JsCode   # 👈 for autoSizeAllColumns
 
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
@@ -1007,6 +1002,7 @@ with tabs[1]:
 
     else:
         st.info("No pending deficiencies to summarize.")
+
 
 
 
