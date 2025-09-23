@@ -67,6 +67,7 @@ def load_data_from_github():
         df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
         df["Location"] = df["Location"].astype(str).str.strip().str.upper()
         df["_sheet_row"] = df.index + 2
+        df["_original_sheet_index"] = df.index
         return df
     except Exception as e:
         st.error(f"❌ Could not load Excel from GitHub: {e}")
@@ -78,6 +79,8 @@ def load_data():
         df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
         if "_sheet_row" not in df.columns:
             df["_sheet_row"] = df.index + 2
+        if "_original_sheet_index" not in df.columns:
+            df["_original_sheet_index"] = df.index
         return df
     else:
         return load_data_from_github()
@@ -91,25 +94,32 @@ if st.session_state.df.empty:
 df = st.session_state.df
 
 # ---------- UTILS ----------
-def classify_feedback(feedback, remark=None):
+def classify_feedback(feedback):
     val = feedback or ""
     return "Pending" if val.strip() == "" else "Resolved"
 
 def get_status(feedback, remark):
-    return classify_feedback(feedback, remark)
+    return classify_feedback(feedback)
 
 def color_text_status(status):
     return "🔴 Pending" if status == "Pending" else ("🟢 Resolved" if status == "Resolved" else status)
 
 def update_feedback_column(edited_df):
-    df = st.session_state.df
+    """
+    Updates the session dataframe and saves locally.
+    Moves 'User Feedback/Remark' into 'Feedback' column.
+    """
+    df = st.session_state.df.copy()
+    
     for _, row in edited_df.iterrows():
-        r = int(row["_sheet_row"]) - 2
-        for col in ["Feedback", "User Feedback/Remark", "Head", "Action By", "Sub Head"]:
-            if col in df.columns and col in row:
-                df.at[r, col] = row[col]
+        idx = int(row["_original_sheet_index"])
+        user_remark = str(row.get("User Feedback/Remark", "")).strip()
+        if user_remark:
+            df.at[idx, "Feedback"] = user_remark
+            df.at[idx, "User Feedback/Remark"] = ""  # Clear remark field
+
     st.session_state.df = df
-    save_to_local_excel(df)  # persist locally
+    save_to_local_excel(df)
 
 # ---------- HEADER ----------
 st.markdown("""
@@ -134,10 +144,10 @@ FOOTPLATE_LIST = df["Location"].dropna().unique().tolist()
 HEAD_LIST = df["Head"].dropna().unique().tolist()
 SUBHEAD_LIST = {h: df[df["Head"]==h]["Sub Head"].dropna().unique().tolist() for h in HEAD_LIST}
 
-tabs = st.tabs(["📊 View Records", "📈 Analytics"])
+tabs = st.tabs(["📊 View Records"])
 with tabs[0]:
     if df.empty:
-        st.warning("Deficiencies will be updated soon !")
+        st.warning("Deficiencies will be updated soon!")
         st.stop()
 
     # Filters
@@ -171,7 +181,6 @@ with tabs[0]:
 
     # ---------- AG GRID EDIT ----------
     st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
-
     editable_filtered = filtered.copy()
     if not editable_filtered.empty:
         # Search box
@@ -181,11 +190,6 @@ with tabs[0]:
                 editable_filtered["Deficiencies Noted"].astype(str).str.lower().str.contains(search_text)
             ]
 
-        if "_original_sheet_index" not in editable_filtered.columns:
-            editable_filtered["_original_sheet_index"] = editable_filtered.index
-        if "_sheet_row" not in editable_filtered.columns:
-            editable_filtered["_sheet_row"] = editable_filtered.index + 2
-
         display_cols = [
             "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
             "Deficiencies Noted", "Inspection By", "Action By", "Feedback",
@@ -193,17 +197,14 @@ with tabs[0]:
         ]
         editable_df = editable_filtered.loc[:, display_cols].copy()
 
-        if "Status" not in editable_df.columns:
-            editable_df["Status"] = [
-                get_status(r["Feedback"], r["User Feedback/Remark"]) 
-                for _, r in editable_df.iterrows()
-            ]
-        editable_df["Status"] = editable_df["Status"].apply(color_text_status)
+        # Add status column
+        editable_df["Status"] = [color_text_status(get_status(r["Feedback"], r["User Feedback/Remark"])) 
+                                 for _, r in editable_df.iterrows()]
 
+        # Ensure ID columns
         editable_df["_original_sheet_index"] = editable_filtered["_original_sheet_index"].values
-        editable_df["_sheet_row"] = editable_filtered["_sheet_row"].values
 
-        # Remove duplicates
+        # Remove duplicates in columns
         editable_df = editable_df.loc[:, ~editable_df.columns.duplicated()]
 
         # Convert dates to string
@@ -217,7 +218,6 @@ with tabs[0]:
         gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True)
         gb.configure_column("User Feedback/Remark", editable=True, wrapText=True, autoHeight=True)
         gb.configure_column("_original_sheet_index", hide=True)
-        gb.configure_column("_sheet_row", hide=True)
         gb.configure_grid_options(singleClickEdit=True)
 
         auto_size_js = JsCode("""
@@ -246,10 +246,12 @@ with tabs[0]:
         c1, c2 = st.columns([1,1])
         if c1.button("✅ Submit Feedback"):
             update_feedback_column(edited_df)
+            st.experimental_rerun()
 
         if c2.button("🔄 Refresh Data"):
-            st.session_state.df = load_data_from_github()
-            st.success("✅ Data refreshed!")
+            st.session_state.df = load_data()
+            st.experimental_rerun()
+
 
 # ---------- ALERT LOG ----------
 st.markdown("## 📋 Alerts Log")
@@ -269,4 +271,5 @@ st.markdown("""
     For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
 </marquee>
 """, unsafe_allow_html=True)
+
 
