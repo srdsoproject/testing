@@ -247,6 +247,22 @@ col_a.metric("🟨 Pending", (filtered_df["Status"]=="Pending").sum())
 col_b.metric("⚠️ No Response", filtered_df["Feedback"].astype(str).str.strip().eq("").sum())
 col_c.metric("🟩 Resolved", (filtered_df["Status"]=="Resolved").sum())
 col_d.metric("📊 Total Records", len(filtered_df))
+def update_feedback_column(updated_rows: pd.DataFrame):
+    """
+    Update the in-memory dataframe and write the full sheet back to Excel.
+    Expects '_original_sheet_index' and '_sheet_row' columns.
+    """
+    if st.session_state.df.empty:
+        st.warning("⚠️ No data to update.")
+        return
+
+    for _, row in updated_rows.iterrows():
+        idx = int(row["_original_sheet_index"])
+        for col in row.index:
+            if col in st.session_state.df.columns:
+                st.session_state.df.at[idx, col] = row[col]
+
+    save_to_local_excel(st.session_state.df)   # reuse your existing saver
 
 # -------------------- EDITABLE GRID --------------------
 # =====================  EDITABLE FEEDBACK TABLE  =====================
@@ -434,6 +450,7 @@ st.markdown("""
 - For Medical Department: Pertains to **MEDICAL**
 
 """)
+
 
 
 
