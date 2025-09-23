@@ -196,8 +196,8 @@ with tabs[0]:
     # ---------- SUBMIT BUTTON ----------
     c1, c2 = st.columns([1,1])
     if c1.button("✅ Submit Feedback"):
-    if "_original_sheet_index" not in edited_df.columns:
-        st.error("⚠️ Cannot find original row index. Please refresh.")
+        if "_original_sheet_index" not in edited_df.columns:
+            st.error("⚠️ Cannot find original row index. Please refresh.")
     else:
         df_main = st.session_state.df.copy()
         changes = 0
@@ -246,6 +246,7 @@ st.markdown("""
     For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
 </marquee>
 """, unsafe_allow_html=True)
+
 
 
 
