@@ -1,26 +1,17 @@
-import pandas as pd
-import streamlit as st
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
-from st_aggrid.shared import JsCode
-from io import BytesIO
-import os
-
-LOCAL_FILE = "responses.xlsx"
 import streamlit as st
 import pandas as pd
 import numpy as np
 from io import BytesIO
-from matplotlib import pyplot as plt
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from st_aggrid.shared import JsCode
-from openpyxl.styles import Alignment, Font, Border, Side
-import requests
 import os
+import requests
 
 # ---------- CONFIG ----------
 st.set_page_config(page_title="Inspection App", layout="wide")
-GITHUB_RAW_URL = "https://github.com/srdsoproject/testing/raw/main/responses.xlsx"
+
 LOCAL_FILE = "responses_local.xlsx"
+GITHUB_RAW_URL = "https://github.com/srdsoproject/testing/raw/main/responses.xlsx"
 
 # ---------- SESSION STATE ----------
 if "logged_in" not in st.session_state:
@@ -51,21 +42,14 @@ if not st.session_state.logged_in:
                 st.session_state.logged_in = True
                 st.session_state.user = user
                 st.success(f"✅ Welcome, {user['name']}!")
-                st.rerun()
+                st.experimental_rerun()
             else:
                 st.error("❌ Invalid email or password.")
     st.stop()
-# ----------------- Helper Functions -----------------
 
+# ---------- HELPER FUNCTIONS ----------
 def load_data():
-    import os
-    import pandas as pd
-    from io import BytesIO
-    import requests
-
-    LOCAL_FILE = "responses.xlsx"
-    GITHUB_RAW_URL = "https://raw.githubusercontent.com/username/repo/main/responses.xlsx"
-
+    """Load data from local file or GitHub if missing"""
     if os.path.exists(LOCAL_FILE):
         df = pd.read_excel(LOCAL_FILE)
     else:
@@ -73,7 +57,7 @@ def load_data():
         resp.raise_for_status()
         df = pd.read_excel(BytesIO(resp.content))
 
-    # Ensure all required columns exist
+    # Ensure required columns
     REQUIRED_COLS = [
         "Date of Inspection", "Type of Inspection", "Location",
         "Head", "Sub Head", "Deficiencies Noted",
@@ -82,7 +66,7 @@ def load_data():
     ]
     for col in REQUIRED_COLS:
         if col not in df.columns:
-            df[col] = ""  # fill missing column with empty string
+            df[col] = ""
 
     # Helper columns for AG-Grid
     if "_sheet_row" not in df.columns:
@@ -96,7 +80,6 @@ def load_data():
 
     return df
 
-
 def save_to_local_excel(df):
     df.to_excel(LOCAL_FILE, index=False)
 
@@ -105,33 +88,30 @@ def classify_feedback(feedback):
     return "Pending" if val.strip() == "" else "Resolved"
 
 def get_status(feedback, remark):
-    # Use Feedback column only for status
     return classify_feedback(feedback)
 
 def color_text_status(status):
     return "🔴 Pending" if status == "Pending" else ("🟢 Resolved" if status == "Resolved" else status)
 
-# ----------------- Load Data -----------------
-if "df" not in st.session_state:
+# ---------- LOAD DATA ----------
+if st.session_state.df.empty:
     st.session_state.df = load_data()
 df_main = st.session_state.df.copy()
 
 st.markdown("### ✍️ Edit User Feedback / Remarks")
 
+# ---------- PREPARE EDITABLE DF ----------
 editable_df = df_main.copy()
+editable_df["User Feedback/Remark"] = editable_df.get("User Feedback/Remark", "").fillna("").astype(str)
+editable_df["Feedback"] = editable_df.get("Feedback", "").fillna("").astype(str)
+editable_df["Status"] = editable_df.apply(
+    lambda r: color_text_status(get_status(r["Feedback"], r["User Feedback/Remark"])),
+    axis=1
+)
 
-# Ensure text columns are strings
-editable_df["User Feedback/Remark"] = editable_df["User Feedback/Remark"].fillna("").astype(str)
-editable_df["Feedback"] = editable_df["Feedback"].fillna("").astype(str)
-
-# Add Status column
-editable_df["Status"] = editable_df.apply(lambda r: color_text_status(get_status(r["Feedback"], r["User Feedback/Remark"])), axis=1)
-
-# ----------------- AG-Grid Configuration -----------------
+# ---------- AG-GRID CONFIG ----------
 gb = GridOptionsBuilder.from_dataframe(editable_df)
 gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True)
-
-# Make only User Feedback/Remark editable and force as text
 gb.configure_column(
     "User Feedback/Remark",
     editable=True,
@@ -141,12 +121,10 @@ gb.configure_column(
     cellEditorPopup=False,
     cellEditorParams={"maxLength": 4000},
 )
-
-# Hide helper ID columns
 gb.configure_column("_original_sheet_index", hide=True)
 gb.configure_column("_sheet_row", hide=True)
 
-# Auto-size all columns
+# Auto-size columns
 auto_size_js = JsCode("""
 function(params) {
     let allColumnIds = [];
@@ -157,7 +135,6 @@ function(params) {
 }
 """)
 gb.configure_grid_options(onFirstDataRendered=auto_size_js)
-
 grid_options = gb.build()
 
 grid_response = AgGrid(
@@ -167,13 +144,12 @@ grid_response = AgGrid(
     height=600,
     allow_unsafe_jscode=True
 )
-
 edited_df = pd.DataFrame(grid_response["data"])
 
-# Create columns for buttons
+# ---------- BUTTONS ----------
 c1, c2, _ = st.columns([1,1,1])
 
-# Submit button
+# Submit Feedback
 if c1.button("✅ Submit Feedback"):
     if "_original_sheet_index" not in edited_df.columns:
         st.error("⚠️ Cannot find original row index. Please refresh.")
@@ -181,15 +157,14 @@ if c1.button("✅ Submit Feedback"):
         changes = 0
         df_main = st.session_state.df.copy()
 
-        # Only update rows where user typed a remark
+        # Only update rows with non-empty User Feedback/Remark
         edited_rows = edited_df[edited_df["User Feedback/Remark"].astype(str).str.strip() != ""]
         for _, row in edited_rows.iterrows():
             idx = int(row["_original_sheet_index"])
-            val = row["User Feedback/Remark"]
-            new_remark = "" if pd.isna(val) else str(val).strip()
+            new_remark = str(row["User Feedback/Remark"]).strip()
             if new_remark:
-                df_main.at[idx, "Feedback"] = new_remark
-                df_main.at[idx, "User Feedback/Remark"] = ""
+                df_main.at[idx, "Feedback"] = new_remark  # Update Feedback
+                df_main.at[idx, "User Feedback/Remark"] = ""  # Clear edit field
                 changes += 1
 
         if changes > 0:
@@ -200,7 +175,7 @@ if c1.button("✅ Submit Feedback"):
         else:
             st.info("ℹ️ No new feedback to submit.")
 
-# Refresh button (at same indentation as columns)
+# Refresh Data
 if c2.button("🔄 Refresh Data"):
     st.session_state.df = load_data()
     st.success("✅ Data refreshed successfully!")
@@ -227,6 +202,7 @@ st.markdown("""
     For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
 </marquee>
 """, unsafe_allow_html=True)
+
 
 
 
