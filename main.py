@@ -6,7 +6,6 @@ from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from st_aggrid.shared import JsCode
 import os
 import requests
-import re
 
 # -------------------- CONSTANTS --------------------
 LOCAL_FILE = "responses_local.xlsx"
@@ -50,16 +49,6 @@ SUBHEAD_LIST = {
     "FINANCE":["MISC"], "MEDICAL":["MISC"], "STORE": ["MISC"],
 }
 
-INSPECTION_BY_LIST = [""] + ["HQ OFFICER CCE/CR",'DRM/SUR', 'ADRM', 'Sr.DSO', 'Sr.DOM', 'Sr.DEN/S', 'Sr.DEN/C', 'Sr.DEN/Co', 'Sr.DSTE',
-                             'Sr.DEE/TRD', 'Sr.DEE/G','Sr.DEE/TRO', 'Sr.DME', 'Sr.DCM', 'Sr.DPO', 'Sr.DFM', 'Sr.DMM', 'DSC',
-                             'DME,DEE/TRD', 'DFM', 'DSTE/HQ', 'DSTE/KLBG', 'ADEN/T/SUR', 'ADEN/W/SUR', 'ADEN/KWV',
-                             'ADEN/PVR', 'ADEN/LUR', 'ADEN/KLBG', 'ADSTE/SUR', 'ADSTE/I/KWV', 'ADSTE/II/KWV',
-                             'ADME/SUR', 'AOM/GD', 'AOM/GEN', 'ACM/Cog', 'ACM/TC', 'ACM/GD', 'APO/GEN', 'APO/WEL',
-                             'ADFM/I', 'ADFMII', 'ASC', 'ADSO/SUR']
-
-ACTION_BY_LIST = [""] + ['DRM/SUR', 'ADRM', 'Sr.DSO', 'Sr.DOM', 'Sr.DEN/S', 'Sr.DEN/C', 'Sr.DEN/Co', 'Sr.DSTE',
-                         'Sr.DEE/TRD', 'Sr.DEE/G','Sr.DEE/TRO', 'Sr.DME', 'Sr.DCM', 'Sr.DPO', 'Sr.DFM', 'Sr.DMM', 'DSC', 'CMS']
-
 VALID_INSPECTIONS = [
     "FOOTPLATE INSPECTION", "STATION INSPECTION", "LC GATE INSPECTION",
     "MISC", "COACHING DEPOT", "ON TRAIN", "SURPRISE/AMBUSH INSPECTION", "WORKSITE INSPECTION", "OTHER (UNUSUAL)",
@@ -90,16 +79,14 @@ def load_data():
     if "_original_sheet_index" not in df.columns: df["_original_sheet_index"] = df.index
     df["Feedback"] = df["Feedback"].fillna("").astype(str)
     df["User Feedback/Remark"] = df["User Feedback/Remark"].fillna("").astype(str)
+    df["Status"] = df.apply(lambda r: "Pending" if r["Feedback"].strip() == "" else "Resolved", axis=1)
     return df
 
 def save_to_local_excel(df):
     df.to_excel(LOCAL_FILE, index=False)
 
-def get_status(feedback, remark=""):
-    return "Pending" if str(feedback).strip() == "" else "Resolved"
-
 def color_text_status(status):
-    return "🔴 Pending" if status == "Pending" else ("🟢 Resolved" if status == "Resolved" else status)
+    return "🔴 Pending" if status == "Pending" else "🟢 Resolved"
 
 # -------------------- SESSION STATE --------------------
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
@@ -134,43 +121,40 @@ if not st.session_state.logged_in:
 # -------------------- LOAD DATA --------------------
 if st.session_state.df.empty:
     st.session_state.df = load_data()
-    df_main = st.session_state.df.copy()
-    
-    # -------------------- FILTER EXAMPLE --------------------
-    # Using proper datetime comparison
-    from_date = st.date_input("📅 From Date", df_main["Date of Inspection"].min())
-    to_date   = st.date_input("📅 To Date", df_main["Date of Inspection"].max())
-    
-    from_date_dt = pd.to_datetime(from_date)
-    to_date_dt   = pd.to_datetime(to_date)
-    
-    filtered_df = df_main[
-        (df_main["Date of Inspection"] >= from_date_dt) &
-        (df_main["Date of Inspection"] <= to_date_dt)
-    ]
 
-    filtered_df = df_main.copy()
-    if type_filter: filtered_df = filtered_df[filtered_df["Type of Inspection"].isin(type_filter)]
-    if location_filter: filtered_df = filtered_df[filtered_df["Location"].isin(location_filter)]
-    if head_filter: filtered_df = filtered_df[filtered_df["Head"].isin(head_filter)]
-    if sub_filter: filtered_df = filtered_df[filtered_df["Sub Head"].isin(sub_filter)]
-    if status_filter != "All": filtered_df = filtered_df[filtered_df["Status"] == status_filter]
-    filtered_df = filtered_df[(filtered_df["Date of Inspection"].dt.date >= from_date) & 
-                              (filtered_df["Date of Inspection"].dt.date <= to_date)]
-    st.write(f"🔹 Showing {len(filtered_df)} record(s)")
+df_main = st.session_state.df.copy()
 
-    # -------------------- METRICS --------------------
-    col_a, col_b, col_c, col_d = st.columns(4)
-    col_a.metric("🟨 Pending", (filtered_df["Status"]=="Pending").sum())
-    col_b.metric("⚠️ No Response", filtered_df["Feedback"].astype(str).str.strip().eq("").sum())
-    col_c.metric("🟩 Resolved", (filtered_df["Status"]=="Resolved").sum())
-    col_d.metric("📊 Total Records", len(filtered_df))
+# -------------------- FILTERS --------------------
+st.markdown("### 🔍 Filters")
+from_date = st.date_input("📅 From Date", df_main["Date of Inspection"].min())
+to_date   = st.date_input("📅 To Date", df_main["Date of Inspection"].max())
+type_filter = st.multiselect("Type of Inspection", VALID_INSPECTIONS)
+location_filter = st.multiselect("Location", FOOTPLATE_LIST)
+head_filter = st.multiselect("Head", HEAD_LIST[1:])
+sub_filter = st.multiselect("Sub Head", sorted({s for h in head_filter for s in SUBHEAD_LIST.get(h, [])}))
+status_filter = st.selectbox("🔘 Status", ["All", "Pending", "Resolved"])
+
+filtered_df = df_main.copy()
+filtered_df = filtered_df[(filtered_df["Date of Inspection"] >= pd.to_datetime(from_date)) &
+                          (filtered_df["Date of Inspection"] <= pd.to_datetime(to_date))]
+if type_filter: filtered_df = filtered_df[filtered_df["Type of Inspection"].isin(type_filter)]
+if location_filter: filtered_df = filtered_df[filtered_df["Location"].isin(location_filter)]
+if head_filter: filtered_df = filtered_df[filtered_df["Head"].isin(head_filter)]
+if sub_filter: filtered_df = filtered_df[filtered_df["Sub Head"].isin(sub_filter)]
+if status_filter != "All": filtered_df = filtered_df[filtered_df["Status"] == status_filter]
+
+st.write(f"🔹 Showing {len(filtered_df)} record(s)")
+
+# -------------------- METRICS --------------------
+col_a, col_b, col_c, col_d = st.columns(4)
+col_a.metric("🟨 Pending", (filtered_df["Status"]=="Pending").sum())
+col_b.metric("⚠️ No Response", filtered_df["Feedback"].astype(str).str.strip().eq("").sum())
+col_c.metric("🟩 Resolved", (filtered_df["Status"]=="Resolved").sum())
+col_d.metric("📊 Total Records", len(filtered_df))
 
 # -------------------- EDITABLE AG GRID --------------------
 st.markdown("### ✍️ Edit User Feedback / Remarks")
 editable_df = filtered_df.copy()
-editable_df["User Feedback/Remark"] = editable_df["User Feedback/Remark"].astype(str)
-editable_df["Feedback"] = editable_df["Feedback"].astype(str)
 editable_df["Status"] = editable_df["Status"].apply(color_text_status)
 
 gb = GridOptionsBuilder.from_dataframe(editable_df)
@@ -215,14 +199,14 @@ if c1.button("✅ Submit Feedback"):
         save_to_local_excel(df_main_copy)
         st.session_state.df = df_main_copy
         st.success(f"✅ Updated {changes} feedback row(s).")
-        st.rerun()
+        st.experimental_rerun()
     else:
         st.info("ℹ️ No new feedback to submit.")
 
 if c2.button("🔄 Refresh Data"):
     st.session_state.df = load_data()
     st.success("✅ Data refreshed successfully!")
-    st.rerun()
+    st.experimental_rerun()
 
 # -------------------- ALERT LOG --------------------
 st.markdown("## 📋 Alerts Log")
@@ -232,7 +216,7 @@ if st.session_state.alerts_log:
             st.markdown(log, unsafe_allow_html=True)
             if st.button("Mark as Read", key=f"mark_{i}"):
                 st.session_state.alerts_log.pop(i)
-                st.rerun()
+                st.experimental_rerun()
 else:
     st.info("✅ No pending alerts.")
 
@@ -242,5 +226,3 @@ st.markdown("""
     For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
 </marquee>
 """, unsafe_allow_html=True)
-
-
