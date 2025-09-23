@@ -104,23 +104,6 @@ def get_status(feedback, remark):
 def color_text_status(status):
     return "🔴 Pending" if status == "Pending" else ("🟢 Resolved" if status == "Resolved" else status)
 
-def update_feedback_column(edited_df):
-    """
-    Updates the session dataframe and saves locally.
-    Moves 'User Feedback/Remark' into 'Feedback' column.
-    """
-    df = st.session_state.df.copy()
-    
-    for _, row in edited_df.iterrows():
-        idx = int(row["_original_sheet_index"])
-        user_remark = str(row.get("User Feedback/Remark", "")).strip()
-        if user_remark:
-            df.at[idx, "Feedback"] = user_remark
-            df.at[idx, "User Feedback/Remark"] = ""  # Clear remark field
-
-    st.session_state.df = df
-    save_to_local_excel(df)
-
 # ---------- HEADER ----------
 st.markdown("""
 <div style="display:flex;align-items:center;margin-top:10px;margin-bottom:20px;">
@@ -201,19 +184,19 @@ with tabs[0]:
         editable_df["Status"] = [color_text_status(get_status(r["Feedback"], r["User Feedback/Remark"])) 
                                  for _, r in editable_df.iterrows()]
 
-        # Ensure ID columns
+        # Ensure ID column
         editable_df["_original_sheet_index"] = editable_filtered["_original_sheet_index"].values
 
-        # Remove duplicates in columns
+        # Remove duplicate columns if any
         editable_df = editable_df.loc[:, ~editable_df.columns.duplicated()]
 
-        # Convert dates to string
+        # Convert dates to string for display
         if "Date of Inspection" in editable_df.columns:
             editable_df["Date of Inspection"] = pd.to_datetime(
                 editable_df["Date of Inspection"], errors="coerce"
             ).dt.strftime("%Y-%m-%d")
 
-        # AG Grid config
+        # AG Grid configuration
         gb = GridOptionsBuilder.from_dataframe(editable_df)
         gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True)
         gb.configure_column("User Feedback/Remark", editable=True, wrapText=True, autoHeight=True)
@@ -242,15 +225,30 @@ with tabs[0]:
 
         edited_df = pd.DataFrame(grid_response["data"])
 
-        # ---------- Buttons ----------
+        # ---------- SUBMIT BUTTON ----------
         c1, c2 = st.columns([1,1])
         if c1.button("✅ Submit Feedback"):
-            update_feedback_column(edited_df)
-            st.experimental_rerun()
+            if "_original_sheet_index" not in edited_df.columns:
+                st.error("⚠️ Cannot find original row index. Please refresh the page.")
+            else:
+                df_main = st.session_state.df.copy()
+                changes = 0
+                for _, row in edited_df.iterrows():
+                    idx = int(row["_original_sheet_index"])
+                    new_remark = str(row.get("User Feedback/Remark", "")).strip()
+                    if new_remark:
+                        df_main.at[idx, "Feedback"] = new_remark
+                        df_main.at[idx, "User Feedback/Remark"] = ""
+                        changes += 1
+                df_main.to_excel(LOCAL_FILE, index=False)
+                st.session_state.df = df_main
+                st.success(f"✅ Updated {changes} row(s).")
+                st.experimental_rerun()
 
         if c2.button("🔄 Refresh Data"):
             st.session_state.df = load_data()
             st.experimental_rerun()
+
 
 
 # ---------- ALERT LOG ----------
@@ -271,5 +269,6 @@ st.markdown("""
     For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
 </marquee>
 """, unsafe_allow_html=True)
+
 
 
