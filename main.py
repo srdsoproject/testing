@@ -211,11 +211,11 @@ with tabs[0]:
             save_to_local_excel(df_main)
             st.session_state.df = df_main
             st.success(f"✅ Updated {changes} row(s).")
-            st.experimental_rerun()
+            st.rerun()
 
     if c2.button("🔄 Refresh Data"):
         st.session_state.df = load_data()
-        st.experimental_rerun()
+        st.rerun()
 
 
 
@@ -238,6 +238,7 @@ st.markdown("""
     For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
 </marquee>
 """, unsafe_allow_html=True)
+
 
 
 
