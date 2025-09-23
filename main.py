@@ -125,18 +125,38 @@ if st.session_state.df.empty:
 df_main = st.session_state.df.copy()
 
 # -------------------- FILTERS --------------------
+# -------------------- FILTERS --------------------
 st.markdown("### 🔍 Filters")
-from_date = st.date_input("📅 From Date", df_main["Date of Inspection"].min())
-to_date   = st.date_input("📅 To Date", df_main["Date of Inspection"].max())
+
+# Ensure datetime column is valid
+df_main["Date of Inspection"] = pd.to_datetime(df_main["Date of Inspection"], errors="coerce")
+
+# Date inputs
+from_date = st.date_input("📅 From Date", df_main["Date of Inspection"].min().date())
+to_date   = st.date_input("📅 To Date", df_main["Date of Inspection"].max().date())
+
+# Convert to datetime for comparison
+from_dt = pd.to_datetime(from_date)
+to_dt = pd.to_datetime(to_date)
+
+# Filter variables
 type_filter = st.multiselect("Type of Inspection", VALID_INSPECTIONS)
 location_filter = st.multiselect("Location", FOOTPLATE_LIST)
 head_filter = st.multiselect("Head", HEAD_LIST[1:])
 sub_filter = st.multiselect("Sub Head", sorted({s for h in head_filter for s in SUBHEAD_LIST.get(h, [])}))
 status_filter = st.selectbox("🔘 Status", ["All", "Pending", "Resolved"])
 
+# -------------------- FILTER DATA --------------------
 filtered_df = df_main.copy()
-filtered_df = filtered_df[(filtered_df["Date of Inspection"] >= pd.to_datetime(from_date)) &
-                          (filtered_df["Date of Inspection"] <= pd.to_datetime(to_date))]
+
+# Remove rows where Date is NaT
+filtered_df = filtered_df[filtered_df["Date of Inspection"].notna()]
+
+# Apply date filter
+filtered_df = filtered_df[(filtered_df["Date of Inspection"] >= from_dt) &
+                          (filtered_df["Date of Inspection"] <= to_dt)]
+
+# Apply other filters
 if type_filter: filtered_df = filtered_df[filtered_df["Type of Inspection"].isin(type_filter)]
 if location_filter: filtered_df = filtered_df[filtered_df["Location"].isin(location_filter)]
 if head_filter: filtered_df = filtered_df[filtered_df["Head"].isin(head_filter)]
@@ -144,6 +164,7 @@ if sub_filter: filtered_df = filtered_df[filtered_df["Sub Head"].isin(sub_filter
 if status_filter != "All": filtered_df = filtered_df[filtered_df["Status"] == status_filter]
 
 st.write(f"🔹 Showing {len(filtered_df)} record(s)")
+
 
 # -------------------- METRICS --------------------
 col_a, col_b, col_c, col_d = st.columns(4)
@@ -226,3 +247,4 @@ st.markdown("""
     For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
 </marquee>
 """, unsafe_allow_html=True)
+
