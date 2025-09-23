@@ -101,7 +101,7 @@ def load_data():
     if "_original_sheet_index" not in df.columns:
         df["_original_sheet_index"] = df.index
 
-        return df
+    return df
     else:
         return load_data_from_github()
 
@@ -289,6 +289,7 @@ st.markdown("""
     For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
 </marquee>
 """, unsafe_allow_html=True)
+
 
 
 
