@@ -292,7 +292,65 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+tabs = st.tabs(["📊 View Records"])
+with tabs[0]:
+    if df.empty:
+        st.warning("Deficiencies will be updated soon !")
+        st.stop()
 
+    # Ensure required cols
+    for col in ["Type of Inspection","Location","Head","Sub Head","Deficiencies Noted",
+                "Inspection By","Action By","Feedback","User Feedback/Remark"]:
+        if col not in df.columns:
+            df[col] = ""
+
+    # Format date to yyyy-mm-dd
+    df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce").dt.date
+    df["_original_sheet_index"] = df.index
+    df["Status"] = df.apply(lambda r: get_status(r["Feedback"], r.get("User Feedback/Remark","")), axis=1)
+
+    # ---------------- FILTERS ----------------
+    start_date = df["Date of Inspection"].min()
+    end_date   = df["Date of Inspection"].max()
+
+    c1, c2 = st.columns(2)
+    c1.multiselect("Type of Inspection", VALID_INSPECTIONS, key="view_type_filter")
+    c2.multiselect("Location", FOOTPLATE_LIST, key="view_location_filter")
+
+    c3, c4 = st.columns(2)
+    c3.multiselect("Head", HEAD_LIST[1:], key="view_head_filter")
+    sub_opts = sorted({s for h in st.session_state.view_head_filter for s in SUBHEAD_LIST.get(h, [])})
+    c4.multiselect("Sub Head", sub_opts, key="view_sub_filter")
+
+    selected_status = st.selectbox("🔘 Status", ["All", "Pending", "Resolved"], key="view_status_filter")
+
+    filtered = df[(df["Date of Inspection"] >= start_date) & (df["Date of Inspection"] <= end_date)]
+    if st.session_state.view_type_filter:
+        filtered = filtered[filtered["Type of Inspection"].isin(st.session_state.view_type_filter)]
+    if st.session_state.view_location_filter:
+        filtered = filtered[filtered["Location"].isin(st.session_state.view_location_filter)]
+    if st.session_state.view_head_filter:
+        filtered = filtered[filtered["Head"].isin(st.session_state.view_head_filter)]
+    if st.session_state.view_sub_filter:
+        filtered = filtered[filtered["Sub Head"].isin(st.session_state.view_sub_filter)]
+    if selected_status != "All":
+        filtered = filtered[filtered["Status"] == selected_status]
+
+    # Replace newlines
+    filtered = filtered.applymap(lambda x: x.replace("\n"," ") if isinstance(x,str) else x)
+    filtered = filtered.sort_values("Date of Inspection")
+
+    st.write(f"🔹 Showing {len(filtered)} record(s) from **{start_date}** to **{end_date}**")
+
+    # ---------------- METRICS ----------------
+    col_a, col_b, col_c, col_d = st.columns(4)
+    pending_count = (filtered["Status"]=="Pending").sum()
+    no_response_count = filtered["Feedback"].isna().sum() + (filtered["Feedback"].astype(str).str.strip()=="").sum()
+    resolved_count = (filtered["Status"]=="Resolved").sum()
+    col_a.metric("🟨 Pending", pending_count)
+    col_b.metric("⚠️ No Response", no_response_count)
+    col_c.metric("🟩 Resolved", resolved_count)
+    col_d.metric("📊 Total Records", len(filtered))
 # ---------- LOAD DATA ----------
 if st.session_state.df.empty:
     st.session_state.df = load_data()
@@ -402,6 +460,7 @@ st.markdown("""
     For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
 </marquee>
 """, unsafe_allow_html=True)
+
 
 
 
