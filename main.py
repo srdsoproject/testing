@@ -134,20 +134,20 @@ if not st.session_state.logged_in:
 # -------------------- LOAD DATA --------------------
 if st.session_state.df.empty:
     st.session_state.df = load_data()
-df_main = st.session_state.df.copy()
-
-# -------------------- FILTER EXAMPLE --------------------
-# Using proper datetime comparison
-from_date = st.date_input("📅 From Date", df_main["Date of Inspection"].min())
-to_date   = st.date_input("📅 To Date", df_main["Date of Inspection"].max())
-
-from_date_dt = pd.to_datetime(from_date)
-to_date_dt   = pd.to_datetime(to_date)
-
-filtered_df = df_main[
-    (df_main["Date of Inspection"] >= from_date_dt) &
-    (df_main["Date of Inspection"] <= to_date_dt)
-]
+    df_main = st.session_state.df.copy()
+    
+    # -------------------- FILTER EXAMPLE --------------------
+    # Using proper datetime comparison
+    from_date = st.date_input("📅 From Date", df_main["Date of Inspection"].min())
+    to_date   = st.date_input("📅 To Date", df_main["Date of Inspection"].max())
+    
+    from_date_dt = pd.to_datetime(from_date)
+    to_date_dt   = pd.to_datetime(to_date)
+    
+    filtered_df = df_main[
+        (df_main["Date of Inspection"] >= from_date_dt) &
+        (df_main["Date of Inspection"] <= to_date_dt)
+    ]
 
     filtered_df = df_main.copy()
     if type_filter: filtered_df = filtered_df[filtered_df["Type of Inspection"].isin(type_filter)]
@@ -242,4 +242,5 @@ st.markdown("""
     For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
 </marquee>
 """, unsafe_allow_html=True)
+
 
