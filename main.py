@@ -5,6 +5,7 @@ from io import BytesIO
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from st_aggrid.shared import JsCode
 import os
+import re
 import requests
 
 # -------------------- CONSTANTS --------------------
@@ -56,7 +57,69 @@ VALID_INSPECTIONS = [
 
 FOOTPLATE_LIST = STATION_LIST + GATE_LIST + FOOTPLATE_ROUTES
 
-# -------------------- HELPER FUNCTIONS --------------------
+# -------------------- HELPERS FOR STATUS --------------------
+def normalize_str(text):
+    return text.lower().strip() if isinstance(text, str) else ""
+
+def classify_feedback(feedback, user_remark=""):
+    """Smart classification: Pending / Resolved"""
+    if isinstance(feedback, str) and feedback.strip() == "`":
+        return ""
+    def _classify(txt):
+        if not txt:
+            return None
+        date_found = bool(re.search(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', txt))
+        resolved_kw = [
+            "attended","solved","done","completed","confirmed by","message given",
+            "tdc work completed","replaced","msg given","msg sent","counseled","info shared",
+            "communicated","sent successfully","counselled","gate will be closed soon",
+            "attending at the time","handled","resolved","action taken","spoken to","warned",
+            "counselling","hubli","working normal","met","discussion held","report sent",
+            "notified","explained","nil","na","tlc","work completed","acknowledged","visited",
+            "briefed","guided","handover","working properly","checked found working","supply restored",
+            "updated by","adv to","counselled the staff","complied","checked and found",
+            "maintained","for needful action","provided at","in working condition","is working",
+            "this is not a deficiency","not deficiency","it is observation","found working",
+            "equipment is working","item is working","as per plan","putright","put right",
+            "operational feasibility","will be provided","will be supplied shortly","advised to ubl",
+            "updated","letter has been sent","letter has been given"
+        ]
+        pending_kw = [
+            "work is going on","tdc given","target date","expected by","likely by","planned by",
+            "will be","needful","to be","pending","not done","awaiting","waiting","yet to","next time",
+            "follow up","tdc.","tdc","t d c","will attend","will be attended","scheduled","reminder",
+            "to inform","to counsel","to submit","to do","to replace","prior","remains","still",
+            "under process","not yet","to be done","will ensure","during next","action will be taken",
+            "will be supplied shortly","not available","not updated","progress","under progress",
+            "noted please","to arrange","awaited","material awaited","approval awaited","to procure",
+            "yet pending","incomplete","tentative","ongoing","in progress","being done","arranging",
+            "waiting for","subject to","awaiting approval","awaiting material","awaiting confirmation",
+            "next schedule","planned for","will arrange","proposed date","to complete","to be completed",
+            "likely completion","expected completion","not received","awaiting response"
+        ]
+        if "tdc" in txt and any(k in txt for k in resolved_kw):
+            return "Resolved"
+        if any(k in txt for k in pending_kw):
+            return "Pending"
+        if date_found:
+            return "Pending" if "tdc" in txt else "Resolved"
+        if any(k in txt for k in resolved_kw):
+            return "Resolved"
+        return None
+
+    fb = normalize_str(feedback)
+    rm = normalize_str(user_remark)
+    marks = re.findall(r"[!#]", f"{fb} {rm}")
+    if marks:
+        return "Resolved" if marks[-1] == "#" else "Pending"
+
+    a = _classify(fb)
+    b = _classify(rm)
+    if a == "Resolved" or b == "Resolved": return "Resolved"
+    if a == "Pending"  or b == "Pending":  return "Pending"
+    return "Pending"
+
+# -------------------- DATA LOAD/SAVE --------------------
 def load_data():
     if os.path.exists(LOCAL_FILE):
         df = pd.read_excel(LOCAL_FILE)
@@ -66,20 +129,25 @@ def load_data():
         df = pd.read_excel(BytesIO(resp.content))
 
     required_cols = [
-        "Date of Inspection", "Type of Inspection", "Location",
-        "Head", "Sub Head", "Deficiencies Noted",
-        "Inspection By", "Action By", "Feedback",
-        "User Feedback/Remark"
+        "Date of Inspection","Type of Inspection","Location",
+        "Head","Sub Head","Deficiencies Noted",
+        "Inspection By","Action By","Feedback","User Feedback/Remark"
     ]
     for col in required_cols:
-        if col not in df.columns: df[col] = ""
-    
+        if col not in df.columns:
+            df[col] = ""
+
     df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
     if "_sheet_row" not in df.columns: df["_sheet_row"] = df.index + 2
     if "_original_sheet_index" not in df.columns: df["_original_sheet_index"] = df.index
     df["Feedback"] = df["Feedback"].fillna("").astype(str)
     df["User Feedback/Remark"] = df["User Feedback/Remark"].fillna("").astype(str)
-    df["Status"] = df.apply(lambda r: "Pending" if r["Feedback"].strip() == "" else "Resolved", axis=1)
+
+    # ✅ Smart Pending/Resolved
+    df["Status"] = df.apply(
+        lambda r: classify_feedback(r["Feedback"], r["User Feedback/Remark"]),
+        axis=1
+    )
     return df
 
 def save_to_local_excel(df):
@@ -125,38 +193,25 @@ if st.session_state.df.empty:
 df_main = st.session_state.df.copy()
 
 # -------------------- FILTERS --------------------
-# -------------------- FILTERS --------------------
 st.markdown("### 🔍 Filters")
 
-# Ensure datetime column is valid
 df_main["Date of Inspection"] = pd.to_datetime(df_main["Date of Inspection"], errors="coerce")
-
-# Date inputs
 from_date = st.date_input("📅 From Date", df_main["Date of Inspection"].min().date())
-to_date   = st.date_input("📅 To Date", df_main["Date of Inspection"].max().date())
+to_date   = st.date_input("📅 To Date",   df_main["Date of Inspection"].max().date())
 
-# Convert to datetime for comparison
 from_dt = pd.to_datetime(from_date)
-to_dt = pd.to_datetime(to_date)
+to_dt   = pd.to_datetime(to_date)
 
-# Filter variables
 type_filter = st.multiselect("Type of Inspection", VALID_INSPECTIONS)
 location_filter = st.multiselect("Location", FOOTPLATE_LIST)
 head_filter = st.multiselect("Head", HEAD_LIST[1:])
 sub_filter = st.multiselect("Sub Head", sorted({s for h in head_filter for s in SUBHEAD_LIST.get(h, [])}))
 status_filter = st.selectbox("🔘 Status", ["All", "Pending", "Resolved"])
 
-# -------------------- FILTER DATA --------------------
 filtered_df = df_main.copy()
-
-# Remove rows where Date is NaT
 filtered_df = filtered_df[filtered_df["Date of Inspection"].notna()]
-
-# Apply date filter
 filtered_df = filtered_df[(filtered_df["Date of Inspection"] >= from_dt) &
                           (filtered_df["Date of Inspection"] <= to_dt)]
-
-# Apply other filters
 if type_filter: filtered_df = filtered_df[filtered_df["Type of Inspection"].isin(type_filter)]
 if location_filter: filtered_df = filtered_df[filtered_df["Location"].isin(location_filter)]
 if head_filter: filtered_df = filtered_df[filtered_df["Head"].isin(head_filter)]
@@ -164,70 +219,6 @@ if sub_filter: filtered_df = filtered_df[filtered_df["Sub Head"].isin(sub_filter
 if status_filter != "All": filtered_df = filtered_df[filtered_df["Status"] == status_filter]
 
 st.write(f"🔹 Showing {len(filtered_df)} record(s)")
-def classify_feedback(feedback, user_remark=""):
-    # Empty backtick = clear
-    if isinstance(feedback, str) and feedback.strip() == "`":
-        return ""
-
-    def _classify(text_normalized):
-        if not text_normalized:
-            return None
-        date_found = bool(re.search(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', text_normalized))
-
-        resolved_kw = [
-            "attended", "solved", "done", "completed", "confirmed by", "message given",
-            "tdc work completed", "replaced", "msg given", "msg sent", "counseled", "info shared",
-            "communicated", "sent successfully", "counselled", "gate will be closed soon",
-            "attending at the time", "handled", "resolved", "action taken", "spoken to", "warned",
-            "counselling", "hubli", "working normal", "met", "discussion held", "report sent",
-            "notified", "explained", "nil", "na", "tlc", "work completed", "acknowledged", "visited",
-            "briefed", "guided", "handover", "working properly", "checked found working", "supply restored",
-             "updated by", "adv to", "counselled the staff", "complied", "checked and found",
-            "maintained", "for needful action", "provided at", "in working condition", "is working", "this is not a deficiency", "not deficiency", "it is observation", 
-            "found working", "equipment is working", "item is working", "as per plan", "putright", "put right",
-            "operational feasibility", "will be provided", "will be supplied shortly", "advised to ubl", "updated", "letter has been sent", "letter has been given"
-        ]
-
-        pending_kw = [
-            "work is going on", "tdc given", "target date", "expected by", "likely by", "planned by",
-            "will be", "needful", "to be", "pending", "not done", "awaiting", "waiting", "yet to", "next time",
-            "follow up", "tdc.", "tdc", "t d c", "will attend", "will be attended", "scheduled", "reminder",
-            "to inform", "to counsel", "to submit", "to do", "to replace", "prior", "remains", "still",
-            "under process", "not yet", "to be done", "will ensure", "during next", "action will be taken",
-            "will be supplied shortly", "not available", "not updated", "progress", "under progress", 'noted please', 'noted please. tdc',
-            "to arrange", "awaited", "material awaited", "approval awaited", "to procure", "yet pending", "Noted Please.",
-            "incomplete", "tentative", "ongoing", "in progress", "being done", "arranging", "waiting for",
-            "subject to", "awaiting approval", "awaiting material", "awaiting confirmation", "next schedule",
-            "planned for", "will arrange", "proposed date", "to complete", "to be completed",
-            "likely completion", "expected completion", "not received", "awaiting response"
-        ]
-
-        if "tdc" in text_normalized and any(k in text_normalized for k in resolved_kw):
-            return "Resolved"
-        if any(k in text_normalized for k in pending_kw):
-            return "Pending"
-        if date_found:
-            return "Pending" if "tdc" in text_normalized else "Resolved"
-        if any(k in text_normalized for k in resolved_kw):
-            return "Resolved"
-        return None
-
-    fb = normalize_str(feedback)
-    rm = normalize_str(user_remark)
-
-    # marker override
-    m = re.findall(r"[!#]", f"{fb} {rm}".strip())
-    if m:
-        return "Resolved" if m[-1] == "#" else "Pending"
-
-    a = _classify(fb)
-    b = _classify(rm)
-    if a == "Resolved" or b == "Resolved":
-        return "Resolved"
-    if a == "Pending" or b == "Pending":
-        return "Pending"
-    return "Pending"
-
 
 # -------------------- METRICS --------------------
 col_a, col_b, col_c, col_d = st.columns(4)
@@ -236,7 +227,7 @@ col_b.metric("⚠️ No Response", filtered_df["Feedback"].astype(str).str.strip
 col_c.metric("🟩 Resolved", (filtered_df["Status"]=="Resolved").sum())
 col_d.metric("📊 Total Records", len(filtered_df))
 
-# -------------------- EDITABLE AG GRID --------------------
+# -------------------- EDITABLE GRID --------------------
 st.markdown("### ✍️ Edit User Feedback / Remarks")
 editable_df = filtered_df.copy()
 editable_df["Status"] = editable_df["Status"].apply(color_text_status)
@@ -244,7 +235,8 @@ editable_df["Status"] = editable_df["Status"].apply(color_text_status)
 gb = GridOptionsBuilder.from_dataframe(editable_df)
 gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True)
 gb.configure_column("User Feedback/Remark", editable=True, wrapText=True, autoHeight=True,
-                    cellEditor="agTextCellEditor", cellEditorPopup=False, cellEditorParams={"maxLength":4000})
+                    cellEditor="agTextCellEditor", cellEditorPopup=False,
+                    cellEditorParams={"maxLength":4000})
 gb.configure_column("_original_sheet_index", hide=True)
 gb.configure_column("_sheet_row", hide=True)
 auto_size_js = JsCode("""
@@ -255,11 +247,9 @@ function(params) {
 }
 """)
 gb.configure_grid_options(onFirstDataRendered=auto_size_js)
-grid_options = gb.build()
-
 grid_response = AgGrid(
     editable_df,
-    gridOptions=grid_options,
+    gridOptions=gb.build(),
     update_mode=GridUpdateMode.VALUE_CHANGED,
     height=600,
     allow_unsafe_jscode=True
@@ -269,19 +259,23 @@ edited_df = pd.DataFrame(grid_response["data"])
 # -------------------- BUTTONS --------------------
 c1, c2, _ = st.columns([1,1,1])
 if c1.button("✅ Submit Feedback"):
-    df_main_copy = st.session_state.df.copy()
+    df_copy = st.session_state.df.copy()
     changes = 0
     edited_rows = edited_df[edited_df["User Feedback/Remark"].astype(str).str.strip() != ""]
     for _, row in edited_rows.iterrows():
         idx = int(row["_original_sheet_index"])
         new_remark = str(row["User Feedback/Remark"]).strip()
         if new_remark:
-            df_main_copy.at[idx, "Feedback"] = new_remark
-            df_main_copy.at[idx, "User Feedback/Remark"] = ""
+            df_copy.at[idx, "Feedback"] = new_remark
+            df_copy.at[idx, "User Feedback/Remark"] = ""
             changes += 1
     if changes > 0:
-        save_to_local_excel(df_main_copy)
-        st.session_state.df = df_main_copy
+        # Re-classify status after edits
+        df_copy["Status"] = df_copy.apply(
+            lambda r: classify_feedback(r["Feedback"], r["User Feedback/Remark"]), axis=1
+        )
+        save_to_local_excel(df_copy)
+        st.session_state.df = df_copy
         st.success(f"✅ Updated {changes} feedback row(s).")
         st.rerun()
     else:
@@ -307,9 +301,7 @@ else:
 # -------------------- FOOTER --------------------
 st.markdown("""
 <marquee behavior="scroll" direction="left" style="color:red;font-weight:bold;font-size:16px;">
-    For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
+    For any correction in data, contact Safety Department on sursafetyposition@gmail.com,
+    Contact: Rly phone no. 55620, Cell: +91 9022507772
 </marquee>
 """, unsafe_allow_html=True)
-
-
-
