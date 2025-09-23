@@ -6,7 +6,55 @@ from io import BytesIO
 import os
 
 LOCAL_FILE = "responses.xlsx"
+import streamlit as st
+import pandas as pd
+import numpy as np
+from io import BytesIO
+from matplotlib import pyplot as plt
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+from st_aggrid.shared import JsCode
+from openpyxl.styles import Alignment, Font, Border, Side
+import requests
+import os
 
+# ---------- CONFIG ----------
+st.set_page_config(page_title="Inspection App", layout="wide")
+GITHUB_RAW_URL = "https://github.com/srdsoproject/testing/raw/main/responses.xlsx"
+LOCAL_FILE = "responses_local.xlsx"
+
+# ---------- SESSION STATE ----------
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+if "user" not in st.session_state:
+    st.session_state.user = {}
+if "df" not in st.session_state:
+    st.session_state.df = pd.DataFrame()
+if "alerts_log" not in st.session_state:
+    st.session_state.alerts_log = []
+
+# ---------- LOGIN ----------
+def login(email, password):
+    for user in st.secrets["users"]:
+        if user["email"] == email and user["password"] == password:
+            return user
+    return None
+
+if not st.session_state.logged_in:
+    st.title("🔐 Login to S.A.R.A.L")
+    with st.form("login_form", clear_on_submit=True):
+        email = st.text_input("📧 Email")
+        password = st.text_input("🔒 Password", type="password")
+        submitted = st.form_submit_button("Login")
+        if submitted:
+            user = login(email, password)
+            if user:
+                st.session_state.logged_in = True
+                st.session_state.user = user
+                st.success(f"✅ Welcome, {user['name']}!")
+                st.rerun()
+            else:
+                st.error("❌ Invalid email or password.")
+    st.stop()
 # ----------------- Helper Functions -----------------
 
 def load_data():
@@ -169,6 +217,7 @@ st.markdown("""
     For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
 </marquee>
 """, unsafe_allow_html=True)
+
 
 
 
