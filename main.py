@@ -206,6 +206,7 @@ with tabs[0]:
         edited_rows = edited_df[edited_df["User Feedback/Remark"].astype(str).str.strip() != ""]
         for _, row in edited_rows.iterrows():
             idx = int(row["_original_sheet_index"])
+            val = row["User Feedback/Remark"]
             new_remark = row["User Feedback/Remark"].strip()
 
             # Update Feedback in the main dataframe
@@ -246,6 +247,7 @@ st.markdown("""
     For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
 </marquee>
 """, unsafe_allow_html=True)
+
 
 
 
