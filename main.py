@@ -158,7 +158,25 @@ def save_to_local_excel(df):
 def color_text_status(status):
     return "🔴 Pending" if status == "Pending" else "🟢 Resolved"
 # -------------------- HEADER --------------------
-
+# -------------------- HEADER --------------------
+st.markdown(
+    """
+    <div style="display:flex;align-items:center;margin-top:10px;margin-bottom:20px;">
+        <img src="https://raw.githubusercontent.com/srdsoproject/testing/main/Central%20Railway%20Logo.png"
+             height="55" style="margin-right:15px;object-fit:contain;">
+        <div>
+            <h3 style="margin:0;font-weight:bold;color:var(--text-color);">
+                An initiative by <b>Safety Department</b>, Solapur Division
+            </h3>
+        </div>
+    </div>
+    <h1 style="margin-top:0;color:var(--text-color);">📋 S.A.R.A.L</h1>
+    <h3 style="margin-top:-10px;font-weight:normal;color:var(--text-color);">
+        (Safety Abnormality Report & Action List – Version 1.1.8)
+    </h3>
+    """,
+    unsafe_allow_html=True
+)
 # -------------------- SESSION STATE --------------------
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
 if "user" not in st.session_state: st.session_state.user = {}
@@ -331,6 +349,7 @@ st.markdown("""
 - For Medical Department: Pertains to **MEDICAL**
 
 """)
+
 
 
 
