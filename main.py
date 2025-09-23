@@ -230,8 +230,12 @@ col_d.metric("📊 Total Records", len(filtered_df))
 # -------------------- EDITABLE GRID --------------------
 st.markdown("### ✍️ Edit User Feedback / Remarks")
 editable_df = filtered_df.copy()
-filtered_df["Date of Inspection"] = filtered_df["Date of Inspection"].dt.strftime("%Y-%m-%d")
+
+# ✅ Format as yyyy-mm-dd
+editable_df["Date of Inspection"] = editable_df["Date of Inspection"].dt.strftime("%Y-%m-%d")
+
 editable_df["Status"] = editable_df["Status"].apply(color_text_status)
+
 
 gb = GridOptionsBuilder.from_dataframe(editable_df)
 gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True)
@@ -306,4 +310,5 @@ st.markdown("""
     Contact: Rly phone no. 55620, Cell: +91 9022507772
 </marquee>
 """, unsafe_allow_html=True)
+
 
