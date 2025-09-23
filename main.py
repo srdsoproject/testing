@@ -113,7 +113,7 @@ if not st.session_state.logged_in:
                 st.session_state.logged_in = True
                 st.session_state.user = user
                 st.success(f"✅ Welcome, {user['name']}!")
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.error("❌ Invalid email or password.")
     st.stop()
@@ -220,14 +220,14 @@ if c1.button("✅ Submit Feedback"):
         save_to_local_excel(df_main_copy)
         st.session_state.df = df_main_copy
         st.success(f"✅ Updated {changes} feedback row(s).")
-        st.experimental_rerun()
+        st.rerun()
     else:
         st.info("ℹ️ No new feedback to submit.")
 
 if c2.button("🔄 Refresh Data"):
     st.session_state.df = load_data()
     st.success("✅ Data refreshed successfully!")
-    st.experimental_rerun()
+    st.rerun()
 
 # -------------------- ALERT LOG --------------------
 st.markdown("## 📋 Alerts Log")
@@ -237,7 +237,7 @@ if st.session_state.alerts_log:
             st.markdown(log, unsafe_allow_html=True)
             if st.button("Mark as Read", key=f"mark_{i}"):
                 st.session_state.alerts_log.pop(i)
-                st.experimental_rerun()
+                st.rerun()
 else:
     st.info("✅ No pending alerts.")
 
@@ -247,4 +247,5 @@ st.markdown("""
     For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
 </marquee>
 """, unsafe_allow_html=True)
+
 
