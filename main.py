@@ -69,7 +69,9 @@ def load_data():
             df[col] = ""
 
     # Convert "Date of Inspection" to datetime, keep only date
-    df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce").dt.date
+    # After loading your dataframe
+    df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce").dt.strftime("%Y-%m-%d")
+
 
     # Helper columns for AG-Grid
     if "_sheet_row" not in df.columns:
@@ -206,6 +208,7 @@ st.markdown("""
     For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
 </marquee>
 """, unsafe_allow_html=True)
+
 
 
 
