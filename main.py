@@ -89,7 +89,7 @@ df = st.session_state.df
 
 # ---------- UTILS ----------
 def classify_feedback(feedback):
-    val = feedback or ""
+    val = "" if pd.isna(feedback) else str(feedback)
     return "Pending" if val.strip() == "" else "Resolved"
 
 def get_status(feedback, remark):
@@ -246,6 +246,7 @@ st.markdown("""
     For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
 </marquee>
 """, unsafe_allow_html=True)
+
 
 
 
