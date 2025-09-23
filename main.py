@@ -68,17 +68,21 @@ def load_data():
         if col not in df.columns:
             df[col] = ""
 
+    # Convert "Date of Inspection" to datetime, keep only date
+    df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce").dt.date
+
     # Helper columns for AG-Grid
     if "_sheet_row" not in df.columns:
         df["_sheet_row"] = df.index + 2
     if "_original_sheet_index" not in df.columns:
         df["_original_sheet_index"] = df.index
 
-    # Ensure string type
+    # Ensure string type for feedback fields
     df["Feedback"] = df["Feedback"].fillna("").astype(str)
     df["User Feedback/Remark"] = df["User Feedback/Remark"].fillna("").astype(str)
 
     return df
+
 
 def save_to_local_excel(df):
     df.to_excel(LOCAL_FILE, index=False)
@@ -202,6 +206,7 @@ st.markdown("""
     For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
 </marquee>
 """, unsafe_allow_html=True)
+
 
 
 
