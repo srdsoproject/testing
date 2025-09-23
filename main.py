@@ -74,13 +74,13 @@ def load_data_from_github():
         return pd.DataFrame(columns=REQUIRED_COLS)
 
 def load_data():
-     if os.path.exists(LOCAL_FILE):
+    if os.path.exists(LOCAL_FILE):
         df = pd.read_excel(LOCAL_FILE)
-        else:
-            resp = requests.get(GITHUB_RAW_URL)
-            resp.raise_for_status()
-            df = pd.read_excel(BytesIO(resp.content))
-    
+    else:
+        resp = requests.get(GITHUB_RAW_URL)
+        resp.raise_for_status()
+        df = pd.read_excel(BytesIO(resp.content))
+
     # Ensure required columns
     REQUIRED_COLS = [
         "Date of Inspection", "Type of Inspection", "Location",
@@ -102,6 +102,7 @@ def load_data():
         df["_original_sheet_index"] = df.index
 
     return df
+
     else:
         return load_data_from_github()
 
@@ -289,6 +290,7 @@ st.markdown("""
     For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
 </marquee>
 """, unsafe_allow_html=True)
+
 
 
 
