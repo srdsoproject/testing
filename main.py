@@ -1,14 +1,17 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import os
-import requests
-import re
 from io import BytesIO
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from st_aggrid.shared import JsCode
+import os
+import requests
+import re
 
 # -------------------- CONSTANTS --------------------
+LOCAL_FILE = "responses_local.xlsx"
+GITHUB_RAW_URL = "https://github.com/srdsoproject/testing/raw/main/responses.xlsx"
+
 STATION_LIST = list(dict.fromkeys([
     'BRB','MLM','BGVN','JNTR','PRWD','WSB','PPJ','JEUR','KEM','BLNI','DHS','KWV','WDS','MA','AAG',
     'MKPT','MO','MVE','PK','BALE',"SUR",'TKWD','HG','TLT','AKOR','NGS','BOT','DUD','KUI','GDGN','GUR',
@@ -29,84 +32,42 @@ GATE_LIST = list(dict.fromkeys([
 FOOTPLATE_ROUTES = ["SUR-DD","SUR-WADI","LUR-KWV",'KWV-MRJ','DD-SUR','WADI-SUR','KWV-LUR','MRJ-KWV']
 HEAD_LIST = ["", "ELECT/TRD", "ELECT/G", "ELECT/TRO", "SIGNAL & TELECOM", "OPTG","MECHANICAL",
              "ENGINEERING", "COMMERCIAL", "C&W", 'PERSONNEL', 'SECURITY', "FINANCE", "MEDICAL", "STORE"]
+
 SUBHEAD_LIST = {
     "ELECT/TRD": ["T/W WAGON", "TSS/SP/SSP", "OHE SECTION", "OHE STATION", "MISC"],
     "ELECT/G": ["TL/AC COACH", "POWER/PANTRY CAR", "WIRING/EQUIPMENT", "UPS", "AC", "DG", "SOLAR LIGHT", "MISC"],
-    "ELECT/TRO": ["LOCO DEFECTS", "RUNNING ROOM DEFICIENCIES", "LOBBY DEFICIENCIES", "LRD RELATED", "PERSONAL STORE", "PR RELATED","CMS", "MISC"],
+    "ELECT/TRO": ["LOCO DEFECTS", "RUNNING ROOM DEFICIENCIES", "LOBBY DEFICIENCIES", "LRD RELATED", "PERSONAL STORE", "PR RELATED",
+                  "CMS", "MISC"],
     "MECHANICAL":["MISC"],
-    "SIGNAL & TELECOM": [ "SIGNAL PUTBACK/BLANK", "OTHER SIGNAL FAILURE", "BPAC", "GATE", "RELAY ROOM","STATION(VDU/BLOCK INSTRUMENT)", "MISC", "CCTV", "DISPLAY BOARDS"],
-    "OPTG": [ "SWR/CSR/CSL/TWRD", "COMPETENCY RELATED", "STATION RECORDS", "STATION DEFICIENCIES","SM OFFICE DEFICIENCIES", "MISC"],
+    "SIGNAL & TELECOM": [ "SIGNAL PUTBACK/BLANK", "OTHER SIGNAL FAILURE", "BPAC", "GATE", "RELAY ROOM",
+                         "STATION(VDU/BLOCK INSTRUMENT)", "MISC", "CCTV", "DISPLAY BOARDS"],
+    "OPTG": [ "SWR/CSR/CSL/TWRD", "COMPETENCY RELATED", "STATION RECORDS", "STATION DEFICIENCIES",
+             "SM OFFICE DEFICIENCIES", "MISC"],
     "ENGINEERING": [ "IOW WORKS","GSU","ROUGH RIDING", "TRACK NEEDS ATTENTION", "MISC"],
     "COMMERCIAL": [ "TICKETING RELATED/MACHINE", "IRCTC", "MISC"],
-    "C&W": [ "BRAKE BINDING", 'WHEEL DEFECT', 'TRAIN PARTING', 'PASSENGER AMENITIES', 'AIR PRESSURE LEAKAGE','DAMAGED UNDER GEAR PARTS', 'MISC'],
+    "C&W": [ "BRAKE BINDING", 'WHEEL DEFECT', 'TRAIN PARTING', 'PASSENGER AMENITIES', 'AIR PRESSURE LEAKAGE',
+            'DAMAGED UNDER GEAR PARTS', 'MISC'],
     "FINANCE":["MISC"], "MEDICAL":["MISC"], "STORE": ["MISC"],
 }
+
 INSPECTION_BY_LIST = [""] + ["HQ OFFICER CCE/CR",'DRM/SUR', 'ADRM', 'Sr.DSO', 'Sr.DOM', 'Sr.DEN/S', 'Sr.DEN/C', 'Sr.DEN/Co', 'Sr.DSTE',
                              'Sr.DEE/TRD', 'Sr.DEE/G','Sr.DEE/TRO', 'Sr.DME', 'Sr.DCM', 'Sr.DPO', 'Sr.DFM', 'Sr.DMM', 'DSC',
                              'DME,DEE/TRD', 'DFM', 'DSTE/HQ', 'DSTE/KLBG', 'ADEN/T/SUR', 'ADEN/W/SUR', 'ADEN/KWV',
                              'ADEN/PVR', 'ADEN/LUR', 'ADEN/KLBG', 'ADSTE/SUR', 'ADSTE/I/KWV', 'ADSTE/II/KWV',
                              'ADME/SUR', 'AOM/GD', 'AOM/GEN', 'ACM/Cog', 'ACM/TC', 'ACM/GD', 'APO/GEN', 'APO/WEL',
                              'ADFM/I', 'ADFMII', 'ASC', 'ADSO/SUR']
+
 ACTION_BY_LIST = [""] + ['DRM/SUR', 'ADRM', 'Sr.DSO', 'Sr.DOM', 'Sr.DEN/S', 'Sr.DEN/C', 'Sr.DEN/Co', 'Sr.DSTE',
                          'Sr.DEE/TRD', 'Sr.DEE/G','Sr.DEE/TRO', 'Sr.DME', 'Sr.DCM', 'Sr.DPO', 'Sr.DFM', 'Sr.DMM', 'DSC', 'CMS']
+
 VALID_INSPECTIONS = [
     "FOOTPLATE INSPECTION", "STATION INSPECTION", "LC GATE INSPECTION",
     "MISC", "COACHING DEPOT", "ON TRAIN", "SURPRISE/AMBUSH INSPECTION", "WORKSITE INSPECTION", "OTHER (UNUSUAL)",
 ]
+
 FOOTPLATE_LIST = STATION_LIST + GATE_LIST + FOOTPLATE_ROUTES
 
-# -------------------- HELPERS --------------------
-def normalize_str(text):
-    if not isinstance(text, str):
-        return ""
-    return re.sub(r'\s+', ' ', text.lower()).strip()
-
-def classify_feedback(feedback, user_remark=""):
-    fb = normalize_str(feedback)
-    rm = normalize_str(user_remark)
-    if fb.strip() == "" and rm.strip() == "":
-        return "Pending"
-    return "Resolved"
-
-def color_text_status(status):
-    return "🔴 Pending" if status == "Pending" else "🟢 Resolved"
-
-# -------------------- CONFIG --------------------
-st.set_page_config(page_title="Inspection App", layout="wide")
-LOCAL_FILE = "responses_local.xlsx"
-GITHUB_RAW_URL = "https://github.com/srdsoproject/testing/raw/main/responses.xlsx"
-
-# -------------------- SESSION STATE --------------------
-if "logged_in" not in st.session_state: st.session_state.logged_in = False
-if "user" not in st.session_state: st.session_state.user = {}
-if "df" not in st.session_state: st.session_state.df = pd.DataFrame()
-if "alerts_log" not in st.session_state: st.session_state.alerts_log = []
-
-# -------------------- LOGIN --------------------
-def login(email, password):
-    for user in st.secrets["users"]:
-        if user["email"] == email and user["password"] == password:
-            return user
-    return None
-
-if not st.session_state.logged_in:
-    st.title("🔐 Login to S.A.R.A.L")
-    with st.form("login_form", clear_on_submit=True):
-        email = st.text_input("📧 Email")
-        password = st.text_input("🔒 Password", type="password")
-        submitted = st.form_submit_button("Login")
-        if submitted:
-            user = login(email, password)
-            if user:
-                st.session_state.logged_in = True
-                st.session_state.user = user
-                st.success(f"✅ Welcome, {user['name']}!")
-                st.rerun()
-            else:
-                st.error("❌ Invalid email or password.")
-    st.stop()
-
-# -------------------- DATA HANDLING --------------------
+# -------------------- HELPER FUNCTIONS --------------------
 def load_data():
     if os.path.exists(LOCAL_FILE):
         df = pd.read_excel(LOCAL_FILE)
@@ -134,50 +95,59 @@ def load_data():
 def save_to_local_excel(df):
     df.to_excel(LOCAL_FILE, index=False)
 
+def get_status(feedback, remark=""):
+    return "Pending" if str(feedback).strip() == "" else "Resolved"
+
+def color_text_status(status):
+    return "🔴 Pending" if status == "Pending" else ("🟢 Resolved" if status == "Resolved" else status)
+
+# -------------------- SESSION STATE --------------------
+if "logged_in" not in st.session_state: st.session_state.logged_in = False
+if "user" not in st.session_state: st.session_state.user = {}
+if "df" not in st.session_state: st.session_state.df = pd.DataFrame()
+if "alerts_log" not in st.session_state: st.session_state.alerts_log = []
+
+# -------------------- LOGIN --------------------
+def login(email, password):
+    for user in st.secrets["users"]:
+        if user["email"] == email and user["password"] == password:
+            return user
+    return None
+
+if not st.session_state.logged_in:
+    st.title("🔐 Login to S.A.R.A.L")
+    with st.form("login_form", clear_on_submit=True):
+        email = st.text_input("📧 Email")
+        password = st.text_input("🔒 Password", type="password")
+        submitted = st.form_submit_button("Login")
+        if submitted:
+            user = login(email, password)
+            if user:
+                st.session_state.logged_in = True
+                st.session_state.user = user
+                st.success(f"✅ Welcome, {user['name']}!")
+                st.experimental_rerun()
+            else:
+                st.error("❌ Invalid email or password.")
+    st.stop()
+
+# -------------------- LOAD DATA --------------------
 if st.session_state.df.empty:
     st.session_state.df = load_data()
 df_main = st.session_state.df.copy()
 
-# -------------------- HEADER --------------------
-st.markdown(
-    """
-    <div style="display:flex;align-items:center;margin-top:10px;margin-bottom:20px;">
-        <img src="https://raw.githubusercontent.com/srdsoproject/testing/main/Central%20Railway%20Logo.png"
-             height="55" style="margin-right:15px;object-fit:contain;">
-        <div>
-            <h3 style="margin:0;font-weight:bold;color:var(--text-color);">
-                An initiative by <b>Safety Department</b>, Solapur Division
-            </h3>
-        </div>
-    </div>
-    <h1 style="margin-top:0;color:var(--text-color);">📋 S.A.R.A.L</h1>
-    <h3 style="margin-top:-10px;font-weight:normal;color:var(--text-color);">
-        (Safety Abnormality Report & Action List – Version 1.1.8)
-    </h3>
-    """, unsafe_allow_html=True
-)
+# -------------------- FILTER EXAMPLE --------------------
+# Using proper datetime comparison
+from_date = st.date_input("📅 From Date", df_main["Date of Inspection"].min())
+to_date   = st.date_input("📅 To Date", df_main["Date of Inspection"].max())
 
-# -------------------- VIEW FILTERS --------------------
-tabs = st.tabs(["📊 View Records"])
-with tabs[0]:
-    if df_main.empty:
-        st.warning("Deficiencies will be updated soon !")
-        st.stop()
+from_date_dt = pd.to_datetime(from_date)
+to_date_dt   = pd.to_datetime(to_date)
 
-    df_main["_original_sheet_index"] = df_main.index
-    df_main["Status"] = df_main.apply(lambda r: classify_feedback(r["Feedback"], r["User Feedback/Remark"]), axis=1)
-    
-    # Filters
-    st.markdown("### 🔍 Apply Filters")
-    col1, col2 = st.columns(2)
-    type_filter = col1.multiselect("Type of Inspection", VALID_INSPECTIONS)
-    location_filter = col2.multiselect("Location", FOOTPLATE_LIST)
-    col3, col4 = st.columns(2)
-    head_filter = col3.multiselect("Head", HEAD_LIST[1:])
-    sub_filter = col4.multiselect("Sub Head", sorted({s for h in head_filter for s in SUBHEAD_LIST.get(h, [])}))
-    status_filter = st.selectbox("🔘 Status", ["All", "Pending", "Resolved"])
-    from_date = st.date_input("📅 From Date", value=df_main["Date of Inspection"].min())
-    to_date = st.date_input("📅 To Date", value=df_main["Date of Inspection"].max())
+filtered_df = df_main[
+    (df_main["Date of Inspection"] >= from_date_dt) &
+    (df_main["Date of Inspection"] <= to_date_dt)
+]
 
     filtered_df = df_main.copy()
     if type_filter: filtered_df = filtered_df[filtered_df["Type of Inspection"].isin(type_filter)]
@@ -272,3 +242,4 @@ st.markdown("""
     For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
 </marquee>
 """, unsafe_allow_html=True)
+
