@@ -58,37 +58,44 @@ if not st.session_state.logged_in:
 # ----------------- Helper Functions -----------------
 
 def load_data():
+    import os
+    import pandas as pd
+    from io import BytesIO
+    import requests
+
+    LOCAL_FILE = "responses.xlsx"
+    GITHUB_RAW_URL = "https://raw.githubusercontent.com/username/repo/main/responses.xlsx"
+
     if os.path.exists(LOCAL_FILE):
         df = pd.read_excel(LOCAL_FILE)
     else:
-        # create empty dataframe with required columns
-        df = pd.DataFrame(columns=[
-            "Date of Inspection", "Type of Inspection", "Location",
-            "Head", "Sub Head", "Deficiencies Noted",
-            "Inspection By", "Action By", "Feedback",
-            "User Feedback/Remark"
-        ])
-    # Ensure required columns
-    required_cols = [
+        resp = requests.get(GITHUB_RAW_URL)
+        resp.raise_for_status()
+        df = pd.read_excel(BytesIO(resp.content))
+
+    # Ensure all required columns exist
+    REQUIRED_COLS = [
         "Date of Inspection", "Type of Inspection", "Location",
         "Head", "Sub Head", "Deficiencies Noted",
         "Inspection By", "Action By", "Feedback",
         "User Feedback/Remark"
     ]
-    for col in required_cols:
+    for col in REQUIRED_COLS:
         if col not in df.columns:
-            df[col] = ""
-    df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
-    df["Location"] = df["Location"].astype(str).str.strip().str.upper()
+            df[col] = ""  # fill missing column with empty string
 
-    # Add helper columns for AG-Grid
+    # Helper columns for AG-Grid
     if "_sheet_row" not in df.columns:
         df["_sheet_row"] = df.index + 2
     if "_original_sheet_index" not in df.columns:
         df["_original_sheet_index"] = df.index
+
+    # Ensure string type
     df["Feedback"] = df["Feedback"].fillna("").astype(str)
     df["User Feedback/Remark"] = df["User Feedback/Remark"].fillna("").astype(str)
+
     return df
+
 
 def save_to_local_excel(df):
     df.to_excel(LOCAL_FILE, index=False)
@@ -220,6 +227,7 @@ st.markdown("""
     For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
 </marquee>
 """, unsafe_allow_html=True)
+
 
 
 
