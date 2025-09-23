@@ -7,10 +7,12 @@ from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from st_aggrid.shared import JsCode
 from openpyxl.styles import Alignment, Font, Border, Side, NamedStyle
 import requests
+import os
 
 # ---------- CONFIG ----------
 st.set_page_config(page_title="Inspection App", layout="wide")
 GITHUB_RAW_URL = "https://github.com/srdsoproject/testing/raw/main/responses.xlsx"
+LOCAL_FILE = "responses_local.xlsx"
 
 # ---------- SESSION STATE ----------
 if "logged_in" not in st.session_state:
@@ -70,8 +72,22 @@ def load_data_from_github():
         st.error(f"❌ Could not load Excel from GitHub: {e}")
         return pd.DataFrame(columns=REQUIRED_COLS)
 
+def load_data():
+    if os.path.exists(LOCAL_FILE):
+        df = pd.read_excel(LOCAL_FILE)
+        df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
+        if "_sheet_row" not in df.columns:
+            df["_sheet_row"] = df.index + 2
+        return df
+    else:
+        return load_data_from_github()
+
+def save_to_local_excel(df):
+    df.to_excel(LOCAL_FILE, index=False)
+    st.success("✅ Feedback saved locally.")
+
 if st.session_state.df.empty:
-    st.session_state.df = load_data_from_github()
+    st.session_state.df = load_data()
 df = st.session_state.df
 
 # ---------- UTILS ----------
@@ -93,6 +109,7 @@ def update_feedback_column(edited_df):
             if col in df.columns and col in row:
                 df.at[r, col] = row[col]
     st.session_state.df = df
+    save_to_local_excel(df)  # persist locally
 
 # ---------- HEADER ----------
 st.markdown("""
@@ -107,7 +124,7 @@ st.markdown("""
 </div>
 <h1 style="margin-top:0;color:var(--text-color);">📋 S.A.R.A.L</h1>
 <h3 style="margin-top:-10px;font-weight:normal;color:var(--text-color);">
-    (Safety Abnormality Report & Action List – GitHub Version)
+    (Safety Abnormality Report & Action List – Local Version)
 </h3>
 """, unsafe_allow_html=True)
 
@@ -123,7 +140,7 @@ with tabs[0]:
         st.warning("Deficiencies will be updated soon !")
         st.stop()
 
-    # Apply filters
+    # Filters
     start_date = df["Date of Inspection"].min()
     end_date = df["Date of Inspection"].max()
 
@@ -229,7 +246,6 @@ with tabs[0]:
         c1, c2 = st.columns([1,1])
         if c1.button("✅ Submit Feedback"):
             update_feedback_column(edited_df)
-            st.success("✅ Feedback updated successfully!")
 
         if c2.button("🔄 Refresh Data"):
             st.session_state.df = load_data_from_github()
@@ -253,3 +269,4 @@ st.markdown("""
     For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
 </marquee>
 """, unsafe_allow_html=True)
+
