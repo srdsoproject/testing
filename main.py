@@ -330,5 +330,23 @@ st.markdown("""
 </marquee>
 """, unsafe_allow_html=True)
 
+st.markdown("""
+**Use the following syntax or copy to forward attention to other department:**  
+
+- For Operating: Pertains to **OPTG**  
+- For Signal & Telecom: Pertains to **S&T** 
+- For Commercial: Pertains to **COMMERCIAL**
+- For ELECT/G: Pertains to **ELECT/G**
+- For MECHANICAL: Pertains to **MECHANICAL**
+- For ELECT/TRD: Pertains to **ELECT/TRD**
+- For ELECT/TRO: Pertains to **ELECT/TRO**
+- For Engineering South: Pertains to **Sr.DEN/S**
+- For Engineering North: Pertains to **Sr.DEN/C**
+- For Finance Department: Pertains to **FINAINCE**
+- For Store Department: Pertains to **STORE**
+- For Medical Department: Pertains to **MEDICAL**
+
+""")
+
 
 
