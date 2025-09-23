@@ -6,10 +6,11 @@ from matplotlib import pyplot as plt
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from st_aggrid.shared import JsCode
 from openpyxl.styles import Alignment, Font, Border, Side, NamedStyle
+import requests
 
 # ---------- CONFIG ----------
 st.set_page_config(page_title="Inspection App", layout="wide")
-EXCEL_FILE = "responses.xlsx"
+GITHUB_RAW_URL = "https://github.com/srdsoproject/testing/raw/main/responses.xlsx"
 
 # ---------- SESSION STATE ----------
 if "logged_in" not in st.session_state:
@@ -46,8 +47,8 @@ if not st.session_state.logged_in:
     st.stop()
 
 # ---------- DATA LOADING ----------
-@st.cache_data(ttl=0)
-def load_data():
+@st.cache_data(ttl=300)
+def load_data_from_github():
     REQUIRED_COLS = [
         "Date of Inspection", "Type of Inspection", "Location",
         "Head", "Sub Head", "Deficiencies Noted",
@@ -55,7 +56,9 @@ def load_data():
         "User Feedback/Remark"
     ]
     try:
-        df = pd.read_excel(EXCEL_FILE)
+        resp = requests.get(GITHUB_RAW_URL)
+        resp.raise_for_status()
+        df = pd.read_excel(BytesIO(resp.content))
         for col in REQUIRED_COLS:
             if col not in df.columns:
                 df[col] = ""
@@ -63,11 +66,12 @@ def load_data():
         df["Location"] = df["Location"].astype(str).str.strip().str.upper()
         df["_sheet_row"] = df.index + 2
         return df
-    except FileNotFoundError:
+    except Exception as e:
+        st.error(f"❌ Could not load Excel from GitHub: {e}")
         return pd.DataFrame(columns=REQUIRED_COLS)
 
 if st.session_state.df.empty:
-    st.session_state.df = load_data()
+    st.session_state.df = load_data_from_github()
 df = st.session_state.df
 
 # ---------- UTILS ----------
@@ -88,7 +92,6 @@ def update_feedback_column(edited_df):
         for col in ["Feedback", "User Feedback/Remark", "Head", "Action By", "Sub Head"]:
             if col in df.columns and col in row:
                 df.at[r, col] = row[col]
-    df.to_excel(EXCEL_FILE, index=False)
     st.session_state.df = df
 
 # ---------- HEADER ----------
@@ -104,7 +107,7 @@ st.markdown("""
 </div>
 <h1 style="margin-top:0;color:var(--text-color);">📋 S.A.R.A.L</h1>
 <h3 style="margin-top:-10px;font-weight:normal;color:var(--text-color);">
-    (Safety Abnormality Report & Action List – Local Version)
+    (Safety Abnormality Report & Action List – GitHub Version)
 </h3>
 """, unsafe_allow_html=True)
 
@@ -150,65 +153,56 @@ with tabs[0]:
     st.write(f"🔹 Showing {len(filtered)} record(s)")
 
     # ---------- AG GRID EDIT ----------
-    # ---------- AG GRID EDIT ----------
     st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
-    
-    # Make a copy of filtered DataFrame
+
     editable_filtered = filtered.copy()
-    
     if not editable_filtered.empty:
-        # ✅ Search box for Deficiency
+        # Search box
         search_text = st.text_input("🔍 Search Deficiencies", "").strip().lower()
         if search_text:
             editable_filtered = editable_filtered[
                 editable_filtered["Deficiencies Noted"].astype(str).str.lower().str.contains(search_text)
             ]
-    
-        # Ensure stable IDs exist
+
         if "_original_sheet_index" not in editable_filtered.columns:
             editable_filtered["_original_sheet_index"] = editable_filtered.index
         if "_sheet_row" not in editable_filtered.columns:
-            editable_filtered["_sheet_row"] = editable_filtered.index + 2  # For Excel mapping
-    
+            editable_filtered["_sheet_row"] = editable_filtered.index + 2
+
         display_cols = [
             "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
             "Deficiencies Noted", "Inspection By", "Action By", "Feedback",
             "User Feedback/Remark"
         ]
-    
-        # Slice and copy display columns safely
         editable_df = editable_filtered.loc[:, display_cols].copy()
-    
-        # Add Status column if not exists
+
         if "Status" not in editable_df.columns:
             editable_df["Status"] = [
                 get_status(r["Feedback"], r["User Feedback/Remark"]) 
                 for _, r in editable_df.iterrows()
             ]
         editable_df["Status"] = editable_df["Status"].apply(color_text_status)
-    
-        # Carry helper columns for mapping back (hidden in grid)
+
         editable_df["_original_sheet_index"] = editable_filtered["_original_sheet_index"].values
         editable_df["_sheet_row"] = editable_filtered["_sheet_row"].values
-    
-        # Remove any duplicate columns (prevents AgGrid error)
+
+        # Remove duplicates
         editable_df = editable_df.loc[:, ~editable_df.columns.duplicated()]
-    
-        # Convert dates to string for display
+
+        # Convert dates to string
         if "Date of Inspection" in editable_df.columns:
             editable_df["Date of Inspection"] = pd.to_datetime(
                 editable_df["Date of Inspection"], errors="coerce"
             ).dt.strftime("%Y-%m-%d")
-    
-        # -------- AG GRID CONFIG --------
+
+        # AG Grid config
         gb = GridOptionsBuilder.from_dataframe(editable_df)
         gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True)
         gb.configure_column("User Feedback/Remark", editable=True, wrapText=True, autoHeight=True)
         gb.configure_column("_original_sheet_index", hide=True)
         gb.configure_column("_sheet_row", hide=True)
         gb.configure_grid_options(singleClickEdit=True)
-    
-        # Auto-size all columns on load
+
         auto_size_js = JsCode("""
         function(params) {
             let allColumnIds = [];
@@ -220,7 +214,7 @@ with tabs[0]:
         """)
         gb.configure_grid_options(onFirstDataRendered=auto_size_js)
         grid_options = gb.build()
-    
+
         grid_response = AgGrid(
             editable_df,
             gridOptions=grid_options,
@@ -228,19 +222,18 @@ with tabs[0]:
             height=500,
             allow_unsafe_jscode=True
         )
-    
+
         edited_df = pd.DataFrame(grid_response["data"])
-    
-        # ---------- BUTTONS ----------
-        c1, c2 = st.columns([1, 1])
+
+        # ---------- Buttons ----------
+        c1, c2 = st.columns([1,1])
         if c1.button("✅ Submit Feedback"):
             update_feedback_column(edited_df)
             st.success("✅ Feedback updated successfully!")
-    
-        if c2.button("🔄 Refresh Data"):
-            st.session_state.df = load_data()
-            st.success("✅ Data refreshed!")
 
+        if c2.button("🔄 Refresh Data"):
+            st.session_state.df = load_data_from_github()
+            st.success("✅ Data refreshed!")
 
 # ---------- ALERT LOG ----------
 st.markdown("## 📋 Alerts Log")
@@ -260,4 +253,3 @@ st.markdown("""
     For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
 </marquee>
 """, unsafe_allow_html=True)
-
