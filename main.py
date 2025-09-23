@@ -103,8 +103,7 @@ def load_data():
 
     return df
 
-    else:
-        return load_data_from_github()
+
 
 def save_to_local_excel(df):
     df.to_excel(LOCAL_FILE, index=False)
@@ -290,6 +289,7 @@ st.markdown("""
     For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
 </marquee>
 """, unsafe_allow_html=True)
+
 
 
 
