@@ -7,6 +7,25 @@ from st_aggrid.shared import JsCode
 import os
 import re
 import requests
+# -------------------- HEADER --------------------
+st.markdown(
+    """
+    <div style="display:flex;align-items:center;margin-top:10px;margin-bottom:20px;">
+        <img src="https://raw.githubusercontent.com/srdsoproject/testing/main/Central%20Railway%20Logo.png"
+             height="55" style="margin-right:15px;object-fit:contain;">
+        <div>
+            <h3 style="margin:0;font-weight:bold;color:var(--text-color);">
+                An initiative by <b>Safety Department</b>, Solapur Division
+            </h3>
+        </div>
+    </div>
+    <h1 style="margin-top:0;color:var(--text-color);">📋 S.A.R.A.L</h1>
+    <h3 style="margin-top:-10px;font-weight:normal;color:var(--text-color);">
+        (Safety Abnormality Report & Action List – Version 1.1.8)
+    </h3>
+    """,
+    unsafe_allow_html=True
+)
 
 # -------------------- CONSTANTS --------------------
 LOCAL_FILE = "responses_local.xlsx"
@@ -310,5 +329,6 @@ st.markdown("""
     Contact: Rly phone no. 55620, Cell: +91 9022507772
 </marquee>
 """, unsafe_allow_html=True)
+
 
 
