@@ -42,7 +42,7 @@ if not st.session_state.logged_in:
                 st.session_state.logged_in = True
                 st.session_state.user = user
                 st.success(f"✅ Welcome, {user['name']}!")
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.error("❌ Invalid email or password.")
     st.stop()
@@ -202,6 +202,7 @@ st.markdown("""
     For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
 </marquee>
 """, unsafe_allow_html=True)
+
 
 
 
