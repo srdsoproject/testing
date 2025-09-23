@@ -150,43 +150,97 @@ with tabs[0]:
     st.write(f"🔹 Showing {len(filtered)} record(s)")
 
     # ---------- AG GRID EDIT ----------
+    # ---------- AG GRID EDIT ----------
     st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
-    editable_df = filtered.copy()
-    editable_df["_sheet_row"] = editable_df.index + 2
+    
+    # Make a copy of filtered DataFrame
+    editable_filtered = filtered.copy()
+    
+    if not editable_filtered.empty:
+        # ✅ Search box for Deficiency
+        search_text = st.text_input("🔍 Search Deficiencies", "").strip().lower()
+        if search_text:
+            editable_filtered = editable_filtered[
+                editable_filtered["Deficiencies Noted"].astype(str).str.lower().str.contains(search_text)
+            ]
+    
+        # Ensure stable IDs exist
+        if "_original_sheet_index" not in editable_filtered.columns:
+            editable_filtered["_original_sheet_index"] = editable_filtered.index
+        if "_sheet_row" not in editable_filtered.columns:
+            editable_filtered["_sheet_row"] = editable_filtered.index + 2  # For Excel mapping
+    
+        display_cols = [
+            "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
+            "Deficiencies Noted", "Inspection By", "Action By", "Feedback",
+            "User Feedback/Remark"
+        ]
+    
+        # Slice and copy display columns safely
+        editable_df = editable_filtered.loc[:, display_cols].copy()
+    
+        # Add Status column if not exists
+        if "Status" not in editable_df.columns:
+            editable_df["Status"] = [
+                get_status(r["Feedback"], r["User Feedback/Remark"]) 
+                for _, r in editable_df.iterrows()
+            ]
+        editable_df["Status"] = editable_df["Status"].apply(color_text_status)
+    
+        # Carry helper columns for mapping back (hidden in grid)
+        editable_df["_original_sheet_index"] = editable_filtered["_original_sheet_index"].values
+        editable_df["_sheet_row"] = editable_filtered["_sheet_row"].values
+    
+        # Remove any duplicate columns (prevents AgGrid error)
+        editable_df = editable_df.loc[:, ~editable_df.columns.duplicated()]
+    
+        # Convert dates to string for display
+        if "Date of Inspection" in editable_df.columns:
+            editable_df["Date of Inspection"] = pd.to_datetime(
+                editable_df["Date of Inspection"], errors="coerce"
+            ).dt.strftime("%Y-%m-%d")
+    
+        # -------- AG GRID CONFIG --------
+        gb = GridOptionsBuilder.from_dataframe(editable_df)
+        gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True)
+        gb.configure_column("User Feedback/Remark", editable=True, wrapText=True, autoHeight=True)
+        gb.configure_column("_original_sheet_index", hide=True)
+        gb.configure_column("_sheet_row", hide=True)
+        gb.configure_grid_options(singleClickEdit=True)
+    
+        # Auto-size all columns on load
+        auto_size_js = JsCode("""
+        function(params) {
+            let allColumnIds = [];
+            params.columnApi.getAllColumns().forEach(function(column) {
+                allColumnIds.push(column.getColId());
+            });
+            params.columnApi.autoSizeColumns(allColumnIds);
+        }
+        """)
+        gb.configure_grid_options(onFirstDataRendered=auto_size_js)
+        grid_options = gb.build()
+    
+        grid_response = AgGrid(
+            editable_df,
+            gridOptions=grid_options,
+            update_mode=GridUpdateMode.VALUE_CHANGED,
+            height=500,
+            allow_unsafe_jscode=True
+        )
+    
+        edited_df = pd.DataFrame(grid_response["data"])
+    
+        # ---------- BUTTONS ----------
+        c1, c2 = st.columns([1, 1])
+        if c1.button("✅ Submit Feedback"):
+            update_feedback_column(edited_df)
+            st.success("✅ Feedback updated successfully!")
+    
+        if c2.button("🔄 Refresh Data"):
+            st.session_state.df = load_data()
+            st.success("✅ Data refreshed!")
 
-    gb = GridOptionsBuilder.from_dataframe(editable_df)
-    gb.configure_default_column(editable=False, wrapText=True, autoHeight=True)
-    gb.configure_column("User Feedback/Remark", editable=True, wrapText=True, autoHeight=True)
-    gb.configure_column("_sheet_row", hide=True)
-    gb.configure_grid_options(singleClickEdit=True)
-    auto_size_js = JsCode("""
-    function(params) {
-        let allColumnIds = [];
-        params.columnApi.getAllColumns().forEach(function(column) {
-            allColumnIds.push(column.getColId());
-        });
-        params.columnApi.autoSizeColumns(allColumnIds);
-    }
-    """)
-    gb.configure_grid_options(onFirstDataRendered=auto_size_js)
-    grid_options = gb.build()
-
-    grid_response = AgGrid(
-        editable_df,
-        gridOptions=grid_options,
-        update_mode=GridUpdateMode.VALUE_CHANGED,
-        height=500,
-        allow_unsafe_jscode=True
-    )
-
-    edited_df = pd.DataFrame(grid_response["data"])
-    if st.button("✅ Submit Feedback"):
-        update_feedback_column(edited_df)
-        st.success("✅ Feedback updated successfully!")
-
-    if st.button("🔄 Refresh Data"):
-        st.session_state.df = load_data()
-        st.success("✅ Data refreshed!")
 
 # ---------- ALERT LOG ----------
 st.markdown("## 📋 Alerts Log")
@@ -206,3 +260,4 @@ st.markdown("""
     For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
 </marquee>
 """, unsafe_allow_html=True)
+
