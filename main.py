@@ -272,7 +272,9 @@ def apply_common_filters(df, prefix=""):
 
     return out
 
-
+if "df" not in st.session_state:
+    st.session_state.df = load_data()  # your existing load_data() function
+df = st.session_state.df
 # -------------------- HEADER --------------------
 st.markdown(
     """
@@ -460,6 +462,7 @@ st.markdown("""
     For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
 </marquee>
 """, unsafe_allow_html=True)
+
 
 
 
