@@ -163,8 +163,11 @@ grid_response = AgGrid(
 
 edited_df = pd.DataFrame(grid_response["data"])
 
-# ----------------- Submit Button -----------------
-if st.button("✅ Submit Feedback"):
+# Create columns for buttons
+c1, c2, _ = st.columns([1,1,1])
+
+# Submit button
+if c1.button("✅ Submit Feedback"):
     if "_original_sheet_index" not in edited_df.columns:
         st.error("⚠️ Cannot find original row index. Please refresh.")
     else:
@@ -190,11 +193,11 @@ if st.button("✅ Submit Feedback"):
         else:
             st.info("ℹ️ No new feedback to submit.")
 
-
-
-    if c2.button("🔄 Refresh Data"):
-        st.session_state.df = load_data()
-        st.rerun()
+# Refresh button (at same indentation as columns)
+if c2.button("🔄 Refresh Data"):
+    st.session_state.df = load_data()
+    st.success("✅ Data refreshed successfully!")
+    st.rerun()
 
 
 
@@ -217,6 +220,7 @@ st.markdown("""
     For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
 </marquee>
 """, unsafe_allow_html=True)
+
 
 
 
