@@ -233,6 +233,65 @@ def get_status(feedback, remark):
 
 def color_text_status(status):
     return "🔴 Pending" if status == "Pending" else ("🟢 Resolved" if status == "Resolved" else status)
+def apply_common_filters(df, prefix=""):
+    with st.expander("🔍 Apply Additional Filters", expanded=True):
+        c1, c2 = st.columns(2)
+        c1.multiselect("Inspection By", INSPECTION_BY_LIST[1:], 
+                       default=st.session_state.get(prefix+"insp", []), key=prefix+"insp")
+        c2.multiselect("Action By", ACTION_BY_LIST[1:], 
+                       default=st.session_state.get(prefix+"action", []), key=prefix+"action")
+
+        d1, d2 = st.columns(2)
+        d1.date_input("📅 From Date", key=prefix+"from_date")
+        d2.date_input("📅 To Date", key=prefix+"to_date")
+
+    out = df.copy()
+
+    # --- Filter by "Inspection By"
+    if st.session_state.get(prefix+"insp"):
+        sel = st.session_state[prefix+"insp"]
+        out = out[out["Inspection By"].apply(
+            lambda x: any(s.strip() in str(x).split(",") for s in sel)
+        )]
+
+    # --- Filter by "Action By"
+    if st.session_state.get(prefix+"action"):
+        sel = st.session_state[prefix+"action"]
+        out = out[out["Action By"].apply(
+            lambda x: any(s.strip() in str(x).split(",") for s in sel)
+        )]
+
+    # --- Filter by Date Range (using "Date of Inspection")
+    if st.session_state.get(prefix+"from_date") and st.session_state.get(prefix+"to_date"):
+        from_date = st.session_state[prefix+"from_date"]
+        to_date   = st.session_state[prefix+"to_date"]
+        out = out[
+            (out["Date of Inspection"] >= pd.to_datetime(from_date)) &
+            (out["Date of Inspection"] <= pd.to_datetime(to_date))
+        ]
+
+    return out
+
+
+# -------------------- HEADER --------------------
+st.markdown(
+    """
+    <div style="display:flex;align-items:center;margin-top:10px;margin-bottom:20px;">
+        <img src="https://raw.githubusercontent.com/srdsoproject/testing/main/Central%20Railway%20Logo.png"
+             height="55" style="margin-right:15px;object-fit:contain;">
+        <div>
+            <h3 style="margin:0;font-weight:bold;color:var(--text-color);">
+                An initiative by <b>Safety Department</b>, Solapur Division
+            </h3>
+        </div>
+    </div>
+    <h1 style="margin-top:0;color:var(--text-color);">📋 S.A.R.A.L</h1>
+    <h3 style="margin-top:-10px;font-weight:normal;color:var(--text-color);">
+        (Safety Abnormality Report & Action List – Version 1.1.8)
+    </h3>
+    """,
+    unsafe_allow_html=True
+)
 
 # ---------- LOAD DATA ----------
 if st.session_state.df.empty:
@@ -343,6 +402,7 @@ st.markdown("""
     For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
 </marquee>
 """, unsafe_allow_html=True)
+
 
 
 
