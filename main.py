@@ -196,22 +196,30 @@ with tabs[0]:
     # ---------- SUBMIT BUTTON ----------
     c1, c2 = st.columns([1,1])
     if c1.button("✅ Submit Feedback"):
-        if "_original_sheet_index" not in edited_df.columns:
-            st.error("⚠️ Cannot find original row index. Please refresh.")
-        else:
-            df_main = st.session_state.df.copy()
-            changes = 0
-            for _, row in edited_df.iterrows():
-                idx = int(row["_original_sheet_index"])
-                new_remark = str(row.get("User Feedback/Remark", "")).strip()
-                if new_remark:
-                    df_main.at[idx, "Feedback"] = new_remark
-                    df_main.at[idx, "User Feedback/Remark"] = ""
-                    changes += 1
+    if "_original_sheet_index" not in edited_df.columns:
+        st.error("⚠️ Cannot find original row index. Please refresh.")
+    else:
+        df_main = st.session_state.df.copy()
+        changes = 0
+
+        # Only process rows where "User Feedback/Remark" is non-empty
+        edited_rows = edited_df[edited_df["User Feedback/Remark"].astype(str).str.strip() != ""]
+        for _, row in edited_rows.iterrows():
+            idx = int(row["_original_sheet_index"])
+            new_remark = row["User Feedback/Remark"].strip()
+
+            # Update Feedback in the main dataframe
+            df_main.at[idx, "Feedback"] = new_remark
+            df_main.at[idx, "User Feedback/Remark"] = ""
+            changes += 1
+
+        if changes > 0:
             save_to_local_excel(df_main)
             st.session_state.df = df_main
             st.success(f"✅ Updated {changes} row(s).")
             st.rerun()
+        else:
+            st.info("ℹ️ No new feedback to submit.")
 
     if c2.button("🔄 Refresh Data"):
         st.session_state.df = load_data()
@@ -238,6 +246,7 @@ st.markdown("""
     For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
 </marquee>
 """, unsafe_allow_html=True)
+
 
 
 
