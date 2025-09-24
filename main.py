@@ -1009,21 +1009,28 @@ with tabs[1]:
 
     # --- 🌐 Location/Section/Gate Filter ---
     # --- 🌐 Location/Section/Gate Filter ---
+    # --- 🌐 Location/Section/Gate Filter ---
     st.markdown("### 📍 Pending Deficiencies by Location/Section/Gate")
     
     # Ensure the columns exist
     for col in ["Station", "Gate", "FootplateRoute"]:
         if col not in pending.columns:
-            pending[col] = "Unknown"  # Or np.nan if you prefer
+            pending[col] = "UNKNOWN"
+    
+    # Normalize strings for reliable matching
+    pending["Station"] = pending["Station"].astype(str).str.strip().str.upper()
+    pending["Gate"] = pending["Gate"].astype(str).str.strip().str.upper()
+    pending["FootplateRoute"] = pending["FootplateRoute"].astype(str).str.strip().str.upper()
     
     selected_stations = st.multiselect("Select Stations", STATION_LIST, default=STATION_LIST)
     selected_gates    = st.multiselect("Select Gates", GATE_LIST, default=GATE_LIST)
     selected_routes   = st.multiselect("Select Footplate Routes", FOOTPLATE_ROUTES, default=FOOTPLATE_ROUTES)
     
+    # Filter after normalization
     filtered_pending = pending[
-        pending["Station"].isin(selected_stations) &
-        pending["Gate"].isin(selected_gates) &
-        pending["FootplateRoute"].isin(selected_routes)
+        pending["Station"].isin([s.upper() for s in selected_stations]) &
+        pending["Gate"].isin([g.upper() for g in selected_gates]) &
+        pending["FootplateRoute"].isin([r.upper() for r in selected_routes])
     ]
     
     if not filtered_pending.empty:
@@ -1035,10 +1042,11 @@ with tabs[1]:
             .sort_values("PendingCount", ascending=False)
         )
     
-        # 🔴 Highlight top 3 bars in red
+        # Highlight top 3 bars in red
         loc_counts["color"] = "#ff7f0e"  # default orange
-        loc_counts.loc[:2, "color"] = "red"  # top 3 in red
+        loc_counts.loc[:2, "color"] = "red"  # top 3 red
     
+        # Create chart
         loc_chart = alt.Chart(loc_counts).mark_bar().encode(
             x=alt.X("PendingCount:Q", title="Pending Deficiencies"),
             y=alt.Y("Station:N", sort='-x', title="Station"),
@@ -1052,6 +1060,7 @@ with tabs[1]:
         st.altair_chart(loc_chart, use_container_width=True)
     else:
         st.info("No pending deficiencies for selected location/section/gates.")
+
 
 
 
