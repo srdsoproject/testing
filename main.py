@@ -1010,33 +1010,34 @@ with tabs[1]:
     # --- 🌐 Location/Section/Gate Filter ---
     # --- 🌐 Location/Section/Gate Filter ---
     # --- 🌐 Location/Section/Gate Filter ---
+    # --- 🌐 Location/Section/Gate Filter ---
     st.markdown("### 📍 Pending Deficiencies by Location/Section/Gate")
     
     # Ensure the columns exist
-    for col in ["Station", "Gate", "FootplateRoute"]:
+    for col in ["Location", "Gate", "FootplateRoute"]:
         if col not in pending.columns:
             pending[col] = "UNKNOWN"
     
     # Normalize strings for reliable matching
-    pending["Station"] = pending["Station"].astype(str).str.strip().str.upper()
+    pending["Location"] = pending["Location"].astype(str).str.strip().str.upper()
     pending["Gate"] = pending["Gate"].astype(str).str.strip().str.upper()
     pending["FootplateRoute"] = pending["FootplateRoute"].astype(str).str.strip().str.upper()
     
-    selected_stations = st.multiselect("Select Stations", STATION_LIST, default=STATION_LIST)
-    selected_gates    = st.multiselect("Select Gates", GATE_LIST, default=GATE_LIST)
-    selected_routes   = st.multiselect("Select Footplate Routes", FOOTPLATE_ROUTES, default=FOOTPLATE_ROUTES)
+    selected_locations = st.multiselect("Select Locations", STATION_LIST, default=STATION_LIST)
+    selected_gates     = st.multiselect("Select Gates", GATE_LIST, default=GATE_LIST)
+    selected_routes    = st.multiselect("Select Footplate Routes", FOOTPLATE_ROUTES, default=FOOTPLATE_ROUTES)
     
     # Filter after normalization
     filtered_pending = pending[
-        pending["Station"].isin([s.upper() for s in selected_stations]) &
+        pending["Location"].isin([loc.upper() for loc in selected_locations]) &
         pending["Gate"].isin([g.upper() for g in selected_gates]) &
         pending["FootplateRoute"].isin([r.upper() for r in selected_routes])
     ]
     
     if not filtered_pending.empty:
-        # Count pending per Station/Gate
+        # Count pending per Location/Gate
         loc_counts = (
-            filtered_pending.groupby(["Station", "Gate"])
+            filtered_pending.groupby(["Location", "Gate"])
             .size()
             .reset_index(name="PendingCount")
             .sort_values("PendingCount", ascending=False)
@@ -1049,9 +1050,9 @@ with tabs[1]:
         # Create chart
         loc_chart = alt.Chart(loc_counts).mark_bar().encode(
             x=alt.X("PendingCount:Q", title="Pending Deficiencies"),
-            y=alt.Y("Station:N", sort='-x', title="Station"),
+            y=alt.Y("Location:N", sort='-x', title="Location"),
             color=alt.Color("color:N", scale=None),
-            tooltip=["Station", "Gate", "PendingCount"]
+            tooltip=["Location", "Gate", "PendingCount"]
         ).properties(
             width="container",
             height=400
@@ -1060,6 +1061,8 @@ with tabs[1]:
         st.altair_chart(loc_chart, use_container_width=True)
     else:
         st.info("No pending deficiencies for selected location/section/gates.")
+
+
 
 
 
