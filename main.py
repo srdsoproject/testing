@@ -1029,9 +1029,14 @@ with tabs[1]:
             .sort_values("PendingCount", ascending=False)
         )
 
-        loc_chart = alt.Chart(loc_counts).mark_bar(color="#ff7f0e").encode(
+        # 🔴 Highlight top 3 bars in red
+        loc_counts["color"] = "#ff7f0e"  # default orange
+        loc_counts.loc[:2, "color"] = "red"  # top 3 in red
+
+        loc_chart = alt.Chart(loc_counts).mark_bar().encode(
             x=alt.X("PendingCount:Q", title="Pending Deficiencies"),
             y=alt.Y("Station:N", sort='-x', title="Station"),
+            color=alt.Color("color:N", scale=None),
             tooltip=["Station", "Gate", "PendingCount"]
         ).properties(
             width="container",
@@ -1041,4 +1046,5 @@ with tabs[1]:
         st.altair_chart(loc_chart, use_container_width=True)
     else:
         st.info("No pending deficiencies for selected location/section/gates.")
+
 
