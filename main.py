@@ -973,6 +973,7 @@ with tabs[1]:
         st.info("No data available for analytics.")
 
     # --- Department-wise Summary ---
+    # --- Department-wise Summary ---
     st.markdown("### 🏢 Department-wise Pending Counts")
     if not pending.empty:
         dept_counts = (
@@ -982,12 +983,12 @@ with tabs[1]:
             .reset_index(name="PendingCount")
         )
         total_pending = dept_counts["PendingCount"].sum()
-
+    
         # Text summary
         for _, row in dept_counts.iterrows():
             st.markdown(f"- **{row['Head']}** : {row['PendingCount']}")
         st.markdown(f"**Total Pending : {total_pending}**")
-
+    
         # --- 📈 Department-wise Bar Graph ---
         dept_chart = alt.Chart(dept_counts).mark_bar(color="#1f77b4").encode(
             x=alt.X("PendingCount:Q", title="Pending Deficiencies"),
@@ -997,11 +998,16 @@ with tabs[1]:
             width="container",
             height=400
         )
-
         st.altair_chart(dept_chart, use_container_width=True)
-
+    
+        # --- 🔴 Top 3 Critical Departments ---
+        top3 = dept_counts.head(3)
+        critical_text = ", ".join([f"{row['Head']} ({row['PendingCount']})" for _, row in top3.iterrows()])
+        st.markdown(f"**Critical Departments with Pending Compliances:** {critical_text}")
+    
     else:
         st.info("No pending deficiencies to summarize.")
+
 
 
 
