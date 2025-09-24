@@ -973,7 +973,6 @@ with tabs[1]:
         st.info("No data available for analytics.")
 
     # --- Department-wise Summary ---
-    # --- Department-wise Summary ---
     st.markdown("### 🏢 Department-wise Pending Counts")
     if not pending.empty:
         dept_counts = (
@@ -1008,12 +1007,38 @@ with tabs[1]:
     else:
         st.info("No pending deficiencies to summarize.")
 
+    # --- 🌐 Location/Section/Gate Filter ---
+    st.markdown("### 📍 Pending Deficiencies by Location/Section/Gate")
+    
+    selected_stations = st.multiselect("Select Stations", STATION_LIST, default=STATION_LIST)
+    selected_gates    = st.multiselect("Select Gates", GATE_LIST, default=GATE_LIST)
+    selected_routes   = st.multiselect("Select Footplate Routes", FOOTPLATE_ROUTES, default=FOOTPLATE_ROUTES)
 
+    filtered_pending = pending[
+        pending["Station"].isin(selected_stations) &
+        pending["Gate"].isin(selected_gates) &
+        pending["FootplateRoute"].isin(selected_routes)
+    ]
 
+    if not filtered_pending.empty:
+        # Count pending per Station/Gate
+        loc_counts = (
+            filtered_pending.groupby(["Station", "Gate"])
+            .size()
+            .reset_index(name="PendingCount")
+            .sort_values("PendingCount", ascending=False)
+        )
 
+        loc_chart = alt.Chart(loc_counts).mark_bar(color="#ff7f0e").encode(
+            x=alt.X("PendingCount:Q", title="Pending Deficiencies"),
+            y=alt.Y("Station:N", sort='-x', title="Station"),
+            tooltip=["Station", "Gate", "PendingCount"]
+        ).properties(
+            width="container",
+            height=400
+        )
 
-
-
-
-
+        st.altair_chart(loc_chart, use_container_width=True)
+    else:
+        st.info("No pending deficiencies for selected location/section/gates.")
 
