@@ -931,7 +931,7 @@ with tabs[1]:
         ].copy()
         pending["Head"] = pending["Head"].astype(str).str.strip().str.upper()
 
-        # --- Monthly Trend ---
+        # ---- Monthly Trend ----
         trend = (
             pending.groupby(pd.Grouper(key="Date of Inspection", freq="M"))
             .size().reset_index(name="PendingCount")
@@ -967,9 +967,14 @@ with tabs[1]:
                 st.markdown(f"- **{row['Head']}** : {row['PendingCount']}")
             st.markdown(f"**Total Pending : {total_pending}**")
 
-            dept_chart = alt.Chart(dept_counts).mark_bar(color="#1f77b4").encode(
+            # Highlight top 3 departments in red
+            dept_counts["color"] = "#ff7f0e"  # default orange
+            dept_counts.loc[:2, "color"] = "red"
+
+            dept_chart = alt.Chart(dept_counts).mark_bar().encode(
                 x=alt.X("PendingCount:Q", title="Pending Deficiencies"),
                 y=alt.Y("Head:N", sort='-x', title="Department"),
+                color=alt.Color("color:N", scale=None),
                 tooltip=["Head", "PendingCount"]
             ).properties(width="container", height=400)
             st.altair_chart(dept_chart, use_container_width=True)
@@ -980,8 +985,8 @@ with tabs[1]:
         else:
             st.info("No pending deficiencies to summarize.")
 
-        # --- Location/Section/Gate Chart ---
-        st.markdown("### 📍 Pending Deficiencies by Location/Section/Gate")
+        # --- Location/Gate/Route Combined Chart ---
+        st.markdown("### 📍 Pending Deficiencies by Section (Location + Gate + FootplateRoute)")
 
         # Ensure columns exist
         for col in ["Location", "Gate", "FootplateRoute", "Status", "Feedback"]:
@@ -992,27 +997,25 @@ with tabs[1]:
         for col in ["Location", "Gate", "FootplateRoute", "Status", "Feedback"]:
             pending[col] = pending[col].astype(str).str.strip().str.upper()
 
-        # Dynamic multiselect defaults
-        selected_locations = st.multiselect("Select Locations", pending["Location"].unique(), default=pending["Location"].unique())
-        selected_gates     = st.multiselect("Select Gates", pending["Gate"].unique(), default=pending["Gate"].unique())
-        selected_routes    = st.multiselect("Select Footplate Routes", pending["FootplateRoute"].unique(), default=pending["FootplateRoute"].unique())
+        # Combine into single column
+        pending["Section"] = pending["Location"] + " | " + pending["Gate"] + " | " + pending["FootplateRoute"]
 
-        # Filter rows
+        # Dynamic multiselect
+        selected_sections = st.multiselect("Select Sections", pending["Section"].unique(), default=pending["Section"].unique())
+
         filtered_pending = pending[
-            pending["Location"].isin([s.upper() for s in selected_locations]) &
-            pending["Gate"].isin([g.upper() for g in selected_gates]) &
-            pending["FootplateRoute"].isin([r.upper() for r in selected_routes])
+            pending["Section"].isin([s.upper() for s in selected_sections])
         ]
 
-        # Only rows that are pending
+        # Only pending
         filtered_pending = filtered_pending[
             (filtered_pending["Status"] == "PENDING") | (filtered_pending["Feedback"] == "")
         ]
 
         if not filtered_pending.empty:
             loc_counts = (
-                filtered_pending.groupby(["Location", "Gate"])
-                .size().reset_index(name="PendingCount")
+                filtered_pending.groupby("Section").size()
+                .reset_index(name="PendingCount")
                 .sort_values("PendingCount", ascending=False)
             )
 
@@ -1021,14 +1024,16 @@ with tabs[1]:
 
             loc_chart = alt.Chart(loc_counts).mark_bar().encode(
                 x=alt.X("PendingCount:Q", title="Pending Deficiencies"),
-                y=alt.Y("Location:N", sort='-x', title="Location"),
+                y=alt.Y("Section:N", sort='-x', title="Section"),
                 color=alt.Color("color:N", scale=None),
-                tooltip=["Location", "Gate", "PendingCount"]
-            ).properties(width="container", height=400)
+                tooltip=["Section", "PendingCount"]
+            ).properties(width="container", height=500)
 
             st.altair_chart(loc_chart, use_container_width=True)
         else:
-            st.info("No pending deficiencies for selected location/section/gates.")
+            st.info("No pending deficiencies for selected sections.")
+
+
 
 
 
