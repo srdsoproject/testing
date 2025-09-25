@@ -931,6 +931,7 @@ with tabs[1]:
     if df.empty:
         st.info("No data available for analytics.")
     else:
+        # --- Parse Dates ---
         df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
 
         # --- Date Filter ---
@@ -952,7 +953,7 @@ with tabs[1]:
             (df["Feedback"].astype(str).str.strip() == "")
         ].copy()
 
-        # Normalize Head
+        # Normalize Department names
         pending["Head"] = pending["Head"].astype(str).str.strip().str.upper()
 
         # ---- Trend Chart ----
@@ -985,6 +986,7 @@ with tabs[1]:
             dept_counts["color"] = "#ff7f0e"
             dept_counts.loc[:2, "color"] = "red"
 
+            # Display list
             for _, row in dept_counts.iterrows():
                 st.markdown(f"- **{row['Head']}** : {row['PendingCount']}")
             st.markdown(f"**Total Pending : {total_pending}**")
@@ -1005,26 +1007,36 @@ with tabs[1]:
 
         # ---- Critical Locations Chart (Top 3) ----
         st.markdown("### 🚨 Top 3 Critical Locations")
-        if not pending.empty:
-            # Count pending per Location, Gate, Section separately
-            loc_counts = pending.groupby("Location").size().reset_index(name="PendingCount")
-            gate_counts = pending.groupby("Gate").size().reset_index(name="PendingCount")
-            section_counts = pending.groupby("Section").size().reset_index(name="PendingCount")
+        # Ensure columns exist
+        for col in ["Location","Gate","Section"]:
+            if col not in pending.columns:
+                pending[col] = ""
+        pending["Location"] = pending["Location"].astype(str).str.strip().str.upper()
+        pending["Gate"] = pending["Gate"].astype(str).str.strip().str.upper()
+        pending["Section"] = pending["Section"].astype(str).str.strip().str.upper()
 
-            # Combine all
-            combined_counts = pd.concat([loc_counts, gate_counts, section_counts])
-            combined_counts = combined_counts[combined_counts.iloc[:,0] != ""]  # remove empty
-            combined_counts = combined_counts.groupby(combined_counts.columns[0]).sum().reset_index().sort_values("PendingCount", ascending=False)
+        # Filter only predefined valid entries
+        pending_stations = pending[pending["Location"].isin(STATION_LIST)]
+        pending_gates = pending[pending["Gate"].isin(GATE_LIST)]
+        pending_routes = pending[pending["Section"].isin([s.upper() for s in FOOTPLATE_ROUTES])]
 
-            # Top 3
-            critical_loc = combined_counts.head(3)
-            critical_loc["color"] = "red"
+        combined_counts = pd.concat([
+            pending_stations.groupby("Location").size().reset_index(name="PendingCount"),
+            pending_gates.groupby("Gate").size().reset_index(name="PendingCount"),
+            pending_routes.groupby("Section").size().reset_index(name="PendingCount")
+        ])
+        combined_counts = combined_counts.groupby(combined_counts.columns[0]).sum().reset_index()
+        combined_counts = combined_counts.sort_values("PendingCount", ascending=False)
 
-            critical_loc_chart = alt.Chart(critical_loc).mark_bar().encode(
+        if not combined_counts.empty:
+            top3_critical = combined_counts.head(3)
+            top3_critical["color"] = "red"
+
+            critical_loc_chart = alt.Chart(top3_critical).mark_bar().encode(
                 x=alt.X("PendingCount:Q", title="Pending Deficiencies"),
-                y=alt.Y(critical_loc.columns[0]+":N", sort='-x', title="Location / Gate / Section"),
+                y=alt.Y(top3_critical.columns[0]+":N", sort='-x', title="Location / Gate / Section"),
                 color=alt.Color("color:N", scale=None),
-                tooltip=[critical_loc.columns[0],"PendingCount"]
+                tooltip=[top3_critical.columns[0],"PendingCount"]
             ).properties(width="container", height=300)
             st.altair_chart(critical_loc_chart, use_container_width=True)
         else:
@@ -1032,7 +1044,6 @@ with tabs[1]:
 
         # ---- Unified Location / Gate / Section Chart ----
         st.markdown("### 📍 Pending Deficiencies by Location / Gate / Section")
-        # Multiselect per column
         selected_locations = st.multiselect("Select Locations", pending["Location"].unique(), default=pending["Location"].unique())
         selected_gates = st.multiselect("Select Gates", pending["Gate"].unique(), default=pending["Gate"].unique())
         selected_sections = st.multiselect("Select Sections", pending["Section"].unique(), default=pending["Section"].unique())
@@ -1044,7 +1055,6 @@ with tabs[1]:
         ]
 
         if not filtered_pending_final.empty:
-            # Count combined
             loc_counts_final = pd.concat([
                 filtered_pending_final.groupby("Location").size().reset_index(name="PendingCount"),
                 filtered_pending_final.groupby("Gate").size().reset_index(name="PendingCount"),
