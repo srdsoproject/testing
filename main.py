@@ -924,15 +924,17 @@ with tabs[1]:
     st.markdown("### 📊 Pending Deficiencies Trend (Bar + Trend Line)")
     df = st.session_state.df.copy()
 
+    # Ensure Status column exists
     if "Status" not in df.columns:
         df["Status"] = df["Feedback"].apply(classify_feedback)
 
     if df.empty:
         st.info("No data available for analytics.")
     else:
+        # --- Parse dates safely ---
         df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
 
-        # Date filter
+        # --- Date Range Filter ---
         min_date = df["Date of Inspection"].min()
         max_date = df["Date of Inspection"].max()
         start_date, end_date = st.date_input(
@@ -945,12 +947,15 @@ with tabs[1]:
         end_date = pd.to_datetime(end_date)
         df = df[(df["Date of Inspection"] >= start_date) & (df["Date of Inspection"] <= end_date)]
 
-        # Pending rows only
+        # --- Pending Rows ---
         pending = df[
             df["Status"].str.upper().eq("PENDING") |
             df["Feedback"].isna() |
             (df["Feedback"].astype(str).str.strip() == "")
         ].copy()
+
+        # Normalize Department names to avoid duplicates
+        pending["Head"] = pending["Head"].astype(str).str.strip().str.upper()
 
         # ---- Trend Chart ----
         trend = (
@@ -979,18 +984,23 @@ with tabs[1]:
         st.markdown("### 🏢 Department-wise Pending Counts")
         if not pending.empty:
             dept_counts = (
-                pending.groupby("Head").size()
-                .sort_values(ascending=False)
+                pending.groupby("Head")
+                .size()
                 .reset_index(name="PendingCount")
+                .sort_values("PendingCount", ascending=False)
             )
             total_pending = dept_counts["PendingCount"].sum()
+
+            # Highlight top 3 departments
+            dept_counts["color"] = "#ff7f0e"  # default orange
+            dept_counts.loc[:2, "color"] = "red"
+
+            # Display list
             for _, row in dept_counts.iterrows():
                 st.markdown(f"- **{row['Head']}** : {row['PendingCount']}")
             st.markdown(f"**Total Pending : {total_pending}**")
 
-            dept_counts["color"] = "#ff7f0e"
-            dept_counts.loc[:2, "color"] = "red"
-
+            # Altair chart
             dept_chart = alt.Chart(dept_counts).mark_bar().encode(
                 x=alt.X("PendingCount:Q", title="Pending Deficiencies"),
                 y=alt.Y("Head:N", sort='-x', title="Department"),
@@ -998,28 +1008,43 @@ with tabs[1]:
                 tooltip=["Head", "PendingCount"]
             ).properties(width="container", height=400)
             st.altair_chart(dept_chart, use_container_width=True)
+
+            # Top 3 critical departments text
+            top3 = dept_counts.head(3)
+            critical_text = ", ".join([f"{row['Head']} ({row['PendingCount']})" for _, row in top3.iterrows()])
+            st.markdown(f"**Critical Departments with Pending Compliances:** {critical_text}")
         else:
             st.info("No pending deficiencies to summarize.")
 
-        # ---- Unified Location Filter & Chart ----
+        # ---- Unified Location / Gate / Route Chart ----
         st.markdown("### 📍 Pending Deficiencies by Location / Gate / Route")
 
-        # Ensure Location column
-        if "Location" not in pending.columns:
-            pending["Location"] = ""
-        pending["Location"] = pending["Location"].astype(str).str.strip().str.upper()
+        # Ensure essential columns
+        for col in ["Location", "Gate", "Section"]:
+            if col not in pending.columns:
+                pending[col] = ""
 
-        # Only show options present in the data
-        available_locations = [loc for loc in ALL_LOCATIONS if loc in pending["Location"].unique()]
+        pending["Location"] = pending["Location"].astype(str).str.strip().str.upper()
+        pending["Gate"] = pending["Gate"].astype(str).str.strip().str.upper()
+        pending["Section"] = pending["Section"].astype(str).str.strip().str.upper()
+
+        # Merge into single key
+        pending["LocationKey"] = ""
+        pending.loc[pending["Location"].isin(STATION_LIST), "LocationKey"] = pending["Location"]
+        pending.loc[pending["Gate"].isin(GATE_LIST), "LocationKey"] = pending["Gate"]
+        pending.loc[pending["Section"].isin([s.upper() for s in FOOTPLATE_ROUTES]), "LocationKey"] = pending["Section"]
+
+        all_options = STATION_LIST + GATE_LIST + FOOTPLATE_ROUTES
+        available_options = [s for s in all_options if s in pending["LocationKey"].unique()]
 
         selected_locations = st.multiselect(
-            "Select Station / Gate / Footplate Route",
-            options=available_locations,
-            default=available_locations
+            "Select Stations / Gates / Sections",
+            options=available_options,
+            default=available_options
         )
 
         filtered_pending = pending[
-            pending["Location"].isin(selected_locations) &
+            pending["LocationKey"].isin(selected_locations) &
             (
                 (pending["Status"].str.upper() == "PENDING") |
                 (pending["Feedback"].astype(str).str.strip() == "")
@@ -1028,7 +1053,8 @@ with tabs[1]:
 
         if not filtered_pending.empty:
             loc_counts = (
-                filtered_pending.groupby("Location").size()
+                filtered_pending.groupby("LocationKey")
+                .size()
                 .reset_index(name="PendingCount")
                 .sort_values("PendingCount", ascending=False)
             )
@@ -1038,16 +1064,13 @@ with tabs[1]:
 
             loc_chart = alt.Chart(loc_counts).mark_bar().encode(
                 x=alt.X("PendingCount:Q", title="Pending Deficiencies"),
-                y=alt.Y("Location:N", sort='-x', title="Station / Gate / Route"),
+                y=alt.Y("LocationKey:N", sort='-x', title="Station / Gate / Section"),
                 color=alt.Color("color:N", scale=None),
-                tooltip=["Location", "PendingCount"]
+                tooltip=["LocationKey", "PendingCount"]
             ).properties(width="container", height=500)
 
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
-
-
-
 
 
