@@ -1013,7 +1013,7 @@ with tabs[1]:
 
         if not filtered_pending.empty:
             loc_counts = (
-                filtered_pending.groupby("Section").size()
+                filtered_pending.groupby("Location").size()
                 .reset_index(name="PendingCount")
                 .sort_values("PendingCount", ascending=False)
             )
@@ -1031,6 +1031,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected sections.")
+
 
 
 
