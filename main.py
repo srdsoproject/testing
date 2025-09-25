@@ -993,17 +993,19 @@ with tabs[1]:
             if col not in pending.columns:
                 pending[col] = ""
 
-        # Normalize Location column
+        # Normalize Location column to uppercase
         pending["Location"] = pending["Location"].astype(str).str.strip().str.upper()
 
-        # Dynamic multiselect based only on Location
+        # Use your predefined station list, filtered to only stations present in pending data
+        available_stations = [s for s in STATION_LIST if s in pending["Location"].unique()]
+
         selected_locations = st.multiselect(
             "Select Locations",
-            pending["Location"].unique(),
-            default=pending["Location"].unique()
+            options=available_stations,
+            default=available_stations
         )
 
-        # Filter by selected Locations and only pending rows
+        # Filter pending rows for selected stations only
         filtered_pending = pending[
             pending["Location"].isin(selected_locations) &
             (
@@ -1032,5 +1034,6 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
