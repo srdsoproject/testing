@@ -907,7 +907,7 @@ with tabs[1]:
     if df.empty:
         st.info("No data available for analytics.")
     else:
-        # Parse dates safely
+        # --- Parse dates safely
         df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
 
         # --- Date Range Filter ---
@@ -985,30 +985,31 @@ with tabs[1]:
         else:
             st.info("No pending deficiencies to summarize.")
 
-        # --- Location/Gate/Route Combined Chart ---
+        # --- Location-wise Pending Chart ---
         st.markdown("### 📍 Pending Deficiencies by Location")
 
         # Ensure essential columns exist
         for col in ["Location", "Status", "Feedback"]:
             if col not in pending.columns:
                 pending[col] = ""
-        
+
         # Normalize Location column
         pending["Location"] = pending["Location"].astype(str).str.strip().str.upper()
-        
+
         # Dynamic multiselect based only on Location
         selected_locations = st.multiselect(
             "Select Locations",
             pending["Location"].unique(),
             default=pending["Location"].unique()
         )
-        
-        # Filter by selected Locations
-        filtered_pending = pending[pending["Location"].isin(selected_locations)]
 
-        # Only pending
-        filtered_pending = filtered_pending[
-            (filtered_pending["Status"] == "PENDING") | (filtered_pending["Feedback"] == "")
+        # Filter by selected Locations and only pending rows
+        filtered_pending = pending[
+            pending["Location"].isin(selected_locations) &
+            (
+                (pending["Status"].str.upper() == "PENDING") |
+                (pending["Feedback"].astype(str).str.strip() == "")
+            )
         ]
 
         if not filtered_pending.empty:
@@ -1023,19 +1024,13 @@ with tabs[1]:
 
             loc_chart = alt.Chart(loc_counts).mark_bar().encode(
                 x=alt.X("PendingCount:Q", title="Pending Deficiencies"),
-                y=alt.Y("Section:N", sort='-x', title="Section"),
+                y=alt.Y("Location:N", sort='-x', title="Location"),
                 color=alt.Color("color:N", scale=None),
-                tooltip=["Section", "PendingCount"]
+                tooltip=["Location", "PendingCount"]
             ).properties(width="container", height=500)
 
             st.altair_chart(loc_chart, use_container_width=True)
         else:
-            st.info("No pending deficiencies for selected sections.")
-
-
-
-
-
-
+            st.info("No pending deficiencies for selected locations.")
 
 
