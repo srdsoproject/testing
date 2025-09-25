@@ -954,7 +954,7 @@ with tabs[1]:
             (df["Feedback"].astype(str).str.strip() == "")
         ].copy()
 
-        # Normalize Department names to avoid duplicates
+        # Normalize Department names
         pending["Head"] = pending["Head"].astype(str).str.strip().str.upper()
 
         # ---- Trend Chart ----
@@ -1016,9 +1016,8 @@ with tabs[1]:
         else:
             st.info("No pending deficiencies to summarize.")
 
-        # ---- Unified Location / Gate / Route Chart ----
-        st.markdown("### 📍 Pending Deficiencies by Location / Gate / Route")
-
+        # ---- Critical Locations Chart ----
+        st.markdown("### 🚨 Top 3 Critical Locations")
         # Ensure essential columns
         for col in ["Location", "Gate", "Section"]:
             if col not in pending.columns:
@@ -1034,6 +1033,35 @@ with tabs[1]:
         pending.loc[pending["Gate"].isin(GATE_LIST), "LocationKey"] = pending["Gate"]
         pending.loc[pending["Section"].isin([s.upper() for s in FOOTPLATE_ROUTES]), "LocationKey"] = pending["Section"]
 
+        filtered_pending = pending[
+            (pending["Status"].str.upper() == "PENDING") |
+            (pending["Feedback"].astype(str).str.strip() == "")
+        ]
+
+        if not filtered_pending.empty:
+            loc_counts_full = (
+                filtered_pending.groupby("LocationKey")
+                .size()
+                .reset_index(name="PendingCount")
+                .sort_values("PendingCount", ascending=False)
+            )
+
+            critical_loc = loc_counts_full.head(3)
+            critical_loc["color"] = "red"
+
+            critical_loc_chart = alt.Chart(critical_loc).mark_bar().encode(
+                x=alt.X("PendingCount:Q", title="Pending Deficiencies"),
+                y=alt.Y("LocationKey:N", sort='-x', title="Location / Gate / Route"),
+                color=alt.Color("color:N", scale=None),
+                tooltip=["LocationKey", "PendingCount"]
+            ).properties(width="container", height=300)
+            st.altair_chart(critical_loc_chart, use_container_width=True)
+        else:
+            st.info("No critical locations to display.")
+
+        # ---- Unified Location / Gate / Route Chart ----
+        st.markdown("### 📍 Pending Deficiencies by Location / Gate / Route")
+
         all_options = STATION_LIST + GATE_LIST + FOOTPLATE_ROUTES
         available_options = [s for s in all_options if s in pending["LocationKey"].unique()]
 
@@ -1043,7 +1071,7 @@ with tabs[1]:
             default=available_options
         )
 
-        filtered_pending = pending[
+        filtered_pending_final = pending[
             pending["LocationKey"].isin(selected_locations) &
             (
                 (pending["Status"].str.upper() == "PENDING") |
@@ -1051,9 +1079,9 @@ with tabs[1]:
             )
         ]
 
-        if not filtered_pending.empty:
+        if not filtered_pending_final.empty:
             loc_counts = (
-                filtered_pending.groupby("LocationKey")
+                filtered_pending_final.groupby("LocationKey")
                 .size()
                 .reset_index(name="PendingCount")
                 .sort_values("PendingCount", ascending=False)
@@ -1072,5 +1100,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
+
 
 
