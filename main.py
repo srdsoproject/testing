@@ -986,26 +986,25 @@ with tabs[1]:
             st.info("No pending deficiencies to summarize.")
 
         # --- Location/Gate/Route Combined Chart ---
-        st.markdown("### 📍 Pending Deficiencies by Section (Location + Gate + FootplateRoute)")
+        st.markdown("### 📍 Pending Deficiencies by Location")
 
-        # Ensure columns exist
-        for col in ["Location", "Gate", "FootplateRoute", "Status", "Feedback"]:
+        # Ensure essential columns exist
+        for col in ["Location", "Status", "Feedback"]:
             if col not in pending.columns:
-                pending[col] = "UNKNOWN"
-
-        # Normalize
-        for col in ["Location", "Gate", "FootplateRoute", "Status", "Feedback"]:
-            pending[col] = pending[col].astype(str).str.strip().str.upper()
-
-        # Combine into single column
-        pending["Section"] = pending["Location"] + " | " + pending["Gate"] + " | " + pending["FootplateRoute"]
-
-        # Dynamic multiselect
-        selected_sections = st.multiselect("Select Sections", pending["Section"].unique(), default=pending["Section"].unique())
-
-        filtered_pending = pending[
-            pending["Section"].isin([s.upper() for s in selected_sections])
-        ]
+                pending[col] = ""
+        
+        # Normalize Location column
+        pending["Location"] = pending["Location"].astype(str).str.strip().str.upper()
+        
+        # Dynamic multiselect based only on Location
+        selected_locations = st.multiselect(
+            "Select Locations",
+            pending["Location"].unique(),
+            default=pending["Location"].unique()
+        )
+        
+        # Filter by selected Locations
+        filtered_pending = pending[pending["Location"].isin(selected_locations)]
 
         # Only pending
         filtered_pending = filtered_pending[
@@ -1032,6 +1031,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected sections.")
+
 
 
 
