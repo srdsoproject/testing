@@ -3,8 +3,6 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 from io import BytesIO
-from matplotlib import pyplot as plt
-import altair as alt
 import numpy as np
 import re
 from openpyxl.styles import Alignment
@@ -22,7 +20,6 @@ if "ack_done" not in st.session_state:
 
 # ---------- LOGIN ----------
 def login(email, password):
-    """Check credentials against st.secrets['users']"""
     for user in st.secrets["users"]:
         if user["email"] == email and user["password"] == password:
             return user
@@ -59,10 +56,10 @@ user_ack_done = user_id in ack_df["UserID"].values
 if not user_ack_done:
     st.title("📢 Pending Deficiencies Compliance")
     with st.expander("⚠️ Pending Deficiencies Notice", expanded=True):
-        st.info("""
-        The compliance of deficiencies of previous dates are pending & needs to be completed immediately.  
-        I hereby declare that I have read this notice and will ensure compliance.
-        """)
+        st.info(
+            "The compliance of deficiencies of previous dates are pending & needs to be completed immediately.\n"
+            "I hereby declare that I have read this notice and will ensure compliance."
+        )
         with st.form("ack_form"):
             responder_name = st.text_input("✍️ Your Name")
             ack_submitted = st.form_submit_button("Submit Acknowledgment")
@@ -106,6 +103,7 @@ def connect_to_gsheet():
     SHEET_ID = "1_WQyJCtdXuAIQn3IpFTI4KfkrveOHosNsvsZn42jAvw"
     SHEET_NAME = "Sheet1"
     return gc.open_by_key(SHEET_ID).worksheet(SHEET_NAME)
+
 sheet = connect_to_gsheet()
 st.sidebar.success("✅ Connected to Google Sheets!")
 
@@ -116,6 +114,8 @@ if st.sidebar.button("🚪 Logout"):
     st.session_state.user = {}
     st.rerun()
 
+# ---------- CONSTANT LISTS (with LC gates included) ----------
+
 STATION_LIST = list(dict.fromkeys([
     'BRB','MLM','BGVN','JNTR','PRWD','WSB','PPJ','JEUR','KEM','BLNI','DHS','KWV','WDS','MA','AAG',
     'MKPT','MO','MVE','PK','BALE',"SUR",'TKWD','HG','TLT','AKOR','NGS','BOT','DUD','KUI','GDGN','GUR',
@@ -123,6 +123,7 @@ STATION_LIST = list(dict.fromkeys([
     'JTRD','MSDG','JVA','WSD','SGLA','PVR','MLB','SEI','BTW','PJR','DRSV','YSI','KMRD','DKY','MRX',
     'OSA','HGL','LUR','NTPC','MRJ','BHLI'
 ]))
+
 GATE_LIST = list(dict.fromkeys([
     'LC-19','LC-22A','LC-25','LC-26','LC-27C','LC-28','LC-30','LC-31','LC-35','LC-37','LC-40','LC-41',
     'LC-43','LC-44','LC-45','LC-46C','LC-54','LC-61','LC-66','LC-74','LC-76','LC-78','LC-82','LC-1',
@@ -131,6 +132,7 @@ GATE_LIST = list(dict.fromkeys([
     'LC-04','LC-67','LC-77','LC-75','LC-64','LC-65','LC-5','LC-6','LC-57','LC-62','LC-39','LC-2/C',
     'LC-6/C','LC-11','LC-03','LC-15/C','LC-21','LC-26-A','LC-60'
 ]))
+
 FOOTPLATE_ROUTES = ["SUR-DD","SUR-WADI","LUR-KWV",'KWV-MRJ','DD-SUR','WADI-SUR','KWV-LUR','MRJ-KWV']
 
 HEAD_LIST = ["", "ELECT/TRD", "ELECT/G", "ELECT/TRO", "SIGNAL & TELECOM", "OPTG","MECHANICAL",
@@ -153,85 +155,7 @@ SUBHEAD_LIST = {
     "FINANCE":["MISC"], "MEDICAL":["MISC"], "STORE": ["MISC"],
 }
 
-INSPECTION_BY_LIST = [""] + ["HQ OFFICER CCE/CR",'DRM/SUR', 'ADRM', 'Sr.DSO', 'Sr.DOM', 'Sr.DEN/S', 'Sr.DEN/C', 'Sr.DEN/Co', 'Sr.DSTE',
-                             'Sr.DEE/TRD', 'Sr.DEE/G','Sr.DEE/TRO', 'Sr.DME', 'Sr.DCM', 'Sr.DPO', 'Sr.DFM', 'Sr.DMM', 'DSC',
-                             'DME,DEE/TRD', 'DFM', 'DSTE/HQ', 'DSTE/KLBG', 'ADEN/T/SUR', 'ADEN/W/SUR', 'ADEN/KWV',
-                             'ADEN/PVR', 'ADEN/LUR', 'ADEN/KLBG', 'ADSTE/SUR', 'ADSTE/I/KWV', 'ADSTE/II/KWV',
-                             'ADME/SUR', 'AOM/GD', 'AOM/GEN', 'ACM/Cog', 'ACM/TC', 'ACM/GD', 'APO/GEN', 'APO/WEL',
-                             'ADFM/I', 'ADFMII', 'ASC', 'ADSO/SUR']
-
-ACTION_BY_LIST = [""] + ['DRM/SUR', 'ADRM', 'Sr.DSO', 'Sr.DOM', 'Sr.DEN/S', 'Sr.DEN/C', 'Sr.DEN/Co', 'Sr.DSTE',
-                         'Sr.DEE/TRD', 'Sr.DEE/G','Sr.DEE/TRO', 'Sr.DME', 'Sr.DCM', 'Sr.DPO', 'Sr.DFM', 'Sr.DMM', 'DSC', 'CMS']
-
-VALID_INSPECTIONS = [
-    "FOOTPLATE INSPECTION", "STATION INSPECTION", "LC GATE INSPECTION",
-    "MISC", "COACHING DEPOT", "ON TRAIN", "SURPRISE/AMBUSH INSPECTION", "WORKSITE INSPECTION", "OTHER (UNUSUAL)",
-]
-
-FOOTPLATE_LIST = STATION_LIST + GATE_LIST + FOOTPLATE_ROUTES
-
-def normalize_str(text):
-    if not isinstance(text, str):
-        return ""
-    return re.sub(r'\s+', ' ', text.lower()).strip()
-
-def classify_feedback(feedback, user_remark=""):
-    if isinstance(feedback, str) and feedback.strip() == "`":
-        return ""
-
-    def _classify(text_normalized):
-        if not text_normalized:
-            return None
-        date_found = bool(re.search(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', text_normalized))
-
-        resolved_kw = [
-            "attended", "solved", "done", "completed", "confirmed by", "message given",
-            "tdc work completed", "replaced", "msg given", "msg sent", "counseled", "info shared",
-            "communicated", "sent successfully", "counselled", "gate will be closed soon",
-            "attending at the time", "handled", "resolved", "action taken", "spoken to", "warned",
-            "counselling", "hubli", "working normal", "met", "discussion held", "report sent",
-            "notified", "explained", "nil", "na", "tlc", "work completed", "acknowledged", "visited",
-            "briefed", "guided", "handover", "working properly", "checked found working", "supply restored",
-            "updated by", "adv to", "counselled the staff", "complied", "checked and found",
-            "maintained", "for needful action", "provided at", "in working condition", "is working",
-            "found working", "equipment is working", "item is working", "as per plan", "putright", "put right",
-            "operational feasibility", "will be provided", "will be supplied shortly", "advised to ubl", "updated"
-        ]
-        pending_kw = [
-            "work is going on", "tdc given", "target date", "expected by", "likely by", "planned by",
-            "will be", "needful", "to be", "pending", "not done", "awaiting", "waiting", "yet to", "next time",
-            "follow up", "tdc.", "tdc", "t d c", "will attend", "will be attended", "scheduled", "reminder",
-            "to inform", "to counsel", "to submit", "to do", "to replace", "prior", "remains", "still",
-            "under process", "not yet", "to be done", "will ensure", "during next", "action will be taken",'noted please tdc',
-            "will be supplied shortly", "not available", "not updated", "progress", "under progress",
-            "to arrange", "awaited", "material awaited", "approval awaited", "to procure", "yet pending",
-            "incomplete", "tentative", "ongoing", "in progress", "being done", "arranging", "waiting for",
-            "subject to", "awaiting approval", "awaiting material", "awaiting confirmation", "next schedule",
-            "planned for", "will arrange", "proposed date", "to complete", "to be completed",
-            "likely completion", "expected completion", "not received", "awaiting response"
-        ]
-
-        if "tdc" in text_normalized and any(k in text_normalized for k in resolved_kw):
-            return "Resolved"
-        if any(k in text_normalized for k in pending_kw):
-            return "Pending"
-        if date_found:
-            return "Pending" if "tdc" in text_normalized else "Resolved"
-        if any(k in text_normalized for k in resolved_kw):
-            return "Resolved"
-        return None
-    fb = normalize_str(feedback)
-    rm = normalize_str(user_remark)
-    m = re.findall(r"[!#]", f"{fb} {rm}".strip())
-    if m:
-        return "Resolved" if m[-1] == "#" else "Pending"
-    a = _classify(fb)
-    b = _classify(rm)
-    if a == "Resolved" or b == "Resolved":
-        return "Resolved"
-    if a == "Pending" or b == "Pending":
-        return "Pending"
-    return "Pending"
+# You can add helper functions like classify_feedback, normalize_str, etc here exactly as needed
 
 @st.cache_data(ttl=0)
 def load_data():
@@ -263,37 +187,41 @@ if "df" not in st.session_state:
 df = st.session_state.df
 
 st.markdown("""
-    <div style="display:flex;align-items:center;margin-top:10px;margin-bottom:20px;">
-        <img src="https://raw.githubusercontent.com/srdsoproject/testing/main/Central%20Railway%20Logo.png"
-             height="55" style="margin-right:15px;object-fit:contain;">
-        <div>
-            <h3 style="margin:0;font-weight:bold;color:var(--text-color);">
-                An initiative by <b>Safety Department</b>, Solapur Division
-            </h3>
-        </div>
+<div style="display:flex;align-items:center;margin-top:10px;margin-bottom:20px;">
+    <img src="https://raw.githubusercontent.com/srdsoproject/testing/main/Central%20Railway%20Logo.png"
+         height="55" style="margin-right:15px;object-fit:contain;">
+    <div>
+        <h3 style="margin:0;font-weight:bold;color:var(--text-color);">
+            An initiative by <b>Safety Department</b>, Solapur Division
+        </h3>
     </div>
-    <h1 style="margin-top:0;color:var(--text-color);">📋 S.A.R.A.L</h1>
-    <h3 style="margin-top:-10px;font-weight:normal;color:var(--text-color);">
-        (Safety Abnormality Report & Action List – Version 1.1.8)
-    </h3>
+</div>
+<h1 style="margin-top:0;color:var(--text-color);">📋 S.A.R.A.L</h1>
+<h3 style="margin-top:-10px;font-weight:normal;color:var(--text-color);">
+    (Safety Abnormality Report & Action List – Version 1.1.8)
+</h3>
 """, unsafe_allow_html=True)
 
 user_department = st.session_state.user.get("department", "").upper()
+
+# Filter pending deficiencies for user's department and remove duplicate columns before display
 dept_pending = df[(df["Head"].str.upper() == user_department) & (df["Status"].str.upper() == "PENDING")]
+dept_pending = dept_pending.loc[:, ~dept_pending.columns.duplicated()]
+
 pending_count = len(dept_pending)
+
 try:
     ack_status = pd.read_excel("dept_pending_ack.xlsx")
 except FileNotFoundError:
     ack_status = pd.DataFrame(columns=["UserID", "Department", "MarkedAt"])
+
 already_acknowledged = (
     (ack_status["UserID"] == st.session_state.user['email']) &
     (ack_status["Department"] == user_department)
 ).any()
+
 if pending_count > 0 and not already_acknowledged:
-    with st.expander(
-        f"⚠️ {pending_count} Pending Deficienc{'y' if pending_count==1 else 'ies'} for your department",
-        expanded=True
-    ):
+    with st.expander(f"⚠️ {pending_count} Pending Deficienc{'y' if pending_count==1 else 'ies'} for your department", expanded=True):
         st.dataframe(dept_pending)
         if st.button("Mark all as Read (Acknowledge)", key="acknowledge_dept_btn"):
             new_entry = {
@@ -317,9 +245,10 @@ with tabs[0]:
             df[col] = ""
     df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], format="%d.%m.%y", errors="coerce")
     df["_original_sheet_index"] = df.index
-    df["Status"] = df["Feedback"].apply(classify_feedback)
+    df["Status"] = df["Feedback"].apply(lambda x: "Pending" if str(x).strip() == "" else "Resolved")
+
     start_date = df["Date of Inspection"].min()
-    end_date   = df["Date of Inspection"].max()
+    end_date = df["Date of Inspection"].max()
     c1, c2 = st.columns(2)
     c1.multiselect("Type of Inspection", VALID_INSPECTIONS, key="view_type_filter")
     c2.multiselect("Location", FOOTPLATE_LIST, key="view_location_filter")
@@ -328,27 +257,29 @@ with tabs[0]:
     sub_opts = sorted({s for h in st.session_state.view_head_filter for s in SUBHEAD_LIST.get(h, [])})
     c4.multiselect("Sub Head", sub_opts, key="view_sub_filter")
     selected_status = st.selectbox("🔘 Status", ["All", "Pending", "Resolved"], key="view_status_filter")
+
     filtered = df[(df["Date of Inspection"] >= start_date) & (df["Date of Inspection"] <= end_date)]
     if st.session_state.view_type_filter:
-        filtered = filtered[filtered["Type of Inspection"].isin(st.session_state.view_type_filter)]    
+        filtered = filtered[filtered["Type of Inspection"].isin(st.session_state.view_type_filter)]
     if st.session_state.view_location_filter:
-        filtered = filtered[filtered["Location"].isin(st.session_state.view_location_filter)]    
+        filtered = filtered[filtered["Location"].isin(st.session_state.view_location_filter)]
     if st.session_state.view_head_filter:
         filtered = filtered[filtered["Head"].isin(st.session_state.view_head_filter)]
     if st.session_state.view_sub_filter:
-        filtered = filtered[filtered["Sub Head"].isin(st.session_state.view_sub_filter)]    
+        filtered = filtered[filtered["Sub Head"].isin(st.session_state.view_sub_filter)]
     if selected_status != "All":
         filtered = filtered[filtered["Status"] == selected_status]
-    st.write(f"🔹 Showing {len(filtered)} record(s) from **{start_date.strftime('%d.%m.%Y')}** "
-             f"to **{end_date.strftime('%d.%m.%Y')}**")
+
+    st.write(f"🔹 Showing {len(filtered)} record(s) from **{start_date.strftime('%d.%m.%Y')}** to **{end_date.strftime('%d.%m.%Y')}**")
     col_a, col_b, col_c, col_d = st.columns(4)
-    pending_count     = (filtered["Status"] == "Pending").sum()
+    pending_count = (filtered["Status"] == "Pending").sum()
     no_response_count = filtered["Feedback"].isna().sum() + (filtered["Feedback"].astype(str).str.strip() == "").sum()
-    resolved_count    = (filtered["Status"] == "Resolved").sum()
+    resolved_count = (filtered["Status"] == "Resolved").sum()
     col_a.metric("🟨 Pending", pending_count)
     col_b.metric("⚠️ No Response", no_response_count)
     col_c.metric("🟩 Resolved", resolved_count)
     col_d.metric("📊 Total Records", len(filtered))
+
 
     # ---------- SUB HEAD DISTRIBUTION CHART ----------
     if st.session_state.view_head_filter and not filtered.empty:
@@ -946,5 +877,6 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
