@@ -2,9 +2,6 @@ import streamlit as st
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
-from matplotlib import pyplot as plt
-import altair as alt
-import re
 
 # ---------- CONFIG ----------
 st.set_page_config(page_title="Inspection App", layout="wide")
@@ -67,19 +64,19 @@ st.sidebar.success("✅ Connected to Google Sheets!")
 department = st.session_state.user.get("department", "UNKNOWN")
 
 try:
-    # Manually define expected headers to avoid duplicates
-    expected_headers = ["Head", "Deficiency", "Date", "Remarks"]  # adjust to your sheet
+    # Only include actual sheet columns
+    expected_headers = ["Head", "PendingDeficiencies"]
     deficiencies_df = pd.DataFrame(sheet.get_all_records(expected_headers=expected_headers))
 
-    # Rename Head → Department for consistency
+    # Rename Head → Department
     if "Head" in deficiencies_df.columns:
         deficiencies_df = deficiencies_df.rename(columns={"Head": "Department"})
 
     # Count deficiencies per department
-    if not deficiencies_df.empty and "Department" in deficiencies_df.columns:
-        full_pending_by_head = deficiencies_df.groupby("Department").size()
+    if not deficiencies_df.empty and "Department" in deficiencies_df.columns and "PendingDeficiencies" in deficiencies_df.columns:
+        full_pending_by_head = deficiencies_df.groupby("Department")["PendingDeficiencies"].sum()
     else:
-        st.warning("⚠️ 'Department' column not found in sheet.")
+        st.warning("⚠️ 'Department' or 'PendingDeficiencies' column not found in sheet.")
         full_pending_by_head = pd.Series(dtype=int)
 
 except Exception as e:
@@ -157,6 +154,7 @@ if st.sidebar.button("🚪 Logout"):
     st.session_state.logged_in = False
     st.session_state.user = {}
     st.rerun()
+
 
 
 # ---------- CONSTANT LISTS ----------
@@ -1095,6 +1093,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
