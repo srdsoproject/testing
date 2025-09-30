@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
-from io import BytesIO
 from matplotlib import pyplot as plt
 import altair as alt
 import re
@@ -67,20 +66,19 @@ st.sidebar.success("✅ Connected to Google Sheets!")
 # ---------- DEPARTMENT DEFICIENCY CHECK ----------
 department = st.session_state.user.get("department", "UNKNOWN")
 
-# Load deficiencies data (Google Sheet must have Department | PendingDeficiencies)
 try:
     deficiencies_df = pd.DataFrame(sheet.get_all_records())
+    if not deficiencies_df.empty and "Department" in deficiencies_df.columns:
+        # Count deficiencies per department
+        full_pending_by_head = deficiencies_df.groupby("Department").size()
+    else:
+        full_pending_by_head = pd.Series(dtype=int)
 except Exception as e:
-    st.warning("⚠️ Could not load deficiencies data.")
-    deficiencies_df = pd.DataFrame(columns=["Department", "PendingDeficiencies"])
+    st.warning(f"⚠️ Could not load deficiencies data: {e}")
+    full_pending_by_head = pd.Series(dtype=int)
 
-pending_count = 0
-if not deficiencies_df.empty and department in deficiencies_df["Department"].values:
-    pending_count = int(
-        deficiencies_df.loc[
-            deficiencies_df["Department"] == department, "PendingDeficiencies"
-        ].sum()
-    )
+# Get this user's pending deficiency count
+pending_count = full_pending_by_head.get(department, 0)
 
 if pending_count > 50:
     st.error(
@@ -1090,6 +1088,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
