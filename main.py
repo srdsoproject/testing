@@ -576,19 +576,16 @@ with tabs[0]:
         export_df.to_excel(writer, index=False, sheet_name="Filtered Records")
         ws = writer.sheets["Filtered Records"]
 
-        # Define date format style
-        date_style = NamedStyle(name="date_style", number_format="DD-MM-YYYY")
-
         # Apply alignment + wrap text for ALL cells
         for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
             for cell in row:
                 cell.alignment = Alignment(wrap_text=True, vertical="top")
 
-        # Apply date format only to "Date of Inspection" column
+        # Apply date format to "Date of Inspection" column by setting number_format directly
         date_col_idx = export_df.columns.get_loc("Date of Inspection") + 1
         for row in ws.iter_rows(min_row=2, min_col=date_col_idx, max_col=date_col_idx, max_row=len(export_df) + 1):
             for cell in row:
-                cell.style = date_style
+                cell.number_format = "DD-MM-YYYY"
 
         # Auto column widths
         for col in ws.columns:
@@ -600,7 +597,7 @@ with tabs[0]:
                         max_length = max(max_length, len(str(cell.value)))
                 except:
                     pass
-            adjusted_width = (max_length + 2) if max_length < 50 else 50  # cap width
+            adjusted_width = (max_length + 2) if max_length < 50 else 50
             ws.column_dimensions[col_letter].width = adjusted_width
 
         # Apply border to all cells
@@ -1079,6 +1076,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
