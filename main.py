@@ -484,7 +484,6 @@ with tabs[0]:
     col_b.metric("⚠️ No Response", no_response_count)
     col_c.metric("🟩 Resolved", resolved_count)
     col_d.metric("📊 Total Records", len(filtered))
-    col_e.metric("🟨 Total Pending (All Records)", total_pending_count)
 
     # Display top 3 departments by pending deficiencies from filtered data
     pending_by_head = (
@@ -1009,6 +1008,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
