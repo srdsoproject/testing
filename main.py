@@ -68,11 +68,18 @@ department = st.session_state.user.get("department", "UNKNOWN")
 
 try:
     deficiencies_df = pd.DataFrame(sheet.get_all_records())
+
+    # Rename "Head" → "Department" if needed
+    if "Head" in deficiencies_df.columns:
+        deficiencies_df = deficiencies_df.rename(columns={"Head": "Department"})
+
     if not deficiencies_df.empty and "Department" in deficiencies_df.columns:
         # Count deficiencies per department
         full_pending_by_head = deficiencies_df.groupby("Department").size()
     else:
+        st.warning("⚠️ 'Department' column not found in sheet.")
         full_pending_by_head = pd.Series(dtype=int)
+
 except Exception as e:
     st.warning(f"⚠️ Could not load deficiencies data: {e}")
     full_pending_by_head = pd.Series(dtype=int)
@@ -90,7 +97,6 @@ if pending_count > 50:
 # ---------- ACKNOWLEDGMENT ----------
 user_id = st.session_state.user["email"]  # use email as unique ID
 
-# Load acknowledgments safely
 try:
     ack_df = pd.read_excel("responses.xlsx")
     if "UserID" not in ack_df.columns or "Name" not in ack_df.columns:
@@ -98,7 +104,6 @@ try:
 except FileNotFoundError:
     ack_df = pd.DataFrame(columns=["UserID", "Name"])
 
-# Check if THIS user already acknowledged
 user_ack_done = user_id in ack_df["UserID"].values
 
 if not user_ack_done:
@@ -1088,6 +1093,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
