@@ -67,14 +67,16 @@ st.sidebar.success("✅ Connected to Google Sheets!")
 department = st.session_state.user.get("department", "UNKNOWN")
 
 try:
-    deficiencies_df = pd.DataFrame(sheet.get_all_records())
+    # Manually define expected headers to avoid duplicates
+    expected_headers = ["Head", "Deficiency", "Date", "Remarks"]  # adjust to your sheet
+    deficiencies_df = pd.DataFrame(sheet.get_all_records(expected_headers=expected_headers))
 
-    # Rename "Head" → "Department" if needed
+    # Rename Head → Department for consistency
     if "Head" in deficiencies_df.columns:
         deficiencies_df = deficiencies_df.rename(columns={"Head": "Department"})
 
+    # Count deficiencies per department
     if not deficiencies_df.empty and "Department" in deficiencies_df.columns:
-        # Count deficiencies per department
         full_pending_by_head = deficiencies_df.groupby("Department").size()
     else:
         st.warning("⚠️ 'Department' column not found in sheet.")
@@ -1093,6 +1095,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
