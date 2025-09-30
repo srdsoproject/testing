@@ -7,6 +7,7 @@ from matplotlib import pyplot as plt
 import altair as alt
 # ---------- CONFIG ----------
 import pandas as pd
+from openpyxl.styles import Alignment, Font  # Removed Border, Side
 
 st.set_page_config(page_title="Inspection App", layout="wide")
 
@@ -539,9 +540,9 @@ with tabs[0]:
             adjusted_width = (max_length + 2) if max_length < 50 else 50
             ws.column_dimensions[col_letter].width = adjusted_width
     
-        # Removed cell border formatting to avoid NameError with Border and Side
+        # Removed border formatting to avoid errors
     
-        # Apply color formatting to Status column
+        # Apply color formatting to Status column font
         status_col_idx = export_df.columns.get_loc("Status") + 1
         for row in ws.iter_rows(min_row=2, min_col=status_col_idx, max_col=status_col_idx, max_row=len(export_df) + 1):
             for cell in row:
@@ -1008,6 +1009,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
