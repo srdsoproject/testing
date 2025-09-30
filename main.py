@@ -493,10 +493,19 @@ with tabs[0]:
         .sort_values(ascending=False)
     )
     top_3_heads = pending_by_head.head(3)
+    
     if not top_3_heads.empty:
-        st.markdown("### 🏢 Top 3 Departments by Pending Deficiencies")
-        for dept, count in top_3_heads.items():
-            st.markdown(f"- **{dept}**: {count} pending deficiencies")
+        # Filter full DataFrame for these departments and pending status
+        full_pending_by_head = (
+            df[(df["Status"] == "Pending") & (df["Head"].isin(top_3_heads.index))]
+            .groupby("Head")["Status"]
+            .count()
+        )
+
+    st.markdown("### 🏢 Top 3 Departments by Pending Deficiencies (Total Count)")
+    for dept in top_3_heads.index:
+        count = full_pending_by_head.get(dept, 0)
+        st.markdown(f"- **{dept}**: {count} total pending deficiencies")
 
     # Sub Head Distribution Chart if Heads selected and records exist (same as your original code)...
 
@@ -1008,6 +1017,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
