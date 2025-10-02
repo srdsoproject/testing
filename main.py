@@ -6,7 +6,7 @@ import numpy as np
 from io import BytesIO
 from google.oauth2.service_account import Credentials
 from openpyxl.styles import Alignment
-
+import matplotlib.pyplot as plt
 # ---------- CONFIG ----------
 st.set_page_config(page_title="Inspection App", layout="wide")
 
@@ -990,6 +990,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
