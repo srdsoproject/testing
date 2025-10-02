@@ -31,9 +31,9 @@ def login(email, password):
 if not st.session_state.logged_in:
     st.title("🔐 Login to S.A.R.A.L (Safety Abnormality Report & Action List)")
     with st.form("login_form", clear_on_submit=True):
-        email = st.text_input("📧 Email", key="login_email")
-        password = st.text_input("🔒 Password", type="password", key="login_password")
-        submitted = st.form_submit_button("Login", type="primary", use_container_width=True)
+        email = st.text_input("📧 Email")
+        password = st.text_input("🔒 Password", type="password")
+        submitted = st.form_submit_button("Login")
 
         if submitted:
             user = login(email, password)
@@ -67,8 +67,8 @@ if not user_ack_done:
         """)
 
         with st.form("ack_form"):
-            responder_name = st.text_input("✍️ Your Name", key="ack_name")
-            ack_submitted = st.form_submit_button("Submit Acknowledgment", type="primary")
+            responder_name = st.text_input("✍️ Your Name")
+            ack_submitted = st.form_submit_button("Submit Acknowledgment")
 
             if ack_submitted:
                 if responder_name.strip():
@@ -94,7 +94,7 @@ except FileNotFoundError:
     st.write("No responses submitted yet.")
 
 if st.button("🗑️ Clear All Responses", key="clear_responses_btn"):
-    df = pd.DataFrame(columns=["UserID", "Name"])
+    df = pd.DataFrame(columns=["Name"])
     df.to_excel("responses.xlsx", index=False)
     st.success("✅ All responses have been cleared.")
 
@@ -121,10 +121,80 @@ st.sidebar.success("✅ Connected to Google Sheets!")
 # ---------- SIDEBAR ----------
 st.sidebar.markdown(f"👤 Logged in as: **{st.session_state.user['name']}**")
 st.sidebar.markdown(f"📧 {st.session_state.user['email']}")
-if st.sidebar.button("🚪 Logout", key="logout_btn_sidebar"):
+if st.sidebar.button("🚪 Logout"):
     st.session_state.logged_in = False
     st.session_state.user = {}
     st.rerun()
+
+# -------------------- HELPERS --------------------
+def normalize_str(text):
+    if not isinstance(text, str):
+        return ""
+    return re.sub(r'\s+', ' ', text.lower()).strip()
+
+def classify_feedback(feedback, user_remark=""):
+    # Empty backtick = clear
+    if isinstance(feedback, str) and feedback.strip() == "`":
+        return ""
+
+    def _classify(text_normalized):
+        if not text_normalized:
+            return None
+        date_found = bool(re.search(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', text_normalized))
+
+        resolved_kw = [
+            "attended", "solved", "done", "completed", "confirmed by", "message given",
+            "tdc work completed", "replaced", "msg given", "msg sent", "counseled", "info shared",
+            "communicated", "sent successfully", "counselled", "gate will be closed soon",
+            "attending at the time", "handled", "resolved", "action taken", "spoken to", "warned",
+            "counselling", "hubli", "working normal", "met", "discussion held", "report sent",
+            "notified", "explained", "nil", "na", "tlc", "work completed", "acknowledged", "visited",
+            "briefed", "guided", "handover", "working properly", "checked found working", "supply restored",
+            "updated by", "adv to", "counselled the staff", "complied", "checked and found",
+            "maintained", "for needful action", "provided at", "in working condition", "is working",
+            "found working", "equipment is working", "item is working", "as per plan", "putright", "put right",
+            "operational feasibility", "will be provided", "will be supplied shortly", "advised to ubl", "updated"
+        ]
+
+        pending_kw = [
+            "work is going on", "tdc given", "target date", "expected by", "likely by", "planned by",
+            "will be", "needful", "to be", "pending", "not done", "awaiting", "waiting", "yet to", "next time",
+            "follow up", "tdc.", "tdc", "t d c", "will attend", "will be attended", "scheduled", "reminder",
+            "to inform", "to counsel", "to submit", "to do", "to replace", "prior", "remains", "still",
+            "under process", "not yet", "to be done", "will ensure", "during next", "action will be taken",'noted please tdc',
+            "will be supplied shortly", "not available", "not updated", "progress", "under progress",
+            "to arrange", "awaited", "material awaited", "approval awaited", "to procure", "yet pending",
+            "incomplete", "tentative", "ongoing", "in progress", "being done", "arranging", "waiting for",
+            "subject to", "awaiting approval", "awaiting material", "awaiting confirmation", "next schedule",
+            "planned for", "will arrange", "proposed date", "to complete", "to be completed",
+            "likely completion", "expected completion", "not received", "awaiting response"
+        ]
+
+        if "tdc" in text_normalized and any(k in text_normalized for k in resolved_kw):
+            return "Resolved"
+        if any(k in text_normalized for k in pending_kw):
+            return "Pending"
+        if date_found:
+            return "Pending" if "tdc" in text_normalized else "Resolved"
+        if any(k in text_normalized for k in resolved_kw):
+            return "Resolved"
+        return None
+
+    fb = normalize_str(feedback)
+    rm = normalize_str(user_remark)
+
+    # marker override
+    m = re.findall(r"[!#]", f"{fb} {rm}".strip())
+    if m:
+        return "Resolved" if m[-1] == "#" else "Pending"
+
+    a = _classify(fb)
+    b = _classify(rm)
+    if a == "Resolved" or b == "Resolved":
+        return "Resolved"
+    if a == "Pending" or b == "Pending":
+        return "Pending"
+    return "Pending"
 
 # ---------- LOAD DATA ----------
 @st.cache_data(ttl=60)
@@ -197,9 +267,9 @@ def update_feedback_column(edited_df):
 def apply_common_filters(df, prefix=""):
     with st.expander("🔍 Apply Additional Filters", expanded=True):
         c1, c2 = st.columns(2)
-        c1.multiselect("Inspection By", df["Inspection By"].unique().tolist(),
+        c1.multiselect("Inspection By", df["Inspection By"].unique().tolist(), 
                        default=st.session_state.get(prefix+"insp", []), key=prefix+"insp")
-        c2.multiselect("Action By", df["Action By"].unique().tolist(),
+        c2.multiselect("Action By", df["Action By"].unique().tolist(), 
                        default=st.session_state.get(prefix+"action", []), key=prefix+"action")
 
         d1, d2 = st.columns(2)
@@ -915,6 +985,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
