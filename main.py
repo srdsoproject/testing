@@ -96,7 +96,7 @@ if not st.session_state.logged_in:
                 st.session_state.logged_in = True
                 st.session_state.user = user
                 st.success(f"✅ Welcome, {user.get('name')}!")
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.error("❌ Invalid email or password.")
     st.stop()
@@ -133,7 +133,7 @@ if user_id not in ack_df["UserID"].values:
                     ack_df = pd.concat([ack_df, pd.DataFrame([new_entry])], ignore_index=True)
                     ack_df.to_excel(ack_file, index=False)
                     st.success(f"✅ Thank you, {responder_name}, for acknowledging.")
-                    st.experimental_rerun()
+                    st.rerun()
                 else:
                     st.error("❌ Please enter your name before submitting.")
     st.stop()
@@ -162,7 +162,7 @@ st.sidebar.markdown(f"📧 {st.session_state.user.get('email')}")
 if st.sidebar.button("🚪 Logout"):
     st.session_state.logged_in = False
     st.session_state.user = {}
-    st.experimental_rerun()
+    st.rerun()
 
 @st.cache_data(ttl=300)
 def load_sheet_data():
@@ -933,4 +933,5 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
