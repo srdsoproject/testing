@@ -7,6 +7,7 @@ from io import BytesIO
 from google.oauth2.service_account import Credentials
 from openpyxl.styles import Alignment
 import matplotlib.pyplot as plt
+
 # ---------- CONFIG ----------
 st.set_page_config(page_title="Inspection App", layout="wide")
 
@@ -20,7 +21,6 @@ if "ack_done" not in st.session_state:
 
 # ---------- LOGIN ----------
 def login(email, password):
-    """Check credentials against st.secrets['users']"""
     for user in st.secrets["users"]:
         if user["email"] == email and user["password"] == password:
             return user
@@ -63,7 +63,6 @@ if not user_ack_done:
         The compliance of deficiencies of previous dates are pending & needs to be completed immediately.  
         I hereby declare that I have read this notice and will ensure compliance.
         """)
-
         with st.form("ack_form"):
             responder_name = st.text_input("✍️ Your Name")
             ack_submitted = st.form_submit_button("Submit Acknowledgment")
@@ -82,17 +81,17 @@ if not user_ack_done:
 # ---------- DISPLAY ALL RESPONSES ----------
 st.markdown("### 📝 Responses Received")
 try:
-    df = pd.read_excel("responses.xlsx")
-    if not df.empty:
-        st.dataframe(df)
+    df_responses = pd.read_excel("responses.xlsx")
+    if not df_responses.empty:
+        st.dataframe(df_responses)
     else:
         st.write("No responses submitted yet.")
 except FileNotFoundError:
     st.write("No responses submitted yet.")
 
 if st.button("🗑️ Clear All Responses", key="clear_responses_btn"):
-    df = pd.DataFrame(columns=["UserID","Name"])
-    df.to_excel("responses.xlsx", index=False)
+    df_responses = pd.DataFrame(columns=["UserID","Name"])
+    df_responses.to_excel("responses.xlsx", index=False)
     st.success("✅ All responses have been cleared.")
 
 # ---------- CONSTANTS ----------
@@ -284,26 +283,43 @@ def update_feedback_column(edited_df):
 def apply_common_filters(df, prefix=""):
     with st.expander("🔍 Apply Additional Filters", expanded=True):
         c1,c2=st.columns(2)
-        c1.multiselect("Inspection By", df["Inspection By"].unique().tolist(), 
+        insp_selected = c1.multiselect("Inspection By", df["Inspection By"].unique().tolist(), 
                        default=st.session_state.get(prefix+"insp", []), key=prefix+"insp")
-        c2.multiselect("Action By", df["Action By"].unique().tolist(), 
+        action_selected = c2.multiselect("Action By", df["Action By"].unique().tolist(), 
                        default=st.session_state.get(prefix+"action", []), key=prefix+"action")
         d1,d2=st.columns(2)
-        d1.date_input("📅 From Date", key=prefix+"from_date")
-        d2.date_input("📅 To Date", key=prefix+"to_date")
+        from_date = d1.date_input("📅 From Date", key=prefix+"from_date")
+        to_date = d2.date_input("📅 To Date", key=prefix+"to_date")
 
     out=df.copy()
-    if st.session_state.get(prefix+"insp"):
-        sel=st.session_state[prefix+"insp"]
+    if insp_selected:
+        sel=insp_selected
         out=out[out["Inspection By"].apply(lambda x:any(s.strip() in str(x).split(",") for s in sel))]
-    if st.session_state.get(prefix+"action"):
-        sel=st.session_state[prefix+"action"]
+    if action_selected:
+        sel=action_selected
         out=out[out["Action By"].apply(lambda x:any(s.strip() in str(x).split(",") for s in sel))]
-    if st.session_state.get(prefix+"from_date") and st.session_state.get(prefix+"to_date"):
-        from_date=st.session_state[prefix+"from_date"]
-        to_date=st.session_state[prefix+"to_date"]
-        out=out[(out["Date of Inspection"]>=pd.to_datetime(from_date))&(out["Date of Inspection"]<=pd.to_datetime(to_date))]
+    if from_date and to_date:
+        out=out[(out["Date of Inspection"]>=pd.to_datetime(from_date)) & 
+                (out["Date of Inspection"]<=pd.to_datetime(to_date))]
     return out
+
+# ---------- MAIN PAGE ----------
+st.title("🛠 Inspection Records")
+
+filtered_df = apply_common_filters(st.session_state.df)
+st.dataframe(filtered_df)
+
+# ---------- FEEDBACK STATUS CHART ----------
+if not filtered_df.empty:
+    filtered_df["Feedback Status"] = filtered_df.apply(
+        lambda row: classify_feedback(row.get("Feedback",""), row.get("User Feedback/Remark","")), axis=1
+    )
+    status_counts = filtered_df["Feedback Status"].value_counts().reindex(["Pending","Resolved"], fill_value=0)
+    fig, ax = plt.subplots()
+    ax.bar(status_counts.index, status_counts.values, color=["orange","green"])
+    ax.set_title("Feedback Status Summary")
+    ax.set_ylabel("Count")
+    st.pyplot(fig)
 
 
 
@@ -990,6 +1006,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
