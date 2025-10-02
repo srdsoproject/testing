@@ -76,7 +76,7 @@ if not user_ack_done:
         with st.form("ack_form"):
             responder_name = st.text_input("✍️ Your Name")
             ack_submitted = st.form_submit_button("Submit Acknowledgment")
-            
+
             if ack_submitted:
                 if responder_name.strip():
                     # Save acknowledgment (per user)
@@ -473,7 +473,7 @@ with tabs[0]:
     pending_count     = (filtered["Status"] == "Pending").sum()
     no_response_count = filtered["Feedback"].isna().sum() + (filtered["Feedback"].astype(str).str.strip() == "").sum()
     resolved_count    = (filtered["Status"] == "Resolved").sum()
-    
+
     col_a.metric("🟨 Pending", pending_count)
     col_b.metric("⚠️ No Response", no_response_count)
     col_c.metric("🟩 Resolved", resolved_count)
@@ -555,36 +555,36 @@ with tabs[0]:
     from io import BytesIO
     import pandas as pd
     from openpyxl.styles import Alignment, Font, Border, Side, NamedStyle
-    
+
     # Export dataframe
     export_df = filtered[[
         "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
         "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "User Feedback/Remark",
         "Status"
     ]].copy()
-    
+
     # 🔹 Ensure date column is only a date (no time part)
     export_df["Date of Inspection"] = pd.to_datetime(export_df["Date of Inspection"]).dt.date
-    
+
     towb = BytesIO()
     with pd.ExcelWriter(towb, engine="openpyxl") as writer:
         export_df.to_excel(writer, index=False, sheet_name="Filtered Records")
         ws = writer.sheets["Filtered Records"]
-    
+
         # 🔹 Define date format style
         date_style = NamedStyle(name="date_style", number_format="DD-MM-YYYY")
-    
+
         # Apply alignment + wrap text for ALL cells
         for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
             for cell in row:
                 cell.alignment = Alignment(wrap_text=True, vertical="top")
-    
+
         # Apply date format only to "Date of Inspection" column
         date_col_idx = export_df.columns.get_loc("Date of Inspection") + 1
         for row in ws.iter_rows(min_row=2, min_col=date_col_idx, max_col=date_col_idx, max_row=len(export_df) + 1):
             for cell in row:
                 cell.style = date_style
-    
+
         # Auto column widths
         for col in ws.columns:
             max_length = 0
@@ -597,7 +597,7 @@ with tabs[0]:
                     pass
             adjusted_width = (max_length + 2) if max_length < 50 else 50  # cap width
             ws.column_dimensions[col_letter].width = adjusted_width
-    
+
         # Apply border to all cells
         thin_border = Border(left=Side(style='thin'),
                              right=Side(style='thin'),
@@ -606,7 +606,7 @@ with tabs[0]:
         for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
             for cell in row:
                 cell.border = thin_border
-    
+
         # Apply color formatting to Status column
         status_col_idx = export_df.columns.get_loc("Status") + 1
         for row in ws.iter_rows(min_row=2, min_col=status_col_idx, max_col=status_col_idx, max_row=len(export_df) + 1):
@@ -615,9 +615,9 @@ with tabs[0]:
                     cell.font = Font(color="FF0000")  # Red
                 elif str(cell.value).strip().lower() == "resolved":
                     cell.font = Font(color="008000")  # Green
-    
+
     towb.seek(0)
-    
+
     # Streamlit download button
     st.download_button(
         "📥 Export Filtered Records to Excel", 
@@ -646,19 +646,17 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-import streamlit as st  # first import
 
-st.set_page_config(page_title="Inspection App", layout="wide")  # must come immediately after import
-
-# Other imports
+# -------------------- EDITOR --------------------
 from io import BytesIO
 import pandas as pd
 from openpyxl.styles import Alignment, Font, Border, Side, NamedStyle
+import streamlit as st
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from st_aggrid.shared import JsCode
 
 # -------------------- CONFIG --------------------
-
+st.set_page_config(page_title="Inspection App", layout="wide")
 
 # -------------------- EXAMPLE FILTERED DATA --------------------
 # `filtered` should be your dataframe loaded from Google Sheets or Excel
@@ -673,6 +671,7 @@ export_df = filtered[[
 ]].copy()
 
 # Ensure date column is only a date (no time part)
+export_df["Date of Inspection"] = pd.to_datetime(export_df["Date of Inspection"]).dt.date
 export_df["Date of Inspection"] = pd.to_datetime(export_df["Date of Inspection"], errors="coerce").dt.date
 
 towb = BytesIO()
@@ -727,6 +726,7 @@ with pd.ExcelWriter(towb, engine="openpyxl") as writer:
 
 towb.seek(0)
 
+# Streamlit download button
 # Streamlit download button (only one)
 st.download_button(
     label="📥 Export Filtered Records to Excel",
@@ -783,21 +783,30 @@ if not editable_filtered.empty:
     ]
 
     feedback_locked = False
+    head_pending_counts = (
+        editable_filtered[editable_filtered["Status"].str.contains("Pending", case=False, na=False)]
+        .groupby("Head")
+        .size()
+        .to_dict()
+    )
     head_pending_counts = pending_filtered.groupby("Head").size().to_dict()
 
     for head, pending_count in head_pending_counts.items():
         if pending_count > 50:
             st.error(
+                f"⚠️ Department **{head}** has **{pending_count} pending deficiencies**.\n\n"
                 f"⚠️ Department **{head}** has **{pending_count} pending deficiencies** "
                 f"since {start_analysis_date.date()}.\n\n"
                 "Kindly resolve them first, otherwise feedback will be **locked** until further action."
             )
             feedback_locked = True
 
+    # Ensure stable IDs exist for reliable updates
     # Ensure stable IDs exist
     if "_original_sheet_index" not in editable_filtered.columns:
         editable_filtered["_original_sheet_index"] = editable_filtered.index
     if "_sheet_row" not in editable_filtered.columns:
+        editable_filtered["_sheet_row"] = editable_filtered.index + 2  # sheet row (header + 1)
         editable_filtered["_sheet_row"] = editable_filtered.index + 2
 
     display_cols = [
@@ -808,6 +817,10 @@ if not editable_filtered.empty:
     editable_df = editable_filtered[display_cols].copy()
 
     # Show only date part
+    if "Date of Inspection" in editable_df.columns:
+        editable_df["Date of Inspection"] = pd.to_datetime(
+            editable_df["Date of Inspection"], errors="coerce"
+        ).dt.strftime("%Y-%m-%d")
     editable_df["Date of Inspection"] = pd.to_datetime(
         editable_df["Date of Inspection"], errors="coerce"
     ).dt.strftime("%Y-%m-%d")
@@ -828,6 +841,7 @@ if not editable_filtered.empty:
     gb = GridOptionsBuilder.from_dataframe(editable_df)
     gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True)
 
+    # Make ONLY "User Feedback/Remark" editable
     gb.configure_column(
         "User Feedback/Remark",
         editable=True,
@@ -838,10 +852,14 @@ if not editable_filtered.empty:
         cellEditorParams={"maxLength": 4000}
     )
 
+    # Hide helper ID columns
     gb.configure_column("_original_sheet_index", hide=True)
     gb.configure_column("_sheet_row", hide=True)
+
+    # Easier editing UX
     gb.configure_grid_options(singleClickEdit=True)
 
+    # ✅ Auto-size all columns on load
     auto_size_js = JsCode("""
     function(params) {
         let allColumnIds = [];
@@ -854,6 +872,7 @@ if not editable_filtered.empty:
     gb.configure_grid_options(onFirstDataRendered=auto_size_js)
 
     grid_options = gb.build()
+
     grid_response = AgGrid(
         editable_df,
         gridOptions=grid_options,
@@ -877,15 +896,19 @@ if not editable_filtered.empty:
 
     # ----------------- SUBMIT LOGIC -----------------
     if submitted and not feedback_locked:
+        # Validate needed columns
         need_cols = {"_original_sheet_index", "User Feedback/Remark"}
         if not need_cols.issubset(edited_df.columns) or "Feedback" not in editable_filtered.columns:
             st.error("⚠️ Required columns are missing from the data.")
         else:
+            # Compare remarks using the stable ID to find changes
             orig = editable_filtered.set_index("_original_sheet_index")
             new = edited_df.set_index("_original_sheet_index")
 
             old_remarks = orig["User Feedback/Remark"].fillna("").astype(str)
             new_remarks = new["User Feedback/Remark"].fillna("").astype(str)
+
+            # Align indexes before comparing
             common_ids = new_remarks.index.intersection(old_remarks.index)
             diff_mask = new_remarks.loc[common_ids] != old_remarks.loc[common_ids]
             changed_ids = diff_mask[diff_mask].index.tolist()
@@ -894,6 +917,7 @@ if not editable_filtered.empty:
                 diffs = new.loc[changed_ids].copy()
                 diffs["_sheet_row"] = orig.loc[changed_ids, "_sheet_row"].values
 
+                # Routing dictionary
                 routing = {
                     "Pertains to S&T":        ("SIGNAL & TELECOM", "Sr.DSTE"),
                     "Pertains to OPTG":       ("OPTG", "Sr.DOM"),
@@ -904,6 +928,9 @@ if not editable_filtered.empty:
                     "Pertains to Sr.DEN/S":   ("ENGINEERING", "Sr.DEN/S"),
                     "Pertains to Sr.DEN/C":   ("ENGINEERING", "Sr.DEN/C"),
                     "Pertains to Sr.DEN/Co":  ("ENGINEERING", "Sr.DEN/Co"),
+                    "Pertains to FINAINCE": ("FINANCE","Sr.DFM"),
+                    "Pertains to STORE" : ("STORE","Sr.DMM"),
+                    "Pertains to MEDICAL" : ("MEDICAL", "CMS"),
                     "Pertains to FINAINCE":   ("FINANCE","Sr.DFM"),
                     "Pertains to STORE" :     ("STORE","Sr.DMM"),
                     "Pertains to MEDICAL" :   ("MEDICAL", "CMS"),
@@ -923,10 +950,13 @@ if not editable_filtered.empty:
                             diffs.at[oid, "Action By"] = action_by
                             diffs.at[oid, "Sub Head"] = ""
 
+                            # Collect extra info
                             # Build alert message
                             date_str = orig.loc[oid, "Date of Inspection"]
                             deficiency = orig.loc[oid, "Deficiencies Noted"]
                             forwarded_by = orig.loc[oid, "Head"]
+
+                            # Build alert message
                             alert_msg = (
                                 f"📌 **{head} Department Alert**\n"
                                 f"- Date: {date_str}\n"
@@ -936,11 +966,13 @@ if not editable_filtered.empty:
                             )
                             st.session_state.alerts_log.insert(0, alert_msg)
 
+                    # Replace Feedback with new remark (clear remark column)
                     diffs.at[oid, "Feedback"] = user_remark
                     diffs.at[oid, "User Feedback/Remark"] = ""
                     st.session_state.df.at[oid, "Feedback"] = user_remark
                     st.session_state.df.at[oid, "User Feedback/Remark"] = ""
 
+                # Persist to storage
                 update_feedback_column(
                     diffs.reset_index().rename(columns={"index": "_original_sheet_index"})
                 )
@@ -1190,11 +1222,3 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
-
-
-
-
-
-
-
-
