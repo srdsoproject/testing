@@ -3,8 +3,6 @@ import pandas as pd
 import gspread
 import re
 import numpy as np
-import matplotlib.pyplot as plt
-import altair as alt
 from io import BytesIO
 from google.oauth2.service_account import Credentials
 from openpyxl.styles import Alignment
@@ -47,7 +45,7 @@ if not st.session_state.logged_in:
     st.stop()
 
 # ---------- ACKNOWLEDGMENT ----------
-user_id = st.session_state.user["email"]  # use email as unique ID
+user_id = st.session_state.user["email"]
 
 try:
     ack_df = pd.read_excel("responses.xlsx")
@@ -75,7 +73,6 @@ if not user_ack_done:
                     new_entry = {"UserID": user_id, "Name": responder_name.strip()}
                     ack_df = pd.concat([ack_df, pd.DataFrame([new_entry])], ignore_index=True)
                     ack_df.to_excel("responses.xlsx", index=False)
-
                     st.success(f"✅ Thank you, {responder_name}, for acknowledging.")
                     st.rerun()
                 else:
@@ -94,21 +91,133 @@ except FileNotFoundError:
     st.write("No responses submitted yet.")
 
 if st.button("🗑️ Clear All Responses", key="clear_responses_btn"):
-    df = pd.DataFrame(columns=["Name"])
+    df = pd.DataFrame(columns=["UserID","Name"])
     df.to_excel("responses.xlsx", index=False)
     st.success("✅ All responses have been cleared.")
+
+# ---------- CONSTANTS ----------
+STATION_LIST = list(dict.fromkeys([
+    'BRB','MLM','BGVN','JNTR','PRWD','WSB','PPJ','JEUR','KEM','BLNI','DHS','KWV','WDS','MA','AAG',
+    'MKPT','MO','MVE','PK','BALE',"SUR",'TKWD','HG','TLT','AKOR','NGS','BOT','DUD','KUI','GDGN','GUR',
+    'HHD','SVG','BBD','TJSP','KLBG','HQR','MR','SDB','WADI','ARAG','BLNK','SGRE','KVK','LNP','DLGN',
+    'JTRD','MSDG','JVA','WSD','SGLA','PVR','MLB','SEI','BTW','PJR','DRSV','YSI','KMRD','DKY','MRX',
+    'OSA','HGL','LUR','NTPC','MRJ','BHLI'
+]))
+
+GATE_LIST = list(dict.fromkeys([
+    'LC-19','LC-22A','LC-25','LC-26','LC-27C','LC-28','LC-30','LC-31','LC-35','LC-37','LC-40','LC-41',
+    'LC-43','LC-44','LC-45','LC-46C','LC-54','LC-61','LC-66','LC-74','LC-76','LC-78','LC-82','LC-1',
+    'LC-60A','LC-1 TLT ZCL','LC-1 ACC','LC-2 ACC','LC-91','LC-22','LC-24','LC-32','LC-49','LC-70',
+    'LC-10','LC-34','LC-36','LC-47','LC-55','LC-59','LC-2','LC-4','LC-42','LC-02','LC-128','LC-63',
+    'LC-04','LC-67','LC-77','LC-75','LC-64','LC-65','LC-5','LC-6','LC-57','LC-62','LC-39','LC-2/C',
+    'LC-6/C','LC-11','LC-03','LC-15/C','LC-21','LC-26-A','LC-60'
+]))
+
+FOOTPLATE_ROUTES = ["SUR-DD","SUR-WADI","LUR-KWV",'KWV-MRJ','DD-SUR','WADI-SUR','KWV-LUR','MRJ-KWV']
+
+HEAD_LIST = ["", "ELECT/TRD", "ELECT/G", "ELECT/TRO", "SIGNAL & TELECOM", "OPTG","MECHANICAL",
+             "ENGINEERING", "COMMERCIAL", "C&W", 'PERSONNEL', 'SECURITY',  "FINANCE", "MEDICAL", "STORE"]
+
+SUBHEAD_LIST = {
+    "ELECT/TRD": ["T/W WAGON", "TSS/SP/SSP", "OHE SECTION", "OHE STATION", "MISC"],
+    "ELECT/G": ["TL/AC COACH", "POWER/PANTRY CAR", "WIRING/EQUIPMENT", "UPS", "AC", "DG", "SOLAR LIGHT", "MISC"],
+    "ELECT/TRO": ["LOCO DEFECTS", "RUNNING ROOM DEFICIENCIES", "LOBBY DEFICIENCIES", "LRD RELATED", "PERSONAL STORE", "PR RELATED",
+                  "CMS", "MISC"],
+    "MECHANICAL":["MISC"],
+    "SIGNAL & TELECOM": ["SIGNAL PUTBACK/BLANK", "OTHER SIGNAL FAILURE", "BPAC", "GATE", "RELAY ROOM",
+                         "STATION(VDU/BLOCK INSTRUMENT)", "MISC", "CCTV", "DISPLAY BOARDS"],
+    "OPTG": ["SWR/CSR/CSL/TWRD", "COMPETENCY RELATED", "STATION RECORDS", "STATION DEFICIENCIES",
+             "SM OFFICE DEFICIENCIES", "MISC"],
+    "ENGINEERING": ["IOW WORKS","GSU","ROUGH RIDING", "TRACK NEEDS ATTENTION", "MISC"],
+    "COMMERCIAL": ["TICKETING RELATED/MACHINE", "IRCTC", "MISC"],
+    "C&W": ["BRAKE BINDING",'WHEEL DEFECT','TRAIN PARTING','PASSENGER AMENITIES','AIR PRESSURE LEAKAGE',
+            'DAMAGED UNDER GEAR PARTS','MISC'],
+    "FINANCE":["MISC"], "MEDICAL":["MISC"], "STORE": ["MISC"]
+}
+
+INSPECTION_BY_LIST = [""] + ["HQ OFFICER CCE/CR",'DRM/SUR', 'ADRM', 'Sr.DSO', 'Sr.DOM', 'Sr.DEN/S', 'Sr.DEN/C', 'Sr.DEN/Co', 'Sr.DSTE',
+                             'Sr.DEE/TRD', 'Sr.DEE/G','Sr.DEE/TRO', 'Sr.DME', 'Sr.DCM', 'Sr.DPO', 'Sr.DFM', 'Sr.DMM', 'DSC',
+                             'DME,DEE/TRD', 'DFM', 'DSTE/HQ', 'DSTE/KLBG', 'ADEN/T/SUR', 'ADEN/W/SUR', 'ADEN/KWV',
+                             'ADEN/PVR', 'ADEN/LUR', 'ADEN/KLBG', 'ADSTE/SUR', 'ADSTE/I/KWV', 'ADSTE/II/KWV',
+                             'ADME/SUR', 'AOM/GD', 'AOM/GEN', 'ACM/Cog', 'ACM/TC', 'ACM/GD', 'APO/GEN', 'APO/WEL',
+                             'ADFM/I', 'ADFMII', 'ASC', 'ADSO/SUR']
+
+ACTION_BY_LIST = [""] + ['DRM/SUR', 'ADRM', 'Sr.DSO', 'Sr.DOM', 'Sr.DEN/S', 'Sr.DEN/C', 'Sr.DEN/Co', 'Sr.DSTE',
+                         'Sr.DEE/TRD', 'Sr.DEE/G','Sr.DEE/TRO', 'Sr.DME', 'Sr.DCM', 'Sr.DPO', 'Sr.DFM', 'Sr.DMM', 'DSC', 'CMS']
+
+VALID_INSPECTIONS = [
+    "FOOTPLATE INSPECTION", "STATION INSPECTION", "LC GATE INSPECTION",
+    "MISC", "COACHING DEPOT", "ON TRAIN", "SURPRISE/AMBUSH INSPECTION", "WORKSITE INSPECTION", "OTHER (UNUSUAL)",
+]
+
+FOOTPLATE_LIST = STATION_LIST + GATE_LIST + FOOTPLATE_ROUTES
+
+# ---------- HELPERS ----------
+def normalize_str(text):
+    if not isinstance(text, str):
+        return ""
+    return re.sub(r'\s+', ' ', text.lower()).strip()
+
+def classify_feedback(feedback, user_remark=""):
+    if isinstance(feedback, str) and feedback.strip() == "`":
+        return ""
+    def _classify(text_normalized):
+        if not text_normalized:
+            return None
+        date_found = bool(re.search(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', text_normalized))
+        resolved_kw = ["attended","solved","done","completed","confirmed by","message given","tdc work completed",
+                       "replaced","msg given","msg sent","counseled","info shared","communicated","sent successfully",
+                       "counselled","gate will be closed soon","attending at the time","handled","resolved",
+                       "action taken","spoken to","warned","counselling","hubli","working normal","met",
+                       "discussion held","report sent","notified","explained","nil","na","tlc","work completed",
+                       "acknowledged","visited","briefed","guided","handover","working properly",
+                       "checked found working","supply restored","updated by","adv to","counselled the staff",
+                       "complied","checked and found","maintained","for needful action","provided at",
+                       "in working condition","is working","found working","equipment is working",
+                       "item is working","as per plan","putright","put right","operational feasibility",
+                       "will be provided","will be supplied shortly","advised to ubl","updated"]
+        pending_kw = ["work is going on","tdc given","target date","expected by","likely by","planned by",
+                      "will be","needful","to be","pending","not done","awaiting","waiting","yet to","next time",
+                      "follow up","tdc.","tdc","t d c","will attend","will be attended","scheduled","reminder",
+                      "to inform","to counsel","to submit","to do","to replace","prior","remains","still",
+                      "under process","not yet","to be done","will ensure","during next","action will be taken",
+                      "noted please tdc","will be supplied shortly","not available","not updated","progress",
+                      "under progress","to arrange","awaited","material awaited","approval awaited",
+                      "to procure","yet pending","incomplete","tentative","ongoing","in progress","being done",
+                      "arranging","waiting for","subject to","awaiting approval","awaiting material",
+                      "awaiting confirmation","next schedule","planned for","will arrange","proposed date",
+                      "to complete","to be completed","likely completion","expected completion","not received",
+                      "awaiting response"]
+        if "tdc" in text_normalized and any(k in text_normalized for k in resolved_kw):
+            return "Resolved"
+        if any(k in text_normalized for k in pending_kw):
+            return "Pending"
+        if date_found:
+            return "Pending" if "tdc" in text_normalized else "Resolved"
+        if any(k in text_normalized for k in resolved_kw):
+            return "Resolved"
+        return None
+
+    fb = normalize_str(feedback)
+    rm = normalize_str(user_remark)
+    m = re.findall(r"[!#]", f"{fb} {rm}".strip())
+    if m:
+        return "Resolved" if m[-1] == "#" else "Pending"
+    a = _classify(fb)
+    b = _classify(rm)
+    if a == "Resolved" or b == "Resolved":
+        return "Resolved"
+    if a == "Pending" or b == "Pending":
+        return "Pending"
+    return "Pending"
 
 # ---------- GOOGLE SHEETS CONNECTION ----------
 @st.cache_resource
 def connect_to_gsheet():
-    SCOPES = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive",
-    ]
+    SCOPES = ["https://www.googleapis.com/auth/spreadsheets","https://www.googleapis.com/auth/drive"]
     service_account_info = dict(st.secrets["gcp_service_account"])
     if "private_key" in service_account_info:
-        service_account_info["private_key"] = service_account_info["private_key"].replace("\\n", "\n")
-
+        service_account_info["private_key"] = service_account_info["private_key"].replace("\\n","\n")
     creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPES)
     gc = gspread.authorize(creds)
     SHEET_ID = "1_WQyJCtdXuAIQn3IpFTI4KfkrveOHosNsvsZn42jAvw"
@@ -126,97 +235,20 @@ if st.sidebar.button("🚪 Logout"):
     st.session_state.user = {}
     st.rerun()
 
-# -------------------- HELPERS --------------------
-def normalize_str(text):
-    if not isinstance(text, str):
-        return ""
-    return re.sub(r'\s+', ' ', text.lower()).strip()
-
-def classify_feedback(feedback, user_remark=""):
-    # Empty backtick = clear
-    if isinstance(feedback, str) and feedback.strip() == "`":
-        return ""
-
-    def _classify(text_normalized):
-        if not text_normalized:
-            return None
-        date_found = bool(re.search(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', text_normalized))
-
-        resolved_kw = [
-            "attended", "solved", "done", "completed", "confirmed by", "message given",
-            "tdc work completed", "replaced", "msg given", "msg sent", "counseled", "info shared",
-            "communicated", "sent successfully", "counselled", "gate will be closed soon",
-            "attending at the time", "handled", "resolved", "action taken", "spoken to", "warned",
-            "counselling", "hubli", "working normal", "met", "discussion held", "report sent",
-            "notified", "explained", "nil", "na", "tlc", "work completed", "acknowledged", "visited",
-            "briefed", "guided", "handover", "working properly", "checked found working", "supply restored",
-            "updated by", "adv to", "counselled the staff", "complied", "checked and found",
-            "maintained", "for needful action", "provided at", "in working condition", "is working",
-            "found working", "equipment is working", "item is working", "as per plan", "putright", "put right",
-            "operational feasibility", "will be provided", "will be supplied shortly", "advised to ubl", "updated"
-        ]
-
-        pending_kw = [
-            "work is going on", "tdc given", "target date", "expected by", "likely by", "planned by",
-            "will be", "needful", "to be", "pending", "not done", "awaiting", "waiting", "yet to", "next time",
-            "follow up", "tdc.", "tdc", "t d c", "will attend", "will be attended", "scheduled", "reminder",
-            "to inform", "to counsel", "to submit", "to do", "to replace", "prior", "remains", "still",
-            "under process", "not yet", "to be done", "will ensure", "during next", "action will be taken",'noted please tdc',
-            "will be supplied shortly", "not available", "not updated", "progress", "under progress",
-            "to arrange", "awaited", "material awaited", "approval awaited", "to procure", "yet pending",
-            "incomplete", "tentative", "ongoing", "in progress", "being done", "arranging", "waiting for",
-            "subject to", "awaiting approval", "awaiting material", "awaiting confirmation", "next schedule",
-            "planned for", "will arrange", "proposed date", "to complete", "to be completed",
-            "likely completion", "expected completion", "not received", "awaiting response"
-        ]
-
-        if "tdc" in text_normalized and any(k in text_normalized for k in resolved_kw):
-            return "Resolved"
-        if any(k in text_normalized for k in pending_kw):
-            return "Pending"
-        if date_found:
-            return "Pending" if "tdc" in text_normalized else "Resolved"
-        if any(k in text_normalized for k in resolved_kw):
-            return "Resolved"
-        return None
-
-    fb = normalize_str(feedback)
-    rm = normalize_str(user_remark)
-
-    # marker override
-    m = re.findall(r"[!#]", f"{fb} {rm}".strip())
-    if m:
-        return "Resolved" if m[-1] == "#" else "Pending"
-
-    a = _classify(fb)
-    b = _classify(rm)
-    if a == "Resolved" or b == "Resolved":
-        return "Resolved"
-    if a == "Pending" or b == "Pending":
-        return "Pending"
-    return "Pending"
-
 # ---------- LOAD DATA ----------
 @st.cache_data(ttl=60)
 def load_data():
-    REQUIRED_COLS = [
-        "Date of Inspection", "Type of Inspection", "Location",
-        "Head", "Sub Head", "Deficiencies Noted",
-        "Inspection By", "Action By", "Feedback",
-        "User Feedback/Remark"
-    ]
+    REQUIRED_COLS = ["Date of Inspection","Type of Inspection","Location","Head","Sub Head",
+                     "Deficiencies Noted","Inspection By","Action By","Feedback","User Feedback/Remark"]
     try:
         data = sheet.get_all_values()
-        if not data or len(data) < 2:
+        if not data or len(data)<2:
             return pd.DataFrame(columns=REQUIRED_COLS)
-
         headers = [c.strip() for c in data[0]]
         df = pd.DataFrame(data[1:], columns=headers)
-
         for col in REQUIRED_COLS:
             if col not in df.columns:
                 df[col] = ""
-
         df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
         df["Location"] = df["Location"].astype(str).str.strip().str.upper()
         df["_sheet_row"] = df.index + 2
@@ -225,79 +257,52 @@ def load_data():
         st.error(f"❌ Error loading Google Sheet: {e}")
         return pd.DataFrame(columns=REQUIRED_COLS)
 
-# ---------- GOOGLE SHEET UPDATE ----------
+st.session_state.df = load_data()
+
+# ---------- UPDATE GOOGLE SHEET ----------
 def update_feedback_column(edited_df):
     header = sheet.row_values(1)
-    col_map = {name: i+1 for i, name in enumerate(header)}
-
-    needed = ["Feedback", "User Feedback/Remark", "Head", "Action By", "Sub Head"]
+    col_map = {name:i+1 for i,name in enumerate(header)}
+    needed = ["Feedback","User Feedback/Remark","Head","Action By","Sub Head"]
     missing = [c for c in needed if c not in col_map]
     if missing:
         st.error(f"⚠️ Missing columns: {missing}")
         return
-
-    updates = []
-    for _, row in edited_df.iterrows():
-        r = int(row["_sheet_row"])
-        values = [
-            row.get("Feedback", "") or "",
-            row.get("User Feedback/Remark", "") or "",
-            row.get("Head", "") or "",
-            row.get("Action By", "") or "",
-            row.get("Sub Head", "") or "",
-        ]
-        col_start = col_map["Feedback"]
-        col_end   = col_map["Sub Head"]
-        rng = gspread.utils.rowcol_to_a1(r, col_start) + ":" + gspread.utils.rowcol_to_a1(r, col_end)
-        updates.append({"range": rng, "values": [values]})
-
-        # sync session df
-        st.session_state.df.loc[
-            st.session_state.df["_sheet_row"] == r,
-            needed
-        ] = values
-
+    updates=[]
+    for _,row in edited_df.iterrows():
+        r=int(row["_sheet_row"])
+        values=[row.get(c,"") for c in needed]
+        col_start=col_map["Feedback"]
+        col_end=col_map["Sub Head"]
+        rng=gspread.utils.rowcol_to_a1(r,col_start)+":"+gspread.utils.rowcol_to_a1(r,col_end)
+        updates.append({"range":rng,"values":[values]})
+        st.session_state.df.loc[st.session_state.df["_sheet_row"]==r,needed]=values
     if updates:
-        sheet.spreadsheet.values_batch_update({
-            "valueInputOption": "USER_ENTERED",
-            "data": updates
-        })
+        sheet.spreadsheet.values_batch_update({"valueInputOption":"USER_ENTERED","data":updates})
 
 # ---------- FILTER WIDGETS ----------
 def apply_common_filters(df, prefix=""):
     with st.expander("🔍 Apply Additional Filters", expanded=True):
-        c1, c2 = st.columns(2)
+        c1,c2=st.columns(2)
         c1.multiselect("Inspection By", df["Inspection By"].unique().tolist(), 
                        default=st.session_state.get(prefix+"insp", []), key=prefix+"insp")
         c2.multiselect("Action By", df["Action By"].unique().tolist(), 
                        default=st.session_state.get(prefix+"action", []), key=prefix+"action")
-
-        d1, d2 = st.columns(2)
+        d1,d2=st.columns(2)
         d1.date_input("📅 From Date", key=prefix+"from_date")
         d2.date_input("📅 To Date", key=prefix+"to_date")
 
-    out = df.copy()
-
+    out=df.copy()
     if st.session_state.get(prefix+"insp"):
-        sel = st.session_state[prefix+"insp"]
-        out = out[out["Inspection By"].apply(
-            lambda x: any(s.strip() in str(x).split(",") for s in sel)
-        )]
-
+        sel=st.session_state[prefix+"insp"]
+        out=out[out["Inspection By"].apply(lambda x:any(s.strip() in str(x).split(",") for s in sel))]
     if st.session_state.get(prefix+"action"):
-        sel = st.session_state[prefix+"action"]
-        out = out[out["Action By"].apply(
-            lambda x: any(s.strip() in str(x).split(",") for s in sel)
-        )]
-
+        sel=st.session_state[prefix+"action"]
+        out=out[out["Action By"].apply(lambda x:any(s.strip() in str(x).split(",") for s in sel))]
     if st.session_state.get(prefix+"from_date") and st.session_state.get(prefix+"to_date"):
-        from_date = st.session_state[prefix+"from_date"]
-        to_date   = st.session_state[prefix+"to_date"]
-        out = out[
-            (out["Date of Inspection"] >= pd.to_datetime(from_date)) &
-            (out["Date of Inspection"] <= pd.to_datetime(to_date))
-        ]
-
+        from_date=st.session_state[prefix+"from_date"]
+        to_date=st.session_state[prefix+"to_date"]
+        out=out[(out["Date of Inspection"]>=pd.to_datetime(from_date))&(out["Date of Inspection"]<=pd.to_datetime(to_date))]
     return out
 
 
@@ -985,6 +990,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
