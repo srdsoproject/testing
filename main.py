@@ -646,17 +646,19 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+import streamlit as st  # first import
 
-# -------------------- EDITOR --------------------
+st.set_page_config(page_title="Inspection App", layout="wide")  # must come immediately after import
+
+# Other imports
 from io import BytesIO
 import pandas as pd
 from openpyxl.styles import Alignment, Font, Border, Side, NamedStyle
-import streamlit as st
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from st_aggrid.shared import JsCode
 
 # -------------------- CONFIG --------------------
-st.set_page_config(page_title="Inspection App", layout="wide")
+
 
 # -------------------- EXAMPLE FILTERED DATA --------------------
 # `filtered` should be your dataframe loaded from Google Sheets or Excel
@@ -1188,6 +1190,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
