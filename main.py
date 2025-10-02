@@ -650,20 +650,19 @@ st.markdown(
 # -------------------- EDITOR --------------------
 from io import BytesIO
 import pandas as pd
-import streamlit as st
 from openpyxl.styles import Alignment, Font, Border, Side, NamedStyle
+import streamlit as st
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
-from st_aggrid.shared import JsCode   # for autoSizeAllColumns
+from st_aggrid.shared import JsCode
 
-# -------------------- EXPORT TO EXCEL --------------------
-# Export dataframe (filtered must be defined earlier in your app)
+# -------------------- EXPORT DATA --------------------
 export_df = filtered[[
     "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
     "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "User Feedback/Remark",
     "Status"
 ]].copy()
 
-# 🔹 Ensure date column is only a date (no time part)
+# Ensure date column is only a date (no time part)
 export_df["Date of Inspection"] = pd.to_datetime(export_df["Date of Inspection"]).dt.date
 
 towb = BytesIO()
@@ -671,10 +670,10 @@ with pd.ExcelWriter(towb, engine="openpyxl") as writer:
     export_df.to_excel(writer, index=False, sheet_name="Filtered Records")
     ws = writer.sheets["Filtered Records"]
 
-    # 🔹 Define date format style
+    # Define date format style
     date_style = NamedStyle(name="date_style", number_format="DD-MM-YYYY")
 
-    # Apply alignment + wrap text for ALL cells
+    # Apply alignment + wrap text for all cells
     for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
         for cell in row:
             cell.alignment = Alignment(wrap_text=True, vertical="top")
@@ -695,7 +694,7 @@ with pd.ExcelWriter(towb, engine="openpyxl") as writer:
                     max_length = max(max_length, len(str(cell.value)))
             except:
                 pass
-        adjusted_width = (max_length + 2) if max_length < 50 else 50  # cap width
+        adjusted_width = (max_length + 2) if max_length < 50 else 50
         ws.column_dimensions[col_letter].width = adjusted_width
 
     # Apply border to all cells
@@ -720,10 +719,11 @@ towb.seek(0)
 
 # Streamlit download button
 st.download_button(
-    "📥 Export Filtered Records to Excel", 
+    label="📥 Export Filtered Records to Excel",
     data=towb,
     file_name="filtered_records.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    key="download_filtered_excel"
 )
 
 # -------------------- STATUS UTILS --------------------
@@ -756,15 +756,20 @@ if "alerts_log" not in st.session_state:
 
 editable_filtered = filtered.copy()
 if not editable_filtered.empty:
+
     # ✅ Search box for Deficiency
-    search_text = st.text_input("🔍 Search Deficiencies", "").strip().lower()
+    search_text = st.text_input("🔍 Search Deficiencies", "", key="search_def").strip().lower()
     if search_text:
         editable_filtered = editable_filtered[
             editable_filtered["Deficiencies Noted"].astype(str).str.lower().str.contains(search_text)
         ]
 
     # ✅ Select Head
-    selected_head = st.selectbox("👤 Select Head", sorted(editable_filtered["Head"].dropna().unique()))
+    selected_head = st.selectbox(
+        "👤 Select Head",
+        sorted(editable_filtered["Head"].dropna().unique()),
+        key="select_head"
+    )
 
     # ✅ Check Pending Deficiencies for that Head
     pending_count = editable_filtered[
@@ -852,15 +857,16 @@ if not editable_filtered.empty:
         gridOptions=grid_options,
         update_mode=GridUpdateMode.VALUE_CHANGED,
         height=600,
-        allow_unsafe_jscode=True
+        allow_unsafe_jscode=True,
+        key="editable_grid"
     )
 
     edited_df = pd.DataFrame(grid_response["data"])
 
     # ----------------- BUTTONS -----------------
     c1, c2, _ = st.columns([1, 1, 1])
-    submitted = c1.button("✅ Submit Feedback", disabled=feedback_locked)  # 🔒 Disabled if locked
-    if c2.button("🔄 Refresh Data"):
+    submitted = c1.button("✅ Submit Feedback", disabled=feedback_locked, key="submit_feedback")
+    if c2.button("🔄 Refresh Data", key="refresh_data"):
         st.session_state.df = load_data()
         st.success("✅ Data refreshed successfully!")
 
@@ -901,9 +907,9 @@ if not editable_filtered.empty:
                     "Pertains to Sr.DEN/S":   ("ENGINEERING", "Sr.DEN/S"),
                     "Pertains to Sr.DEN/C":   ("ENGINEERING", "Sr.DEN/C"),
                     "Pertains to Sr.DEN/Co":  ("ENGINEERING", "Sr.DEN/Co"),
-                    "Pertains to FINAINCE":   ("FINANCE","Sr.DFM"),
-                    "Pertains to STORE" :     ("STORE","Sr.DMM"),
-                    "Pertains to MEDICAL" :   ("MEDICAL", "CMS"),
+                    "Pertains to FINAINCE": ("FINANCE","Sr.DFM"),
+                    "Pertains to STORE" : ("STORE","Sr.DMM"),
+                    "Pertains to MEDICAL" : ("MEDICAL", "CMS"),
                 }
 
                 for oid in changed_ids:
@@ -920,12 +926,12 @@ if not editable_filtered.empty:
                             diffs.at[oid, "Action By"] = action_by
                             diffs.at[oid, "Sub Head"] = ""
 
-                            # 👉 Collect extra info
+                            # Collect extra info
                             date_str = orig.loc[oid, "Date of Inspection"]
                             deficiency = orig.loc[oid, "Deficiencies Noted"]
                             forwarded_by = orig.loc[oid, "Head"]
 
-                            # 👉 Build alert message
+                            # Build alert message
                             alert_msg = (
                                 f"📌 **{head} Department Alert**\n"
                                 f"- Date: {date_str}\n"
@@ -935,10 +941,9 @@ if not editable_filtered.empty:
                             )
                             st.session_state.alerts_log.insert(0, alert_msg)
 
-                    # ✅ Replace Feedback with new remark (clear remark column)
+                    # Replace Feedback with new remark (clear remark column)
                     diffs.at[oid, "Feedback"] = user_remark
                     diffs.at[oid, "User Feedback/Remark"] = ""
-
                     st.session_state.df.at[oid, "Feedback"] = user_remark
                     st.session_state.df.at[oid, "User Feedback/Remark"] = ""
 
@@ -949,8 +954,10 @@ if not editable_filtered.empty:
                 st.success(f"✅ Updated {len(changed_ids)} Feedback row(s) with new remarks.")
             else:
                 st.info("ℹ️ No changes detected to save.")
+
 else:
     st.info("Deficiencies will be updated soon !")
+
 
 
 
@@ -1192,6 +1199,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
