@@ -1,13 +1,15 @@
 import streamlit as st
 import pandas as pd
 import gspread
-from google.oauth2.service_account import Credentials
-from io import BytesIO
-from matplotlib import pyplot as plt
+import re
+import numpy as np
+import matplotlib.pyplot as plt
 import altair as alt
-# ---------- CONFIG ----------
-import pandas as pd
+from io import BytesIO
+from google.oauth2.service_account import Credentials
+from openpyxl.styles import Alignment
 
+# ---------- CONFIG ----------
 st.set_page_config(page_title="Inspection App", layout="wide")
 
 # ---------- SESSION STATE INITIALIZATION ----------
@@ -19,12 +21,6 @@ if "ack_done" not in st.session_state:
     st.session_state.ack_done = False
 
 # ---------- LOGIN ----------
-import pandas as pd
-
-# ---------- LOGIN ----------
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-
 def login(email, password):
     """Check credentials against st.secrets['users']"""
     for user in st.secrets["users"]:
@@ -53,16 +49,13 @@ if not st.session_state.logged_in:
 # ---------- ACKNOWLEDGMENT ----------
 user_id = st.session_state.user["email"]  # use email as unique ID
 
-# Load acknowledgments safely
 try:
     ack_df = pd.read_excel("responses.xlsx")
-    # Ensure correct columns exist
     if "UserID" not in ack_df.columns or "Name" not in ack_df.columns:
         ack_df = pd.DataFrame(columns=["UserID", "Name"])
 except FileNotFoundError:
     ack_df = pd.DataFrame(columns=["UserID", "Name"])
 
-# Check if THIS user already acknowledged
 user_ack_done = user_id in ack_df["UserID"].values
 
 if not user_ack_done:
@@ -79,7 +72,6 @@ if not user_ack_done:
             
             if ack_submitted:
                 if responder_name.strip():
-                    # Save acknowledgment (per user)
                     new_entry = {"UserID": user_id, "Name": responder_name.strip()}
                     ack_df = pd.concat([ack_df, pd.DataFrame([new_entry])], ignore_index=True)
                     ack_df.to_excel("responses.xlsx", index=False)
@@ -89,7 +81,6 @@ if not user_ack_done:
                 else:
                     st.error("❌ Please enter your name before submitting.")
     st.stop()
-
 
 # ---------- DISPLAY ALL RESPONSES ----------
 st.markdown("### 📝 Responses Received")
@@ -101,17 +92,13 @@ try:
         st.write("No responses submitted yet.")
 except FileNotFoundError:
     st.write("No responses submitted yet.")
+
 if st.button("🗑️ Clear All Responses", key="clear_responses_btn"):
     df = pd.DataFrame(columns=["Name"])
     df.to_excel("responses.xlsx", index=False)
     st.success("✅ All responses have been cleared.")
-# ---------- GOOGLE SHEETS CONNECTION ----------
-import pandas as pd
-import gspread
-import re
-from google.oauth2.service_account import Credentials
 
-# ---------- STEP 1: CONNECT TO GOOGLE SHEETS ----------
+# ---------- GOOGLE SHEETS CONNECTION ----------
 @st.cache_resource
 def connect_to_gsheet():
     SCOPES = [
@@ -139,15 +126,6 @@ if st.sidebar.button("🚪 Logout"):
     st.session_state.user = {}
     st.rerun()
 
-# ---------- CONSTANT LISTS ----------
-# -------------------- IMPORTS --------------------
-import re
-import io
-from io import BytesIO
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-from openpyxl.styles import Alignment
 
 # -------------------- CONSTANTS (DEDUPED) --------------------
 # Use dict.fromkeys(...) to preserve order while removing duplicates
@@ -1075,3 +1053,4 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
