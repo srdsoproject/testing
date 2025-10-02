@@ -31,9 +31,9 @@ def login(email, password):
 if not st.session_state.logged_in:
     st.title("🔐 Login to S.A.R.A.L (Safety Abnormality Report & Action List)")
     with st.form("login_form", clear_on_submit=True):
-        email = st.text_input("📧 Email")
-        password = st.text_input("🔒 Password", type="password")
-        submitted = st.form_submit_button("Login")
+        email = st.text_input("📧 Email", key="login_email")
+        password = st.text_input("🔒 Password", type="password", key="login_password")
+        submitted = st.form_submit_button("Login", type="primary", use_container_width=True)
 
         if submitted:
             user = login(email, password)
@@ -67,9 +67,9 @@ if not user_ack_done:
         """)
 
         with st.form("ack_form"):
-            responder_name = st.text_input("✍️ Your Name")
-            ack_submitted = st.form_submit_button("Submit Acknowledgment")
-            
+            responder_name = st.text_input("✍️ Your Name", key="ack_name")
+            ack_submitted = st.form_submit_button("Submit Acknowledgment", type="primary")
+
             if ack_submitted:
                 if responder_name.strip():
                     new_entry = {"UserID": user_id, "Name": responder_name.strip()}
@@ -94,7 +94,7 @@ except FileNotFoundError:
     st.write("No responses submitted yet.")
 
 if st.button("🗑️ Clear All Responses", key="clear_responses_btn"):
-    df = pd.DataFrame(columns=["Name"])
+    df = pd.DataFrame(columns=["UserID", "Name"])
     df.to_excel("responses.xlsx", index=False)
     st.success("✅ All responses have been cleared.")
 
@@ -121,254 +121,10 @@ st.sidebar.success("✅ Connected to Google Sheets!")
 # ---------- SIDEBAR ----------
 st.sidebar.markdown(f"👤 Logged in as: **{st.session_state.user['name']}**")
 st.sidebar.markdown(f"📧 {st.session_state.user['email']}")
-if st.sidebar.button("🚪 Logout"):
+if st.sidebar.button("🚪 Logout", key="logout_btn_sidebar"):
     st.session_state.logged_in = False
     st.session_state.user = {}
     st.rerun()
-
-# -------------------- CONSTANTS (DEDUPED) --------------------
-# Use dict.fromkeys(...) to preserve order while removing duplicates
-STATION_LIST = list(dict.fromkeys([
-    'BRB','MLM','BGVN','JNTR','PRWD','WSB','PPJ','JEUR','KEM','BLNI','DHS','KWV','WDS','MA','AAG',
-    'MKPT','MO','MVE','PK','BALE',"SUR",'TKWD','HG','TLT','AKOR','NGS','BOT','DUD','KUI','GDGN','GUR',
-    'HHD','SVG','BBD','TJSP','KLBG','HQR','MR','SDB','WADI','ARAG','BLNK','SGRE','KVK','LNP','DLGN',
-    'JTRD','MSDG','JVA','WSD','SGLA','PVR','MLB','SEI','BTW','PJR','DRSV','YSI','KMRD','DKY','MRX',
-    'OSA','HGL','LUR','NTPC','MRJ','BHLI'
-]))
-
-GATE_LIST = list(dict.fromkeys([
-    'LC-19','LC-22A','LC-25','LC-26','LC-27C','LC-28','LC-30','LC-31','LC-35','LC-37','LC-40','LC-41',
-    'LC-43','LC-44','LC-45','LC-46C','LC-54','LC-61','LC-66','LC-74','LC-76','LC-78','LC-82','LC-1',
-    'LC-60A','LC-1 TLT ZCL','LC-1 ACC','LC-2 ACC','LC-91','LC-22','LC-24','LC-32','LC-49','LC-70',
-    'LC-10','LC-34','LC-36','LC-47','LC-55','LC-59','LC-2','LC-4','LC-42','LC-02','LC-128','LC-63',
-    'LC-04','LC-67','LC-77','LC-75','LC-64','LC-65','LC-5','LC-6','LC-57','LC-62','LC-39','LC-2/C',
-    'LC-6/C','LC-11','LC-03','LC-15/C','LC-21','LC-26-A','LC-60'
-]))
-
-FOOTPLATE_ROUTES = ["SUR-DD","SUR-WADI","LUR-KWV",'KWV-MRJ','DD-SUR','WADI-SUR','KWV-LUR','MRJ-KWV']
-
-HEAD_LIST = ["", "ELECT/TRD", "ELECT/G", "ELECT/TRO", "SIGNAL & TELECOM", "OPTG","MECHANICAL",
-             "ENGINEERING", "COMMERCIAL", "C&W", 'PERSONNEL', 'SECURITY',  "FINANCE", "MEDICAL", "STORE"]
-
-SUBHEAD_LIST = {
-    "ELECT/TRD": ["T/W WAGON", "TSS/SP/SSP", "OHE SECTION", "OHE STATION", "MISC"],
-    "ELECT/G": ["TL/AC COACH", "POWER/PANTRY CAR", "WIRING/EQUIPMENT", "UPS", "AC", "DG", "SOLAR LIGHT", "MISC"],
-    "ELECT/TRO": ["LOCO DEFECTS", "RUNNING ROOM DEFICIENCIES", "LOBBY DEFICIENCIES", "LRD RELATED", "PERSONAL STORE", "PR RELATED",
-                  "CMS", "MISC"],
-    "MECHANICAL":["MISC"],
-    "SIGNAL & TELECOM": [ "SIGNAL PUTBACK/BLANK", "OTHER SIGNAL FAILURE", "BPAC", "GATE", "RELAY ROOM",
-                         "STATION(VDU/BLOCK INSTRUMENT)", "MISC", "CCTV", "DISPLAY BOARDS"],
-    "OPTG": [ "SWR/CSR/CSL/TWRD", "COMPETENCY RELATED", "STATION RECORDS", "STATION DEFICIENCIES",
-             "SM OFFICE DEFICIENCIES", "MISC"],
-    "ENGINEERING": [ "IOW WORKS","GSU","ROUGH RIDING", "TRACK NEEDS ATTENTION", "MISC"],
-    "COMMERCIAL": [ "TICKETING RELATED/MACHINE", "IRCTC", "MISC"],
-    "C&W": [ "BRAKE BINDING", 'WHEEL DEFECT', 'TRAIN PARTING', 'PASSENGER AMENITIES', 'AIR PRESSURE LEAKAGE',
-            'DAMAGED UNDER GEAR PARTS', 'MISC'],
-      "FINANCE":["MISC"], "MEDICAL":["MISC"], "STORE": ["MISC"],
-}
-
-INSPECTION_BY_LIST = [""] + ["HQ OFFICER CCE/CR",'DRM/SUR', 'ADRM', 'Sr.DSO', 'Sr.DOM', 'Sr.DEN/S', 'Sr.DEN/C', 'Sr.DEN/Co', 'Sr.DSTE',
-                             'Sr.DEE/TRD', 'Sr.DEE/G','Sr.DEE/TRO', 'Sr.DME', 'Sr.DCM', 'Sr.DPO', 'Sr.DFM', 'Sr.DMM', 'DSC',
-                             'DME,DEE/TRD', 'DFM', 'DSTE/HQ', 'DSTE/KLBG', 'ADEN/T/SUR', 'ADEN/W/SUR', 'ADEN/KWV',
-                             'ADEN/PVR', 'ADEN/LUR', 'ADEN/KLBG', 'ADSTE/SUR', 'ADSTE/I/KWV', 'ADSTE/II/KWV',
-                             'ADME/SUR', 'AOM/GD', 'AOM/GEN', 'ACM/Cog', 'ACM/TC', 'ACM/GD', 'APO/GEN', 'APO/WEL',
-                             'ADFM/I', 'ADFMII', 'ASC', 'ADSO/SUR']
-
-ACTION_BY_LIST = [""] + ['DRM/SUR', 'ADRM', 'Sr.DSO', 'Sr.DOM', 'Sr.DEN/S', 'Sr.DEN/C', 'Sr.DEN/Co', 'Sr.DSTE',
-                         'Sr.DEE/TRD', 'Sr.DEE/G','Sr.DEE/TRO', 'Sr.DME', 'Sr.DCM', 'Sr.DPO', 'Sr.DFM', 'Sr.DMM', 'DSC', 'CMS']
-
-VALID_INSPECTIONS = [
-    "FOOTPLATE INSPECTION", "STATION INSPECTION", "LC GATE INSPECTION",
-    "MISC", "COACHING DEPOT", "ON TRAIN", "SURPRISE/AMBUSH INSPECTION", "WORKSITE INSPECTION", "OTHER (UNUSUAL)",
-]
-
-FOOTPLATE_LIST = STATION_LIST + GATE_LIST + FOOTPLATE_ROUTES
-
-# -------------------- HELPERS --------------------
-def normalize_str(text):
-    if not isinstance(text, str):
-        return ""
-    return re.sub(r'\s+', ' ', text.lower()).strip()
-
-def classify_feedback(feedback, user_remark=""):
-    # Empty backtick = clear
-    if isinstance(feedback, str) and feedback.strip() == "`":
-        return ""
-
-    def _classify(text_normalized):
-        if not text_normalized:
-            return None
-        date_found = bool(re.search(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', text_normalized))
-
-        resolved_kw = [
-            "attended", "solved", "done", "completed", "confirmed by", "message given",
-            "tdc work completed", "replaced", "msg given", "msg sent", "counseled", "info shared",
-            "communicated", "sent successfully", "counselled", "gate will be closed soon",
-            "attending at the time", "handled", "resolved", "action taken", "spoken to", "warned",
-            "counselling", "hubli", "working normal", "met", "discussion held", "report sent",
-            "notified", "explained", "nil", "na", "tlc", "work completed", "acknowledged", "visited",
-            "briefed", "guided", "handover", "working properly", "checked found working", "supply restored",
-            "updated by", "adv to", "counselled the staff", "complied", "checked and found",
-            "maintained", "for needful action", "provided at", "in working condition", "is working",
-            "found working", "equipment is working", "item is working", "as per plan", "putright", "put right",
-            "operational feasibility", "will be provided", "will be supplied shortly", "advised to ubl", "updated"
-        ]
-
-        pending_kw = [
-            "work is going on", "tdc given", "target date", "expected by", "likely by", "planned by",
-            "will be", "needful", "to be", "pending", "not done", "awaiting", "waiting", "yet to", "next time",
-            "follow up", "tdc.", "tdc", "t d c", "will attend", "will be attended", "scheduled", "reminder",
-            "to inform", "to counsel", "to submit", "to do", "to replace", "prior", "remains", "still",
-            "under process", "not yet", "to be done", "will ensure", "during next", "action will be taken",'noted please tdc',
-            "will be supplied shortly", "not available", "not updated", "progress", "under progress",
-            "to arrange", "awaited", "material awaited", "approval awaited", "to procure", "yet pending",
-            "incomplete", "tentative", "ongoing", "in progress", "being done", "arranging", "waiting for",
-            "subject to", "awaiting approval", "awaiting material", "awaiting confirmation", "next schedule",
-            "planned for", "will arrange", "proposed date", "to complete", "to be completed",
-            "likely completion", "expected completion", "not received", "awaiting response"
-        ]
-
-        if "tdc" in text_normalized and any(k in text_normalized for k in resolved_kw):
-            return "Resolved"
-        if any(k in text_normalized for k in pending_kw):
-            return "Pending"
-        if date_found:
-            return "Pending" if "tdc" in text_normalized else "Resolved"
-        if any(k in text_normalized for k in resolved_kw):
-            return "Resolved"
-        return None
-
-    fb = normalize_str(feedback)
-    rm = normalize_str(user_remark)
-
-    # marker override
-    m = re.findall(r"[!#]", f"{fb} {rm}".strip())
-    if m:
-        return "Resolved" if m[-1] == "#" else "Pending"
-
-    a = _classify(fb)
-    b = _classify(rm)
-    if a == "Resolved" or b == "Resolved":
-        return "Resolved"
-    if a == "Pending" or b == "Pending":
-        return "Pending"
-    return "Pending"
-
-import streamlit as st
-import pandas as pd
-import gspread
-import re
-import numpy as np
-import matplotlib.pyplot as plt
-import altair as alt
-from io import BytesIO
-from google.oauth2.service_account import Credentials
-from openpyxl.styles import Alignment
-
-# ---------- CONFIG ----------
-
-# ---------- SESSION STATE INITIALIZATION ----------
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if "user" not in st.session_state:
-    st.session_state.user = {}
-if "ack_done" not in st.session_state:
-    st.session_state.ack_done = False
-
-# ---------- LOGIN ----------
-def login(email, password):
-    """Check credentials against st.secrets['users']"""
-    for user in st.secrets["users"]:
-        if user["email"] == email and user["password"] == password:
-            return user
-    return None
-
-if not st.session_state.logged_in:
-    st.title("🔐 Login to S.A.R.A.L (Safety Abnormality Report & Action List)")
-    with st.form("login_form", clear_on_submit=True):
-        email = st.text_input("📧 Email")
-        password = st.text_input("🔒 Password", type="password")
-        submitted = st.form_submit_button("Login")
-
-        if submitted:
-            user = login(email, password)
-            if user:
-                st.session_state.logged_in = True
-                st.session_state.user = user
-                st.success(f"✅ Welcome, {user['name']}!")
-                st.rerun()
-            else:
-                st.error("❌ Invalid email or password.")
-    st.stop()
-
-# ---------- ACKNOWLEDGMENT ----------
-user_id = st.session_state.user["email"]  # use email as unique ID
-
-try:
-    ack_df = pd.read_excel("responses.xlsx")
-    if "UserID" not in ack_df.columns or "Name" not in ack_df.columns:
-        ack_df = pd.DataFrame(columns=["UserID", "Name"])
-except FileNotFoundError:
-    ack_df = pd.DataFrame(columns=["UserID", "Name"])
-
-user_ack_done = user_id in ack_df["UserID"].values
-
-if not user_ack_done:
-    st.title("📢 Pending Deficiencies Compliance")
-    with st.expander("⚠️ Pending Deficiencies Notice", expanded=True):
-        st.info("""
-        The compliance of deficiencies of previous dates are pending & needs to be completed immediately.  
-        I hereby declare that I have read this notice and will ensure compliance.
-        """)
-
-        with st.form("ack_form"):
-            responder_name = st.text_input("✍️ Your Name")
-            ack_submitted = st.form_submit_button("Submit Acknowledgment")
-            
-            if ack_submitted:
-                if responder_name.strip():
-                    new_entry = {"UserID": user_id, "Name": responder_name.strip()}
-                    ack_df = pd.concat([ack_df, pd.DataFrame([new_entry])], ignore_index=True)
-                    ack_df.to_excel("responses.xlsx", index=False)
-
-                    st.success(f"✅ Thank you, {responder_name}, for acknowledging.")
-                    st.rerun()
-                else:
-                    st.error("❌ Please enter your name before submitting.")
-    st.stop()
-
-# ---------- DISPLAY ALL RESPONSES ----------
-st.markdown("### 📝 Responses Received")
-try:
-    df = pd.read_excel("responses.xlsx")
-    if not df.empty:
-        st.dataframe(df)
-    else:
-        st.write("No responses submitted yet.")
-except FileNotFoundError:
-    st.write("No responses submitted yet.")
-
-
-# ---------- GOOGLE SHEETS CONNECTION ----------
-@st.cache_resource
-def connect_to_gsheet():
-    SCOPES = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive",
-    ]
-    service_account_info = dict(st.secrets["gcp_service_account"])
-    if "private_key" in service_account_info:
-        service_account_info["private_key"] = service_account_info["private_key"].replace("\\n", "\n")
-
-    creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPES)
-    gc = gspread.authorize(creds)
-    SHEET_ID = "1_WQyJCtdXuAIQn3IpFTI4KfkrveOHosNsvsZn42jAvw"
-    SHEET_NAME = "Sheet1"
-    return gc.open_by_key(SHEET_ID).worksheet(SHEET_NAME)
-
-sheet = connect_to_gsheet()
-st.sidebar.success("✅ Connected to Google Sheets!")
-
 
 # ---------- LOAD DATA ----------
 @st.cache_data(ttl=60)
@@ -441,9 +197,9 @@ def update_feedback_column(edited_df):
 def apply_common_filters(df, prefix=""):
     with st.expander("🔍 Apply Additional Filters", expanded=True):
         c1, c2 = st.columns(2)
-        c1.multiselect("Inspection By", df["Inspection By"].unique().tolist(), 
+        c1.multiselect("Inspection By", df["Inspection By"].unique().tolist(),
                        default=st.session_state.get(prefix+"insp", []), key=prefix+"insp")
-        c2.multiselect("Action By", df["Action By"].unique().tolist(), 
+        c2.multiselect("Action By", df["Action By"].unique().tolist(),
                        default=st.session_state.get(prefix+"action", []), key=prefix+"action")
 
         d1, d2 = st.columns(2)
@@ -473,6 +229,7 @@ def apply_common_filters(df, prefix=""):
         ]
 
     return out
+
 
 
 # -------------------- HEADER --------------------
@@ -1158,6 +915,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
