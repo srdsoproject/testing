@@ -648,10 +648,106 @@ st.markdown(
 )
 
 # -------------------- EDITOR --------------------
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+from io import BytesIO
 import pandas as pd
-from st_aggrid.shared import JsCode   # 👈 for autoSizeAllColumns
+import streamlit as st
+from openpyxl.styles import Alignment, Font, Border, Side, NamedStyle
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+from st_aggrid.shared import JsCode   # for autoSizeAllColumns
 
+# -------------------- EXPORT TO EXCEL --------------------
+# Export dataframe (filtered must be defined earlier in your app)
+export_df = filtered[[
+    "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
+    "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "User Feedback/Remark",
+    "Status"
+]].copy()
+
+# 🔹 Ensure date column is only a date (no time part)
+export_df["Date of Inspection"] = pd.to_datetime(export_df["Date of Inspection"]).dt.date
+
+towb = BytesIO()
+with pd.ExcelWriter(towb, engine="openpyxl") as writer:
+    export_df.to_excel(writer, index=False, sheet_name="Filtered Records")
+    ws = writer.sheets["Filtered Records"]
+
+    # 🔹 Define date format style
+    date_style = NamedStyle(name="date_style", number_format="DD-MM-YYYY")
+
+    # Apply alignment + wrap text for ALL cells
+    for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
+        for cell in row:
+            cell.alignment = Alignment(wrap_text=True, vertical="top")
+
+    # Apply date format only to "Date of Inspection" column
+    date_col_idx = export_df.columns.get_loc("Date of Inspection") + 1
+    for row in ws.iter_rows(min_row=2, min_col=date_col_idx, max_col=date_col_idx, max_row=len(export_df) + 1):
+        for cell in row:
+            cell.style = date_style
+
+    # Auto column widths
+    for col in ws.columns:
+        max_length = 0
+        col_letter = col[0].column_letter
+        for cell in col:
+            try:
+                if cell.value:
+                    max_length = max(max_length, len(str(cell.value)))
+            except:
+                pass
+        adjusted_width = (max_length + 2) if max_length < 50 else 50  # cap width
+        ws.column_dimensions[col_letter].width = adjusted_width
+
+    # Apply border to all cells
+    thin_border = Border(left=Side(style='thin'),
+                         right=Side(style='thin'),
+                         top=Side(style='thin'),
+                         bottom=Side(style='thin'))
+    for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
+        for cell in row:
+            cell.border = thin_border
+
+    # Apply color formatting to Status column
+    status_col_idx = export_df.columns.get_loc("Status") + 1
+    for row in ws.iter_rows(min_row=2, min_col=status_col_idx, max_col=status_col_idx, max_row=len(export_df) + 1):
+        for cell in row:
+            if str(cell.value).strip().lower() == "pending":
+                cell.font = Font(color="FF0000")  # Red
+            elif str(cell.value).strip().lower() == "resolved":
+                cell.font = Font(color="008000")  # Green
+
+towb.seek(0)
+
+# Streamlit download button
+st.download_button(
+    "📥 Export Filtered Records to Excel", 
+    data=towb,
+    file_name="filtered_records.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)
+
+# -------------------- STATUS UTILS --------------------
+def get_status(feedback, remark):
+    return classify_feedback(feedback, remark)
+
+def color_text_status(status):
+    return "🔴 Pending" if status == "Pending" else ("🟢 Resolved" if status == "Resolved" else status)
+
+# -------------------- SCROLLBAR & CELL WRAP CSS --------------------
+st.markdown(
+    """
+    <style>
+    ::-webkit-scrollbar { width:16px; height:16px; }
+    ::-webkit-scrollbar-track { background:#f1f1f1; border-radius:8px; }
+    ::-webkit-scrollbar-thumb { background:#888; border-radius:8px; border:3px solid #f1f1f1; }
+    ::-webkit-scrollbar-thumb:hover { background:#555; }
+    * { scrollbar-width:auto; scrollbar-color:#888 #f1f1f1; }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# -------------------- EDITOR --------------------
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
 # Initialize alerts log
@@ -666,6 +762,23 @@ if not editable_filtered.empty:
         editable_filtered = editable_filtered[
             editable_filtered["Deficiencies Noted"].astype(str).str.lower().str.contains(search_text)
         ]
+
+    # ✅ Select Head
+    selected_head = st.selectbox("👤 Select Head", sorted(editable_filtered["Head"].dropna().unique()))
+
+    # ✅ Check Pending Deficiencies for that Head
+    pending_count = editable_filtered[
+        (editable_filtered["Head"] == selected_head) & 
+        (editable_filtered["Status"].str.contains("Pending", case=False, na=False))
+    ].shape[0]
+
+    feedback_locked = False
+    if pending_count > 50:
+        st.error(
+            f"⚠️ Department **{selected_head}** has **{pending_count} pending deficiencies**.\n\n"
+            "Kindly resolve them first, otherwise feedback will be **locked** until further action."
+        )
+        feedback_locked = True
 
     # Ensure stable IDs exist for reliable updates
     if "_original_sheet_index" not in editable_filtered.columns:
@@ -746,13 +859,16 @@ if not editable_filtered.empty:
 
     # ----------------- BUTTONS -----------------
     c1, c2, _ = st.columns([1, 1, 1])
-    submitted = c1.button("✅ Submit Feedback")
+    submitted = c1.button("✅ Submit Feedback", disabled=feedback_locked)  # 🔒 Disabled if locked
     if c2.button("🔄 Refresh Data"):
         st.session_state.df = load_data()
         st.success("✅ Data refreshed successfully!")
 
+    if feedback_locked:
+        st.info("🚫 Feedback submission is locked due to excessive pending deficiencies.")
+
     # ----------------- SUBMIT LOGIC -----------------
-    if submitted:
+    if submitted and not feedback_locked:
         # Validate needed columns
         need_cols = {"_original_sheet_index", "User Feedback/Remark"}
         if not need_cols.issubset(edited_df.columns) or "Feedback" not in editable_filtered.columns:
@@ -785,9 +901,9 @@ if not editable_filtered.empty:
                     "Pertains to Sr.DEN/S":   ("ENGINEERING", "Sr.DEN/S"),
                     "Pertains to Sr.DEN/C":   ("ENGINEERING", "Sr.DEN/C"),
                     "Pertains to Sr.DEN/Co":  ("ENGINEERING", "Sr.DEN/Co"),
-                    "Pertains to FINAINCE": ("FINANCE","Sr.DFM"),
-                    "Pertains to STORE" : ("STORE","Sr.DMM"),
-                    "Pertains to MEDICAL" : ("MEDICAL", "CMS"),
+                    "Pertains to FINAINCE":   ("FINANCE","Sr.DFM"),
+                    "Pertains to STORE" :     ("STORE","Sr.DMM"),
+                    "Pertains to MEDICAL" :   ("MEDICAL", "CMS"),
                 }
 
                 for oid in changed_ids:
@@ -835,6 +951,7 @@ if not editable_filtered.empty:
                 st.info("ℹ️ No changes detected to save.")
 else:
     st.info("Deficiencies will be updated soon !")
+
 
 
 # ---------------- ALERT LOG SECTION ----------------
@@ -1075,6 +1192,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
