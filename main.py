@@ -369,13 +369,6 @@ def connect_to_gsheet():
 sheet = connect_to_gsheet()
 st.sidebar.success("✅ Connected to Google Sheets!")
 
-# ---------- SIDEBAR ----------
-st.sidebar.markdown(f"👤 Logged in as: **{st.session_state.user['name']}**")
-st.sidebar.markdown(f"📧 {st.session_state.user['email']}")
-if st.sidebar.button("🚪 Logout"):
-    st.session_state.logged_in = False
-    st.session_state.user = {}
-    st.rerun()
 
 # ---------- LOAD DATA ----------
 @st.cache_data(ttl=60)
@@ -1165,6 +1158,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
