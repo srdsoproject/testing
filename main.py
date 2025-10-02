@@ -5,160 +5,21 @@ from google.oauth2.service_account import Credentials
 from io import BytesIO
 from matplotlib import pyplot as plt
 import altair as alt
-# ---------- CONFIG ----------
-import pandas as pd
+import re
+import numpy as np
+from openpyxl.styles import Alignment, Font, Border, Side, NamedStyle
 
+# ---------- CONFIG ----------
 st.set_page_config(page_title="Inspection App", layout="wide")
 
-# ---------- SESSION STATE INITIALIZATION ----------
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if "user" not in st.session_state:
-    st.session_state.user = {}
-if "ack_done" not in st.session_state:
-    st.session_state.ack_done = False
-
-# ---------- LOGIN ----------
-import pandas as pd
-
-# ---------- LOGIN ----------
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-
-def login(email, password):
-    """Check credentials against st.secrets['users']"""
-    for user in st.secrets["users"]:
-        if user["email"] == email and user["password"] == password:
-            return user
-    return None
-
-if not st.session_state.logged_in:
-    st.title("🔐 Login to S.A.R.A.L (Safety Abnormality Report & Action List)")
-    with st.form("login_form", clear_on_submit=True):
-        email = st.text_input("📧 Email")
-        password = st.text_input("🔒 Password", type="password")
-        submitted = st.form_submit_button("Login")
-
-        if submitted:
-            user = login(email, password)
-            if user:
-                st.session_state.logged_in = True
-                st.session_state.user = user
-                st.success(f"✅ Welcome, {user['name']}!")
-                st.rerun()
-            else:
-                st.error("❌ Invalid email or password.")
-    st.stop()
-
-# ---------- ACKNOWLEDGMENT ----------
-user_id = st.session_state.user["email"]  # use email as unique ID
-
-# Load acknowledgments safely
-try:
-    ack_df = pd.read_excel("responses.xlsx")
-    # Ensure correct columns exist
-    if "UserID" not in ack_df.columns or "Name" not in ack_df.columns:
-        ack_df = pd.DataFrame(columns=["UserID", "Name"])
-except FileNotFoundError:
-    ack_df = pd.DataFrame(columns=["UserID", "Name"])
-
-# Check if THIS user already acknowledged
-user_ack_done = user_id in ack_df["UserID"].values
-
-if not user_ack_done:
-    st.title("📢 Pending Deficiencies Compliance")
-    with st.expander("⚠️ Pending Deficiencies Notice", expanded=True):
-        st.info("""
-        The compliance of deficiencies of previous dates are pending & needs to be completed immediately.  
-        I hereby declare that I have read this notice and will ensure compliance.
-        """)
-
-        with st.form("ack_form"):
-            responder_name = st.text_input("✍️ Your Name")
-            ack_submitted = st.form_submit_button("Submit Acknowledgment")
-            
-            if ack_submitted:
-                if responder_name.strip():
-                    # Save acknowledgment (per user)
-                    new_entry = {"UserID": user_id, "Name": responder_name.strip()}
-                    ack_df = pd.concat([ack_df, pd.DataFrame([new_entry])], ignore_index=True)
-                    ack_df.to_excel("responses.xlsx", index=False)
-
-                    st.success(f"✅ Thank you, {responder_name}, for acknowledging.")
-                    st.rerun()
-                else:
-                    st.error("❌ Please enter your name before submitting.")
-    st.stop()
-
-
-# ---------- DISPLAY ALL RESPONSES ----------
-st.markdown("### 📝 Responses Received")
-try:
-    df = pd.read_excel("responses.xlsx")
-    if not df.empty:
-        st.dataframe(df)
-    else:
-        st.write("No responses submitted yet.")
-except FileNotFoundError:
-    st.write("No responses submitted yet.")
-if st.button("🗑️ Clear All Responses", key="clear_responses_btn"):
-    df = pd.DataFrame(columns=["Name"])
-    df.to_excel("responses.xlsx", index=False)
-    st.success("✅ All responses have been cleared.")
-# ---------- GOOGLE SHEETS CONNECTION ----------
-import pandas as pd
-import gspread
-import re
-from google.oauth2.service_account import Credentials
-
-# ---------- STEP 1: CONNECT TO GOOGLE SHEETS ----------
-@st.cache_resource
-def connect_to_gsheet():
-    SCOPES = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive",
-    ]
-    service_account_info = dict(st.secrets["gcp_service_account"])
-    if "private_key" in service_account_info:
-        service_account_info["private_key"] = service_account_info["private_key"].replace("\\n", "\n")
-
-    creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPES)
-    gc = gspread.authorize(creds)
-    SHEET_ID = "1_WQyJCtdXuAIQn3IpFTI4KfkrveOHosNsvsZn42jAvw"
-    SHEET_NAME = "Sheet1"
-    return gc.open_by_key(SHEET_ID).worksheet(SHEET_NAME)
-
-sheet = connect_to_gsheet()
-st.sidebar.success("✅ Connected to Google Sheets!")
-
-# ---------- SIDEBAR ----------
-st.sidebar.markdown(f"👤 Logged in as: **{st.session_state.user['name']}**")
-st.sidebar.markdown(f"📧 {st.session_state.user['email']}")
-if st.sidebar.button("🚪 Logout"):
-    st.session_state.logged_in = False
-    st.session_state.user = {}
-    st.rerun()
-
-# ---------- CONSTANT LISTS ----------
-# -------------------- IMPORTS --------------------
-import re
-import io
-from io import BytesIO
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-from openpyxl.styles import Alignment
-
-# -------------------- CONSTANTS (DEDUPED) --------------------
-# Use dict.fromkeys(...) to preserve order while removing duplicates
+# ---------- CONSTANTS ----------
 STATION_LIST = list(dict.fromkeys([
     'BRB','MLM','BGVN','JNTR','PRWD','WSB','PPJ','JEUR','KEM','BLNI','DHS','KWV','WDS','MA','AAG',
-    'MKPT','MO','MVE','PK','BALE',"SUR",'TKWD','HG','TLT','AKOR','NGS','BOT','DUD','KUI','GDGN','GUR',
+    'MKPT','MO','MVE','PK','BALE','SUR','TKWD','HG','TLT','AKOR','NGS','BOT','DUD','KUI','GDGN','GUR',
     'HHD','SVG','BBD','TJSP','KLBG','HQR','MR','SDB','WADI','ARAG','BLNK','SGRE','KVK','LNP','DLGN',
     'JTRD','MSDG','JVA','WSD','SGLA','PVR','MLB','SEI','BTW','PJR','DRSV','YSI','KMRD','DKY','MRX',
     'OSA','HGL','LUR','NTPC','MRJ','BHLI'
 ]))
-
 GATE_LIST = list(dict.fromkeys([
     'LC-19','LC-22A','LC-25','LC-26','LC-27C','LC-28','LC-30','LC-31','LC-35','LC-37','LC-40','LC-41',
     'LC-43','LC-44','LC-45','LC-46C','LC-54','LC-61','LC-66','LC-74','LC-76','LC-78','LC-82','LC-1',
@@ -167,7 +28,6 @@ GATE_LIST = list(dict.fromkeys([
     'LC-04','LC-67','LC-77','LC-75','LC-64','LC-65','LC-5','LC-6','LC-57','LC-62','LC-39','LC-2/C',
     'LC-6/C','LC-11','LC-03','LC-15/C','LC-21','LC-26-A','LC-60'
 ]))
-
 FOOTPLATE_ROUTES = ["SUR-DD","SUR-WADI","LUR-KWV",'KWV-MRJ','DD-SUR','WADI-SUR','KWV-LUR','MRJ-KWV']
 
 HEAD_LIST = ["", "ELECT/TRD", "ELECT/G", "ELECT/TRO", "SIGNAL & TELECOM", "OPTG","MECHANICAL",
@@ -179,15 +39,15 @@ SUBHEAD_LIST = {
     "ELECT/TRO": ["LOCO DEFECTS", "RUNNING ROOM DEFICIENCIES", "LOBBY DEFICIENCIES", "LRD RELATED", "PERSONAL STORE", "PR RELATED",
                   "CMS", "MISC"],
     "MECHANICAL":["MISC"],
-    "SIGNAL & TELECOM": [ "SIGNAL PUTBACK/BLANK", "OTHER SIGNAL FAILURE", "BPAC", "GATE", "RELAY ROOM",
-                         "STATION(VDU/BLOCK INSTRUMENT)", "MISC", "CCTV", "DISPLAY BOARDS"],
-    "OPTG": [ "SWR/CSR/CSL/TWRD", "COMPETENCY RELATED", "STATION RECORDS", "STATION DEFICIENCIES",
+    "SIGNAL & TELECOM": ["SIGNAL PUTBACK/BLANK", "OTHER SIGNAL FAILURE", "BPAC", "GATE", "RELAY ROOM",
+                        "STATION(VDU/BLOCK INSTRUMENT)", "MISC", "CCTV", "DISPLAY BOARDS"],
+    "OPTG": ["SWR/CSR/CSL/TWRD", "COMPETENCY RELATED", "STATION RECORDS", "STATION DEFICIENCIES",
              "SM OFFICE DEFICIENCIES", "MISC"],
-    "ENGINEERING": [ "IOW WORKS","GSU","ROUGH RIDING", "TRACK NEEDS ATTENTION", "MISC"],
-    "COMMERCIAL": [ "TICKETING RELATED/MACHINE", "IRCTC", "MISC"],
-    "C&W": [ "BRAKE BINDING", 'WHEEL DEFECT', 'TRAIN PARTING', 'PASSENGER AMENITIES', 'AIR PRESSURE LEAKAGE',
+    "ENGINEERING": ["IOW WORKS", "GSU", "ROUGH RIDING", "TRACK NEEDS ATTENTION", "MISC"],
+    "COMMERCIAL": ["TICKETING RELATED/MACHINE", "IRCTC", "MISC"],
+    "C&W": ["BRAKE BINDING", 'WHEEL DEFECT', 'TRAIN PARTING', 'PASSENGER AMENITIES', 'AIR PRESSURE LEAKAGE',
             'DAMAGED UNDER GEAR PARTS', 'MISC'],
-      "FINANCE":["MISC"], "MEDICAL":["MISC"], "STORE": ["MISC"],
+    "FINANCE":["MISC"], "MEDICAL":["MISC"], "STORE": ["MISC"],
 }
 
 INSPECTION_BY_LIST = [""] + ["HQ OFFICER CCE/CR",'DRM/SUR', 'ADRM', 'Sr.DSO', 'Sr.DOM', 'Sr.DEN/S', 'Sr.DEN/C', 'Sr.DEN/Co', 'Sr.DSTE',
@@ -207,67 +67,174 @@ VALID_INSPECTIONS = [
 
 FOOTPLATE_LIST = STATION_LIST + GATE_LIST + FOOTPLATE_ROUTES
 
-# -------------------- HELPERS --------------------
+# ---------- SESSION STATE INITIALIZATION ----------
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+if "user" not in st.session_state:
+    st.session_state.user = {}
+if "ack_done" not in st.session_state:
+    st.session_state.ack_done = False
+if "alerts_log" not in st.session_state:
+    st.session_state.alerts_log = []
+
+# ---------- AUTHENTICATION ----------
+def login(email, password):
+    for user in st.secrets.get("users", []):
+        if user.get("email") == email and user.get("password") == password:
+            return user
+    return None
+
+if not st.session_state.logged_in:
+    st.title("🔐 Login to S.A.R.A.L (Safety Abnormality Report & Action List)")
+    with st.form("login_form", clear_on_submit=True):
+        email = st.text_input("📧 Email")
+        password = st.text_input("🔒 Password", type="password")
+        submitted = st.form_submit_button("Login")
+        if submitted:
+            user = login(email, password)
+            if user:
+                st.session_state.logged_in = True
+                st.session_state.user = user
+                st.success(f"✅ Welcome, {user.get('name')}!")
+                st.experimental_rerun()
+            else:
+                st.error("❌ Invalid email or password.")
+    st.stop()
+
+# ---------- ACKNOWLEDGMENT ----------
+import os
+ack_file = "responses.xlsx"
+
+@st.cache_data(ttl=600)
+def load_acknowledgments():
+    try:
+        df = pd.read_excel(ack_file)
+        if "UserID" not in df.columns or "Name" not in df.columns:
+            df = pd.DataFrame(columns=["UserID", "Name"])
+        return df
+    except FileNotFoundError:
+        return pd.DataFrame(columns=["UserID", "Name"])
+
+ack_df = load_acknowledgments()
+user_id = st.session_state.user.get("email")
+if user_id not in ack_df["UserID"].values:
+    st.title("📢 Pending Deficiencies Compliance")
+    with st.expander("⚠️ Pending Deficiencies Notice", expanded=True):
+        st.info("""
+        The compliance of deficiencies of previous dates are pending & needs to be completed immediately.  
+        I hereby declare that I have read this notice and will ensure compliance.
+        """)
+        with st.form("ack_form"):
+            responder_name = st.text_input("✍️ Your Name")
+            submitted = st.form_submit_button("Submit Acknowledgment")
+            if submitted:
+                if responder_name.strip():
+                    new_entry = {"UserID": user_id, "Name": responder_name.strip()}
+                    ack_df = pd.concat([ack_df, pd.DataFrame([new_entry])], ignore_index=True)
+                    ack_df.to_excel(ack_file, index=False)
+                    st.success(f"✅ Thank you, {responder_name}, for acknowledging.")
+                    st.experimental_rerun()
+                else:
+                    st.error("❌ Please enter your name before submitting.")
+    st.stop()
+
+# ---------- GOOGLE SHEETS CONNECTION ----------
+@st.cache_resource
+def connect_to_gsheet():
+    SCOPES = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
+    service_account_info = dict(st.secrets["gcp_service_account"])
+    if "private_key" in service_account_info:
+        service_account_info["private_key"] = service_account_info["private_key"].replace("\\n", "\n")
+    creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPES)
+    gc = gspread.authorize(creds)
+    SHEET_ID = "1_WQyJCtdXuAIQn3IpFTI4KfkrveOHosNsvsZn42jAvw"
+    worksheet = gc.open_by_key(SHEET_ID).sheet1
+    return worksheet
+
+sheet = connect_to_gsheet()
+st.sidebar.success("✅ Connected to Google Sheets!")
+st.sidebar.markdown(f"👤 Logged in as: **{st.session_state.user.get('name')}**")
+st.sidebar.markdown(f"📧 {st.session_state.user.get('email')}")
+
+if st.sidebar.button("🚪 Logout"):
+    st.session_state.logged_in = False
+    st.session_state.user = {}
+    st.experimental_rerun()
+
+@st.cache_data(ttl=300)
+def load_sheet_data():
+    records = sheet.get_all_records()
+    df = pd.DataFrame(records)
+    required_cols = ["Date of Inspection", "Type of Inspection", "Location",
+                     "Head", "Sub Head", "Deficiencies Noted", "Inspection By",
+                     "Action By", "Feedback", "User Feedback/Remark"]
+    for col in required_cols:
+        if col not in df.columns:
+            df[col] = ""
+    df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors='coerce')
+    df["_sheet_row"] = df.index + 2
+    return df
+
+df = load_sheet_data()
+
+# ---------- STATUS CLASSIFICATION ----------
 def normalize_str(text):
     if not isinstance(text, str):
         return ""
     return re.sub(r'\s+', ' ', text.lower()).strip()
 
 def classify_feedback(feedback, user_remark=""):
-    # Empty backtick = clear
-    if isinstance(feedback, str) and feedback.strip() == "`":
-        return ""
-
-    def _classify(text_normalized):
-        if not text_normalized:
-            return None
-        date_found = bool(re.search(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', text_normalized))
-
-        resolved_kw = [
-            "attended", "solved", "done", "completed", "confirmed by", "message given",
-            "tdc work completed", "replaced", "msg given", "msg sent", "counseled", "info shared",
-            "communicated", "sent successfully", "counselled", "gate will be closed soon",
-            "attending at the time", "handled", "resolved", "action taken", "spoken to", "warned",
-            "counselling", "hubli", "working normal", "met", "discussion held", "report sent",
-            "notified", "explained", "nil", "na", "tlc", "work completed", "acknowledged", "visited",
-            "briefed", "guided", "handover", "working properly", "checked found working", "supply restored",
-            "updated by", "adv to", "counselled the staff", "complied", "checked and found",
-            "maintained", "for needful action", "provided at", "in working condition", "is working",
-            "found working", "equipment is working", "item is working", "as per plan", "putright", "put right",
-            "operational feasibility", "will be provided", "will be supplied shortly", "advised to ubl", "updated"
-        ]
-
-        pending_kw = [
-            "work is going on", "tdc given", "target date", "expected by", "likely by", "planned by",
-            "will be", "needful", "to be", "pending", "not done", "awaiting", "waiting", "yet to", "next time",
-            "follow up", "tdc.", "tdc", "t d c", "will attend", "will be attended", "scheduled", "reminder",
-            "to inform", "to counsel", "to submit", "to do", "to replace", "prior", "remains", "still",
-            "under process", "not yet", "to be done", "will ensure", "during next", "action will be taken",'noted please tdc',
-            "will be supplied shortly", "not available", "not updated", "progress", "under progress",
-            "to arrange", "awaited", "material awaited", "approval awaited", "to procure", "yet pending",
-            "incomplete", "tentative", "ongoing", "in progress", "being done", "arranging", "waiting for",
-            "subject to", "awaiting approval", "awaiting material", "awaiting confirmation", "next schedule",
-            "planned for", "will arrange", "proposed date", "to complete", "to be completed",
-            "likely completion", "expected completion", "not received", "awaiting response"
-        ]
-
-        if "tdc" in text_normalized and any(k in text_normalized for k in resolved_kw):
-            return "Resolved"
-        if any(k in text_normalized for k in pending_kw):
-            return "Pending"
-        if date_found:
-            return "Pending" if "tdc" in text_normalized else "Resolved"
-        if any(k in text_normalized for k in resolved_kw):
-            return "Resolved"
-        return None
-
+    # Marker override for special symbols
     fb = normalize_str(feedback)
     rm = normalize_str(user_remark)
+    marker = re.findall(r"[!#]", f"{fb} {rm}".strip())
+    if marker:
+        return "Resolved" if marker[-1]=="#" else "Pending"
 
-    # marker override
-    m = re.findall(r"[!#]", f"{fb} {rm}".strip())
-    if m:
-        return "Resolved" if m[-1] == "#" else "Pending"
+    # Keywords to classify Resolved or Pending
+    resolved_kw = [
+        "attended", "solved", "done", "completed", "confirmed by", "message given",
+        "tdc work completed", "replaced", "msg given", "msg sent", "counseled", "info shared",
+        "communicated", "sent successfully", "counselled", "gate will be closed soon",
+        "attending at the time", "handled", "resolved", "action taken", "spoken to", "warned",
+        "counselling", "hubli", "working normal", "met", "discussion held", "report sent",
+        "notified", "explained", "nil", "na", "tlc", "work completed", "acknowledged", "visited",
+        "briefed", "guided", "handover", "working properly", "checked found working", "supply restored",
+        "updated by", "adv to", "counselled the staff", "complied", "checked and found",
+        "maintained", "for needful action", "provided at", "in working condition", "is working",
+        "found working", "equipment is working", "item is working", "as per plan", "putright", "put right",
+        "operational feasibility", "will be provided", "will be supplied shortly", "advised to ubl", "updated"
+    ]
+    pending_kw = [
+        "work is going on", "tdc given", "target date", "expected by", "likely by", "planned by",
+        "will be", "needful", "to be", "pending", "not done", "awaiting", "waiting", "yet to", "next time",
+        "follow up", "tdc.", "tdc", "t d c", "will attend", "will be attended", "scheduled", "reminder",
+        "to inform", "to counsel", "to submit", "to do", "to replace", "prior", "remains", "still",
+        "under process", "not yet", "to be done", "will ensure", "during next", "action will be taken",'noted please tdc',
+        "will be supplied shortly", "not available", "not updated", "progress", "under progress",
+        "to arrange", "awaited", "material awaited", "approval awaited", "to procure", "yet pending",
+        "incomplete", "tentative", "ongoing", "in progress", "being done", "arranging", "waiting for",
+        "subject to", "awaiting approval", "awaiting material", "awaiting confirmation", "next schedule",
+        "planned for", "will arrange", "proposed date", "to complete", "to be completed",
+        "likely completion", "expected completion", "not received", "awaiting response"
+    ]
+
+    def _classify(text):
+        if not text:
+            return None
+        date_found = bool(re.search(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', text))
+        if "tdc" in text and any(k in text for k in resolved_kw):
+            return "Resolved"
+        if any(k in text for k in pending_kw):
+            return "Pending"
+        if date_found:
+            return "Pending" if "tdc" in text else "Resolved"
+        if any(k in text for k in resolved_kw):
+            return "Resolved"
+        return None
 
     a = _classify(fb)
     b = _classify(rm)
@@ -277,146 +244,37 @@ def classify_feedback(feedback, user_remark=""):
         return "Pending"
     return "Pending"
 
-# ---------- LOAD DATA ----------
-@st.cache_data(ttl=0)
-def load_data():
-    REQUIRED_COLS = [
-        "Date of Inspection", "Type of Inspection", "Location",
-        "Head", "Sub Head", "Deficiencies Noted",
-        "Inspection By", "Action By", "Feedback",
-        "User Feedback/Remark"
-    ]
-    try:
-        data = sheet.get_all_values()
-        if not data or len(data) < 2:
-            return pd.DataFrame(columns=REQUIRED_COLS)
+df["Status"] = df.apply(lambda row: classify_feedback(row["Feedback"], row["User Feedback/Remark"]), axis=1)
 
-        headers = [c.strip() for c in data[0]]
-        df = pd.DataFrame(data[1:], columns=headers)
-
-        for col in REQUIRED_COLS:
-            if col not in df.columns:
-                df[col] = ""
-
-        df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
-        df["Location"] = df["Location"].astype(str).str.strip().str.upper()
-        df["_sheet_row"] = df.index + 2
-        return df
-    except Exception as e:
-        st.error(f"❌ Error loading Google Sheet: {e}")
-        return pd.DataFrame(columns=REQUIRED_COLS)
-
-# ---------- GOOGLE SHEET UPDATE ----------
-def update_feedback_column(edited_df):
-    header = sheet.row_values(1)
-    def col_idx(name):
-        try:
-            return header.index(name) + 1
-        except ValueError:
-            st.error(f"⚠️ '{name}' column not found")
-            return None
-
-    feedback_col = col_idx("Feedback")
-    remark_col   = col_idx("User Feedback/Remark")
-    head_col     = col_idx("Head")
-    action_col   = col_idx("Action By")
-    subhead_col  = col_idx("Sub Head")
-
-    if None in (feedback_col, remark_col, head_col, action_col, subhead_col):
-        return
-
-    updates = []
-    for _, row in edited_df.iterrows():
-        r = int(row["_sheet_row"])
-        def a1(c): return gspread.utils.rowcol_to_a1(r, c)
-
-        fv = row.get("Feedback", "") or ""
-        rv = row.get("User Feedback/Remark", "") or ""
-        hv = row.get("Head", "") or ""
-        av = row.get("Action By", "") or ""
-        sv = row.get("Sub Head", "") or ""
-
-        updates += [
-            {"range": a1(feedback_col), "values": [[fv]]},
-            {"range": a1(remark_col),   "values": [[rv]]},
-            {"range": a1(head_col),     "values": [[hv]]},
-            {"range": a1(action_col),   "values": [[av]]},
-            {"range": a1(subhead_col),  "values": [[sv]]},
-        ]
-
-        # keep session_state in sync
-        s = st.session_state.df
-        s.loc[s["_sheet_row"] == r, ["Feedback","User Feedback/Remark","Head","Action By","Sub Head"]] = [fv, rv, hv, av, sv]
-
-    if updates:
-        sheet.spreadsheet.values_batch_update({"valueInputOption": "USER_ENTERED", "data": updates})
-
-# ---------- FILTER WIDGETS (no date pickers – you set full range below) ----------
+# ---------- FILTERS ----------
 def apply_common_filters(df, prefix=""):
     with st.expander("🔍 Apply Additional Filters", expanded=True):
         c1, c2 = st.columns(2)
-        c1.multiselect("Inspection By", INSPECTION_BY_LIST[1:], 
-                       default=st.session_state.get(prefix+"insp", []), key=prefix+"insp")
-        c2.multiselect("Action By", ACTION_BY_LIST[1:], 
-                       default=st.session_state.get(prefix+"action", []), key=prefix+"action")
+        inspection_selected = c1.multiselect("Inspection By", INSPECTION_BY_LIST[1:],
+                                             default=st.session_state.get(prefix+"insp", []),
+                                             key=prefix+"insp")
+        action_selected = c2.multiselect("Action By", ACTION_BY_LIST[1:],
+                                         default=st.session_state.get(prefix+"action", []),
+                                         key=prefix+"action")
 
         d1, d2 = st.columns(2)
-        d1.date_input("📅 From Date", key=prefix+"from_date")
-        d2.date_input("📅 To Date", key=prefix+"to_date")
+        from_date = d1.date_input("📅 From Date", key=prefix+"from_date")
+        to_date = d2.date_input("📅 To Date", key=prefix+"to_date")
 
     out = df.copy()
 
-    # --- Filter by "Inspection By"
-    if st.session_state.get(prefix+"insp"):
-        sel = st.session_state[prefix+"insp"]
-        out = out[out["Inspection By"].apply(
-            lambda x: any(s.strip() in str(x).split(",") for s in sel)
-        )]
+    if inspection_selected:
+        out = out[out["Inspection By"].apply(lambda x: any(s.strip() in str(x).split(",") for s in inspection_selected))]
 
-    # --- Filter by "Action By"
-    if st.session_state.get(prefix+"action"):
-        sel = st.session_state[prefix+"action"]
-        out = out[out["Action By"].apply(
-            lambda x: any(s.strip() in str(x).split(",") for s in sel)
-        )]
+    if action_selected:
+        out = out[out["Action By"].apply(lambda x: any(s.strip() in str(x).split(",") for s in action_selected))]
 
-    # --- Filter by Date Range (using "Date of Inspection")
-    if st.session_state.get(prefix+"from_date") and st.session_state.get(prefix+"to_date"):
-        from_date = st.session_state[prefix+"from_date"]
-        to_date   = st.session_state[prefix+"to_date"]
-        out = out[
-            (out["Date of Inspection"] >= pd.to_datetime(from_date)) &
-            (out["Date of Inspection"] <= pd.to_datetime(to_date))
-        ]
+    if from_date and to_date:
+        out = out[(out["Date of Inspection"] >= pd.to_datetime(from_date)) & (out["Date of Inspection"] <= pd.to_datetime(to_date))]
 
     return out
 
-
-# -------------------- HEADER --------------------
-st.markdown(
-    """
-    <div style="display:flex;align-items:center;margin-top:10px;margin-bottom:20px;">
-        <img src="https://raw.githubusercontent.com/srdsoproject/testing/main/Central%20Railway%20Logo.png"
-             height="55" style="margin-right:15px;object-fit:contain;">
-        <div>
-            <h3 style="margin:0;font-weight:bold;color:var(--text-color);">
-                An initiative by <b>Safety Department</b>, Solapur Division
-            </h3>
-        </div>
-    </div>
-    <h1 style="margin-top:0;color:var(--text-color);">📋 S.A.R.A.L</h1>
-    <h3 style="margin-top:-10px;font-weight:normal;color:var(--text-color);">
-        (Safety Abnormality Report & Action List – Version 1.1.8)
-    </h3>
-    """,
-    unsafe_allow_html=True
-)
-
-# -------------------- SESSION DATA --------------------
-if "df" not in st.session_state:
-    st.session_state.df = load_data()
-df = st.session_state.df
-
+# ---------- MAIN UI ----------
 tabs = st.tabs(["📊 View Records", "📈 Analytics"])
 with tabs[0]:
     if df.empty:
@@ -1075,3 +933,4 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
