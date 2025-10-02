@@ -126,7 +126,6 @@ if st.sidebar.button("🚪 Logout"):
     st.session_state.user = {}
     st.rerun()
 
-
 # -------------------- CONSTANTS (DEDUPED) --------------------
 # Use dict.fromkeys(...) to preserve order while removing duplicates
 STATION_LIST = list(dict.fromkeys([
@@ -255,8 +254,136 @@ def classify_feedback(feedback, user_remark=""):
         return "Pending"
     return "Pending"
 
+import streamlit as st
+import pandas as pd
+import gspread
+import re
+import numpy as np
+import matplotlib.pyplot as plt
+import altair as alt
+from io import BytesIO
+from google.oauth2.service_account import Credentials
+from openpyxl.styles import Alignment
+
+# ---------- CONFIG ----------
+st.set_page_config(page_title="Inspection App", layout="wide")
+
+# ---------- SESSION STATE INITIALIZATION ----------
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+if "user" not in st.session_state:
+    st.session_state.user = {}
+if "ack_done" not in st.session_state:
+    st.session_state.ack_done = False
+
+# ---------- LOGIN ----------
+def login(email, password):
+    """Check credentials against st.secrets['users']"""
+    for user in st.secrets["users"]:
+        if user["email"] == email and user["password"] == password:
+            return user
+    return None
+
+if not st.session_state.logged_in:
+    st.title("🔐 Login to S.A.R.A.L (Safety Abnormality Report & Action List)")
+    with st.form("login_form", clear_on_submit=True):
+        email = st.text_input("📧 Email")
+        password = st.text_input("🔒 Password", type="password")
+        submitted = st.form_submit_button("Login")
+
+        if submitted:
+            user = login(email, password)
+            if user:
+                st.session_state.logged_in = True
+                st.session_state.user = user
+                st.success(f"✅ Welcome, {user['name']}!")
+                st.rerun()
+            else:
+                st.error("❌ Invalid email or password.")
+    st.stop()
+
+# ---------- ACKNOWLEDGMENT ----------
+user_id = st.session_state.user["email"]  # use email as unique ID
+
+try:
+    ack_df = pd.read_excel("responses.xlsx")
+    if "UserID" not in ack_df.columns or "Name" not in ack_df.columns:
+        ack_df = pd.DataFrame(columns=["UserID", "Name"])
+except FileNotFoundError:
+    ack_df = pd.DataFrame(columns=["UserID", "Name"])
+
+user_ack_done = user_id in ack_df["UserID"].values
+
+if not user_ack_done:
+    st.title("📢 Pending Deficiencies Compliance")
+    with st.expander("⚠️ Pending Deficiencies Notice", expanded=True):
+        st.info("""
+        The compliance of deficiencies of previous dates are pending & needs to be completed immediately.  
+        I hereby declare that I have read this notice and will ensure compliance.
+        """)
+
+        with st.form("ack_form"):
+            responder_name = st.text_input("✍️ Your Name")
+            ack_submitted = st.form_submit_button("Submit Acknowledgment")
+            
+            if ack_submitted:
+                if responder_name.strip():
+                    new_entry = {"UserID": user_id, "Name": responder_name.strip()}
+                    ack_df = pd.concat([ack_df, pd.DataFrame([new_entry])], ignore_index=True)
+                    ack_df.to_excel("responses.xlsx", index=False)
+
+                    st.success(f"✅ Thank you, {responder_name}, for acknowledging.")
+                    st.rerun()
+                else:
+                    st.error("❌ Please enter your name before submitting.")
+    st.stop()
+
+# ---------- DISPLAY ALL RESPONSES ----------
+st.markdown("### 📝 Responses Received")
+try:
+    df = pd.read_excel("responses.xlsx")
+    if not df.empty:
+        st.dataframe(df)
+    else:
+        st.write("No responses submitted yet.")
+except FileNotFoundError:
+    st.write("No responses submitted yet.")
+
+if st.button("🗑️ Clear All Responses", key="clear_responses_btn"):
+    df = pd.DataFrame(columns=["Name"])
+    df.to_excel("responses.xlsx", index=False)
+    st.success("✅ All responses have been cleared.")
+
+# ---------- GOOGLE SHEETS CONNECTION ----------
+@st.cache_resource
+def connect_to_gsheet():
+    SCOPES = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive",
+    ]
+    service_account_info = dict(st.secrets["gcp_service_account"])
+    if "private_key" in service_account_info:
+        service_account_info["private_key"] = service_account_info["private_key"].replace("\\n", "\n")
+
+    creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPES)
+    gc = gspread.authorize(creds)
+    SHEET_ID = "1_WQyJCtdXuAIQn3IpFTI4KfkrveOHosNsvsZn42jAvw"
+    SHEET_NAME = "Sheet1"
+    return gc.open_by_key(SHEET_ID).worksheet(SHEET_NAME)
+
+sheet = connect_to_gsheet()
+st.sidebar.success("✅ Connected to Google Sheets!")
+
+# ---------- SIDEBAR ----------
+st.sidebar.markdown(f"👤 Logged in as: **{st.session_state.user['name']}**")
+st.sidebar.markdown(f"📧 {st.session_state.user['email']}")
+if st.sidebar.button("🚪 Logout"):
+    st.session_state.logged_in = False
+    st.session_state.user = {}
+    st.rerun()
+
 # ---------- LOAD DATA ----------
-@st.cache_data(ttl=0)
+@st.cache_data(ttl=60)
 def load_data():
     REQUIRED_COLS = [
         "Date of Inspection", "Type of Inspection", "Location",
@@ -287,55 +414,48 @@ def load_data():
 # ---------- GOOGLE SHEET UPDATE ----------
 def update_feedback_column(edited_df):
     header = sheet.row_values(1)
-    def col_idx(name):
-        try:
-            return header.index(name) + 1
-        except ValueError:
-            st.error(f"⚠️ '{name}' column not found")
-            return None
+    col_map = {name: i+1 for i, name in enumerate(header)}
 
-    feedback_col = col_idx("Feedback")
-    remark_col   = col_idx("User Feedback/Remark")
-    head_col     = col_idx("Head")
-    action_col   = col_idx("Action By")
-    subhead_col  = col_idx("Sub Head")
-
-    if None in (feedback_col, remark_col, head_col, action_col, subhead_col):
+    needed = ["Feedback", "User Feedback/Remark", "Head", "Action By", "Sub Head"]
+    missing = [c for c in needed if c not in col_map]
+    if missing:
+        st.error(f"⚠️ Missing columns: {missing}")
         return
 
     updates = []
     for _, row in edited_df.iterrows():
         r = int(row["_sheet_row"])
-        def a1(c): return gspread.utils.rowcol_to_a1(r, c)
-
-        fv = row.get("Feedback", "") or ""
-        rv = row.get("User Feedback/Remark", "") or ""
-        hv = row.get("Head", "") or ""
-        av = row.get("Action By", "") or ""
-        sv = row.get("Sub Head", "") or ""
-
-        updates += [
-            {"range": a1(feedback_col), "values": [[fv]]},
-            {"range": a1(remark_col),   "values": [[rv]]},
-            {"range": a1(head_col),     "values": [[hv]]},
-            {"range": a1(action_col),   "values": [[av]]},
-            {"range": a1(subhead_col),  "values": [[sv]]},
+        values = [
+            row.get("Feedback", "") or "",
+            row.get("User Feedback/Remark", "") or "",
+            row.get("Head", "") or "",
+            row.get("Action By", "") or "",
+            row.get("Sub Head", "") or "",
         ]
+        col_start = col_map["Feedback"]
+        col_end   = col_map["Sub Head"]
+        rng = gspread.utils.rowcol_to_a1(r, col_start) + ":" + gspread.utils.rowcol_to_a1(r, col_end)
+        updates.append({"range": rng, "values": [values]})
 
-        # keep session_state in sync
-        s = st.session_state.df
-        s.loc[s["_sheet_row"] == r, ["Feedback","User Feedback/Remark","Head","Action By","Sub Head"]] = [fv, rv, hv, av, sv]
+        # sync session df
+        st.session_state.df.loc[
+            st.session_state.df["_sheet_row"] == r,
+            needed
+        ] = values
 
     if updates:
-        sheet.spreadsheet.values_batch_update({"valueInputOption": "USER_ENTERED", "data": updates})
+        sheet.spreadsheet.values_batch_update({
+            "valueInputOption": "USER_ENTERED",
+            "data": updates
+        })
 
-# ---------- FILTER WIDGETS (no date pickers – you set full range below) ----------
+# ---------- FILTER WIDGETS ----------
 def apply_common_filters(df, prefix=""):
     with st.expander("🔍 Apply Additional Filters", expanded=True):
         c1, c2 = st.columns(2)
-        c1.multiselect("Inspection By", INSPECTION_BY_LIST[1:], 
+        c1.multiselect("Inspection By", df["Inspection By"].unique().tolist(), 
                        default=st.session_state.get(prefix+"insp", []), key=prefix+"insp")
-        c2.multiselect("Action By", ACTION_BY_LIST[1:], 
+        c2.multiselect("Action By", df["Action By"].unique().tolist(), 
                        default=st.session_state.get(prefix+"action", []), key=prefix+"action")
 
         d1, d2 = st.columns(2)
@@ -344,21 +464,18 @@ def apply_common_filters(df, prefix=""):
 
     out = df.copy()
 
-    # --- Filter by "Inspection By"
     if st.session_state.get(prefix+"insp"):
         sel = st.session_state[prefix+"insp"]
         out = out[out["Inspection By"].apply(
             lambda x: any(s.strip() in str(x).split(",") for s in sel)
         )]
 
-    # --- Filter by "Action By"
     if st.session_state.get(prefix+"action"):
         sel = st.session_state[prefix+"action"]
         out = out[out["Action By"].apply(
             lambda x: any(s.strip() in str(x).split(",") for s in sel)
         )]
 
-    # --- Filter by Date Range (using "Date of Inspection")
     if st.session_state.get(prefix+"from_date") and st.session_state.get(prefix+"to_date"):
         from_date = st.session_state[prefix+"from_date"]
         to_date   = st.session_state[prefix+"to_date"]
@@ -1053,4 +1170,5 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
