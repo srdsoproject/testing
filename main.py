@@ -764,26 +764,22 @@ if not editable_filtered.empty:
             editable_filtered["Deficiencies Noted"].astype(str).str.lower().str.contains(search_text)
         ]
 
-    # ✅ Select Head
-    selected_head = st.selectbox(
-        "👤 Select Head",
-        sorted(editable_filtered["Head"].dropna().unique()),
-        key="select_head"
+    # -------------------- AUTOMATIC PENDING DEFICIENCY CHECK --------------------
+    feedback_locked = False
+    head_pending_counts = (
+        editable_filtered[editable_filtered["Status"].str.contains("Pending", case=False, na=False)]
+        .groupby("Head")
+        .size()
+        .to_dict()
     )
 
-    # ✅ Check Pending Deficiencies for that Head
-    pending_count = editable_filtered[
-        (editable_filtered["Head"] == selected_head) & 
-        (editable_filtered["Status"].str.contains("Pending", case=False, na=False))
-    ].shape[0]
-
-    feedback_locked = False
-    if pending_count > 50:
-        st.error(
-            f"⚠️ Department **{selected_head}** has **{pending_count} pending deficiencies**.\n\n"
-            "Kindly resolve them first, otherwise feedback will be **locked** until further action."
-        )
-        feedback_locked = True
+    for head, pending_count in head_pending_counts.items():
+        if pending_count > 50:
+            st.error(
+                f"⚠️ Department **{head}** has **{pending_count} pending deficiencies**.\n\n"
+                "Kindly resolve them first, otherwise feedback will be **locked** until further action."
+            )
+            feedback_locked = True
 
     # Ensure stable IDs exist for reliable updates
     if "_original_sheet_index" not in editable_filtered.columns:
@@ -954,11 +950,8 @@ if not editable_filtered.empty:
                 st.success(f"✅ Updated {len(changed_ids)} Feedback row(s) with new remarks.")
             else:
                 st.info("ℹ️ No changes detected to save.")
-
 else:
-    st.info("Deficiencies will be updated soon !")
-
-
+    st.info("Deficiencies will be updated soon!")
 
 
 # ---------------- ALERT LOG SECTION ----------------
@@ -1199,6 +1192,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
