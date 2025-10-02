@@ -266,7 +266,6 @@ from google.oauth2.service_account import Credentials
 from openpyxl.styles import Alignment
 
 # ---------- CONFIG ----------
-st.set_page_config(page_title="Inspection App", layout="wide")
 
 # ---------- SESSION STATE INITIALIZATION ----------
 if "logged_in" not in st.session_state:
@@ -1170,5 +1169,6 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
