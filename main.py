@@ -3,11 +3,15 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 from io import BytesIO
-from matplotlib import pyplot as plt
+import matplotlib.pyplot as plt
+import numpy as np
 import altair as alt
-# ---------- CONFIG ----------
-import pandas as pd
+from openpyxl.styles import Alignment, Font, Border, Side, NamedStyle
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+from st_aggrid.shared import JsCode
+import re
 
+# ---------- CONFIG ----------
 st.set_page_config(page_title="Inspection App", layout="wide")
 
 # ---------- SESSION STATE INITIALIZATION ----------
@@ -17,101 +21,10 @@ if "user" not in st.session_state:
     st.session_state.user = {}
 if "ack_done" not in st.session_state:
     st.session_state.ack_done = False
+if "alerts_log" not in st.session_state:
+    st.session_state.alerts_log = []
 
-# ---------- LOGIN ----------
-import pandas as pd
-
-# ---------- LOGIN ----------
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-
-def login(email, password):
-    """Check credentials against st.secrets['users']"""
-    for user in st.secrets["users"]:
-        if user["email"] == email and user["password"] == password:
-            return user
-    return None
-
-if not st.session_state.logged_in:
-    st.title("🔐 Login to S.A.R.A.L (Safety Abnormality Report & Action List)")
-    with st.form("login_form", clear_on_submit=True):
-        email = st.text_input("📧 Email")
-        password = st.text_input("🔒 Password", type="password")
-        submitted = st.form_submit_button("Login")
-
-        if submitted:
-            user = login(email, password)
-            if user:
-                st.session_state.logged_in = True
-                st.session_state.user = user
-                st.success(f"✅ Welcome, {user['name']}!")
-                st.rerun()
-            else:
-                st.error("❌ Invalid email or password.")
-    st.stop()
-
-# ---------- ACKNOWLEDGMENT ----------
-user_id = st.session_state.user["email"]  # use email as unique ID
-
-# Load acknowledgments safely
-try:
-    ack_df = pd.read_excel("responses.xlsx")
-    # Ensure correct columns exist
-    if "UserID" not in ack_df.columns or "Name" not in ack_df.columns:
-        ack_df = pd.DataFrame(columns=["UserID", "Name"])
-except FileNotFoundError:
-    ack_df = pd.DataFrame(columns=["UserID", "Name"])
-
-# Check if THIS user already acknowledged
-user_ack_done = user_id in ack_df["UserID"].values
-
-if not user_ack_done:
-    st.title("📢 Pending Deficiencies Compliance")
-    with st.expander("⚠️ Pending Deficiencies Notice", expanded=True):
-        st.info("""
-        The compliance of deficiencies of previous dates are pending & needs to be completed immediately.  
-        I hereby declare that I have read this notice and will ensure compliance.
-        """)
-
-        with st.form("ack_form"):
-            responder_name = st.text_input("✍️ Your Name")
-            ack_submitted = st.form_submit_button("Submit Acknowledgment")
-            
-            if ack_submitted:
-                if responder_name.strip():
-                    # Save acknowledgment (per user)
-                    new_entry = {"UserID": user_id, "Name": responder_name.strip()}
-                    ack_df = pd.concat([ack_df, pd.DataFrame([new_entry])], ignore_index=True)
-                    ack_df.to_excel("responses.xlsx", index=False)
-
-                    st.success(f"✅ Thank you, {responder_name}, for acknowledging.")
-                    st.rerun()
-                else:
-                    st.error("❌ Please enter your name before submitting.")
-    st.stop()
-
-
-# ---------- DISPLAY ALL RESPONSES ----------
-st.markdown("### 📝 Responses Received")
-try:
-    df = pd.read_excel("responses.xlsx")
-    if not df.empty:
-        st.dataframe(df)
-    else:
-        st.write("No responses submitted yet.")
-except FileNotFoundError:
-    st.write("No responses submitted yet.")
-if st.button("🗑️ Clear All Responses", key="clear_responses_btn"):
-    df = pd.DataFrame(columns=["Name"])
-    df.to_excel("responses.xlsx", index=False)
-    st.success("✅ All responses have been cleared.")
 # ---------- GOOGLE SHEETS CONNECTION ----------
-import pandas as pd
-import gspread
-import re
-from google.oauth2.service_account import Credentials
-
-# ---------- STEP 1: CONNECT TO GOOGLE SHEETS ----------
 @st.cache_resource
 def connect_to_gsheet():
     SCOPES = [
@@ -131,26 +44,7 @@ def connect_to_gsheet():
 sheet = connect_to_gsheet()
 st.sidebar.success("✅ Connected to Google Sheets!")
 
-# ---------- SIDEBAR ----------
-st.sidebar.markdown(f"👤 Logged in as: **{st.session_state.user['name']}**")
-st.sidebar.markdown(f"📧 {st.session_state.user['email']}")
-if st.sidebar.button("🚪 Logout"):
-    st.session_state.logged_in = False
-    st.session_state.user = {}
-    st.rerun()
-
 # ---------- CONSTANT LISTS ----------
-# -------------------- IMPORTS --------------------
-import re
-import io
-from io import BytesIO
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-from openpyxl.styles import Alignment
-
-# -------------------- CONSTANTS (DEDUPED) --------------------
-# Use dict.fromkeys(...) to preserve order while removing duplicates
 STATION_LIST = list(dict.fromkeys([
     'BRB','MLM','BGVN','JNTR','PRWD','WSB','PPJ','JEUR','KEM','BLNI','DHS','KWV','WDS','MA','AAG',
     'MKPT','MO','MVE','PK','BALE',"SUR",'TKWD','HG','TLT','AKOR','NGS','BOT','DUD','KUI','GDGN','GUR',
@@ -170,6 +64,8 @@ GATE_LIST = list(dict.fromkeys([
 
 FOOTPLATE_ROUTES = ["SUR-DD","SUR-WADI","LUR-KWV",'KWV-MRJ','DD-SUR','WADI-SUR','KWV-LUR','MRJ-KWV']
 
+FOOTPLATE_LIST = STATION_LIST + GATE_LIST + FOOTPLATE_ROUTES
+
 HEAD_LIST = ["", "ELECT/TRD", "ELECT/G", "ELECT/TRO", "SIGNAL & TELECOM", "OPTG","MECHANICAL",
              "ENGINEERING", "COMMERCIAL", "C&W", 'PERSONNEL', 'SECURITY',  "FINANCE", "MEDICAL", "STORE"]
 
@@ -187,7 +83,7 @@ SUBHEAD_LIST = {
     "COMMERCIAL": [ "TICKETING RELATED/MACHINE", "IRCTC", "MISC"],
     "C&W": [ "BRAKE BINDING", 'WHEEL DEFECT', 'TRAIN PARTING', 'PASSENGER AMENITIES', 'AIR PRESSURE LEAKAGE',
             'DAMAGED UNDER GEAR PARTS', 'MISC'],
-      "FINANCE":["MISC"], "MEDICAL":["MISC"], "STORE": ["MISC"],
+    "FINANCE":["MISC"], "MEDICAL":["MISC"], "STORE": ["MISC"],
 }
 
 INSPECTION_BY_LIST = [""] + ["HQ OFFICER CCE/CR",'DRM/SUR', 'ADRM', 'Sr.DSO', 'Sr.DOM', 'Sr.DEN/S', 'Sr.DEN/C', 'Sr.DEN/Co', 'Sr.DSTE',
@@ -205,9 +101,7 @@ VALID_INSPECTIONS = [
     "MISC", "COACHING DEPOT", "ON TRAIN", "SURPRISE/AMBUSH INSPECTION", "WORKSITE INSPECTION", "OTHER (UNUSUAL)",
 ]
 
-FOOTPLATE_LIST = STATION_LIST + GATE_LIST + FOOTPLATE_ROUTES
-
-# -------------------- HELPERS --------------------
+# ---------- HELPERS ----------
 def normalize_str(text):
     if not isinstance(text, str):
         return ""
@@ -276,6 +170,95 @@ def classify_feedback(feedback, user_remark=""):
     if a == "Pending" or b == "Pending":
         return "Pending"
     return "Pending"
+
+# ---------- LOGIN ----------
+def login(email, password):
+    """Check credentials against st.secrets['users']"""
+    for user in st.secrets["users"]:
+        if user["email"] == email and user["password"] == password:
+            return user
+    return None
+
+if not st.session_state.logged_in:
+    st.title("🔐 Login to S.A.R.A.L (Safety Abnormality Report & Action List)")
+    with st.form("login_form", clear_on_submit=True):
+        email = st.text_input("📧 Email")
+        password = st.text_input("🔒 Password", type="password")
+        submitted = st.form_submit_button("Login")
+
+        if submitted:
+            user = login(email, password)
+            if user:
+                st.session_state.logged_in = True
+                st.session_state.user = user
+                st.success(f"✅ Welcome, {user['name']}!")
+                st.rerun()
+            else:
+                st.error("❌ Invalid email or password.")
+    st.stop()
+
+# ---------- ACKNOWLEDGMENT ----------
+user_id = st.session_state.user["email"]  # use email as unique ID
+
+# Load acknowledgments safely
+try:
+    ack_df = pd.read_excel("responses.xlsx")
+    # Ensure correct columns exist
+    if "UserID" not in ack_df.columns or "Name" not in ack_df.columns:
+        ack_df = pd.DataFrame(columns=["UserID", "Name"])
+except FileNotFoundError:
+    ack_df = pd.DataFrame(columns=["UserID", "Name"])
+
+# Check if THIS user already acknowledged
+user_ack_done = user_id in ack_df["UserID"].values
+
+if not user_ack_done:
+    st.title("📢 Pending Deficiencies Compliance")
+    with st.expander("⚠️ Pending Deficiencies Notice", expanded=True):
+        st.info("""
+        The compliance of deficiencies of previous dates are pending & needs to be completed immediately.  
+        I hereby declare that I have read this notice and will ensure compliance.
+        """)
+
+        with st.form("ack_form"):
+            responder_name = st.text_input("✍️ Your Name")
+            ack_submitted = st.form_submit_button("Submit Acknowledgment")
+            
+            if ack_submitted:
+                if responder_name.strip():
+                    # Save acknowledgment (per user)
+                    new_entry = {"UserID": user_id, "Name": responder_name.strip()}
+                    ack_df = pd.concat([ack_df, pd.DataFrame([new_entry])], ignore_index=True)
+                    ack_df.to_excel("responses.xlsx", index=False)
+
+                    st.success(f"✅ Thank you, {responder_name}, for acknowledging.")
+                    st.rerun()
+                else:
+                    st.error("❌ Please enter your name before submitting.")
+    st.stop()
+
+# ---------- DISPLAY ALL RESPONSES ----------
+st.markdown("### 📝 Responses Received")
+try:
+    df = pd.read_excel("responses.xlsx")
+    if not df.empty:
+        st.dataframe(df)
+    else:
+        st.write("No responses submitted yet.")
+except FileNotFoundError:
+    st.write("No responses submitted yet.")
+if st.button("🗑️ Clear All Responses", key="clear_responses_btn"):
+    df = pd.DataFrame(columns=["UserID", "Name"])
+    df.to_excel("responses.xlsx", index=False)
+    st.success("✅ All responses have been cleared.")
+
+# ---------- SIDEBAR ----------
+st.sidebar.markdown(f"👤 Logged in as: **{st.session_state.user['name']}**")
+st.sidebar.markdown(f"📧 {st.session_state.user['email']}")
+if st.sidebar.button("🚪 Logout"):
+    st.session_state.logged_in = False
+    st.session_state.user = {}
+    st.rerun()
 
 # ---------- LOAD DATA ----------
 @st.cache_data(ttl=0)
@@ -351,7 +334,7 @@ def update_feedback_column(edited_df):
     if updates:
         sheet.spreadsheet.values_batch_update({"valueInputOption": "USER_ENTERED", "data": updates})
 
-# ---------- FILTER WIDGETS (no date pickers – you set full range below) ----------
+# ---------- FILTER WIDGETS ----------
 def apply_common_filters(df, prefix=""):
     with st.expander("🔍 Apply Additional Filters", expanded=True):
         c1, c2 = st.columns(2)
@@ -391,7 +374,6 @@ def apply_common_filters(df, prefix=""):
 
     return out
 
-
 # -------------------- HEADER --------------------
 st.markdown(
     """
@@ -417,6 +399,7 @@ if "df" not in st.session_state:
     st.session_state.df = load_data()
 df = st.session_state.df
 
+# -------------------- TABS --------------------
 tabs = st.tabs(["📊 View Records", "📈 Analytics"])
 with tabs[0]:
     if df.empty:
@@ -434,18 +417,18 @@ with tabs[0]:
     df["_original_sheet_index"] = df.index
     df["Status"] = df["Feedback"].apply(classify_feedback)
 
-    # ---------- FILTERS (no date pickers) ----------
+    # ---------- FILTERS ----------
     start_date = df["Date of Inspection"].min()
     end_date   = df["Date of Inspection"].max()
 
     c1, c2 = st.columns(2)
     c1.multiselect("Type of Inspection", VALID_INSPECTIONS, key="view_type_filter")
-    c2.multiselect("Location", FOOTPLATE_LIST, key="view_location_filter")   # ⬅️ changed to multiselect
+    c2.multiselect("Location", FOOTPLATE_LIST, key="view_location_filter")
 
     c3, c4 = st.columns(2)
     c3.multiselect("Head", HEAD_LIST[1:], key="view_head_filter")
     sub_opts = sorted({s for h in st.session_state.view_head_filter for s in SUBHEAD_LIST.get(h, [])})
-    c4.multiselect("Sub Head", sub_opts, key="view_sub_filter")   # ⬅️ changed to multiselect
+    c4.multiselect("Sub Head", sub_opts, key="view_sub_filter")
 
     selected_status = st.selectbox("🔘 Status", ["All", "Pending", "Resolved"], key="view_status_filter")
 
@@ -552,18 +535,12 @@ with tabs[0]:
                                file_name="subhead_distribution.png", mime="image/png")
 
     # ---------- EXPORT ----------
-    from io import BytesIO
-    import pandas as pd
-    from openpyxl.styles import Alignment, Font, Border, Side, NamedStyle
-    
-    # Export dataframe
     export_df = filtered[[
         "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
         "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "User Feedback/Remark",
         "Status"
     ]].copy()
     
-    # 🔹 Ensure date column is only a date (no time part)
     export_df["Date of Inspection"] = pd.to_datetime(export_df["Date of Inspection"]).dt.date
     
     towb = BytesIO()
@@ -571,21 +548,17 @@ with tabs[0]:
         export_df.to_excel(writer, index=False, sheet_name="Filtered Records")
         ws = writer.sheets["Filtered Records"]
     
-        # 🔹 Define date format style
         date_style = NamedStyle(name="date_style", number_format="DD-MM-YYYY")
     
-        # Apply alignment + wrap text for ALL cells
         for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
             for cell in row:
                 cell.alignment = Alignment(wrap_text=True, vertical="top")
     
-        # Apply date format only to "Date of Inspection" column
         date_col_idx = export_df.columns.get_loc("Date of Inspection") + 1
         for row in ws.iter_rows(min_row=2, min_col=date_col_idx, max_col=date_col_idx, max_row=len(export_df) + 1):
             for cell in row:
                 cell.style = date_style
     
-        # Auto column widths
         for col in ws.columns:
             max_length = 0
             col_letter = col[0].column_letter
@@ -595,10 +568,9 @@ with tabs[0]:
                         max_length = max(max_length, len(str(cell.value)))
                 except:
                     pass
-            adjusted_width = (max_length + 2) if max_length < 50 else 50  # cap width
+            adjusted_width = (max_length + 2) if max_length < 50 else 50
             ws.column_dimensions[col_letter].width = adjusted_width
     
-        # Apply border to all cells
         thin_border = Border(left=Side(style='thin'),
                              right=Side(style='thin'),
                              top=Side(style='thin'),
@@ -607,18 +579,16 @@ with tabs[0]:
             for cell in row:
                 cell.border = thin_border
     
-        # Apply color formatting to Status column
         status_col_idx = export_df.columns.get_loc("Status") + 1
         for row in ws.iter_rows(min_row=2, min_col=status_col_idx, max_col=status_col_idx, max_row=len(export_df) + 1):
             for cell in row:
                 if str(cell.value).strip().lower() == "pending":
-                    cell.font = Font(color="FF0000")  # Red
+                    cell.font = Font(color="FF0000")
                 elif str(cell.value).strip().lower() == "resolved":
-                    cell.font = Font(color="008000")  # Green
+                    cell.font = Font(color="008000")
     
     towb.seek(0)
     
-    # Streamlit download button
     st.download_button(
         "📥 Export Filtered Records to Excel", 
         data=towb,
@@ -626,218 +596,293 @@ with tabs[0]:
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
-# -------------------- STATUS UTILS --------------------
-def get_status(feedback, remark):
-    return classify_feedback(feedback, remark)
+    # -------------------- EDITOR --------------------
+    st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
-def color_text_status(status):
-    return "🔴 Pending" if status == "Pending" else ("🟢 Resolved" if status == "Resolved" else status)
+    editable_filtered = filtered.copy()
+    if not editable_filtered.empty:
+        search_text = st.text_input("🔍 Search Deficiencies", "").strip().lower()
+        if search_text:
+            editable_filtered = editable_filtered[
+                editable_filtered["Deficiencies Noted"].astype(str).str.lower().str.contains(search_text)
+            ]
 
-# -------------------- SCROLLBAR & CELL WRAP CSS --------------------
-st.markdown(
-    """
-    <style>
-    ::-webkit-scrollbar { width:16px; height:16px; }
-    ::-webkit-scrollbar-track { background:#f1f1f1; border-radius:8px; }
-    ::-webkit-scrollbar-thumb { background:#888; border-radius:8px; border:3px solid #f1f1f1; }
-    ::-webkit-scrollbar-thumb:hover { background:#555; }
-    * { scrollbar-width:auto; scrollbar-color:#888 #f1f1f1; }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+        if "_original_sheet_index" not in editable_filtered.columns:
+            editable_filtered["_original_sheet_index"] = editable_filtered.index
+        if "_sheet_row" not in editable_filtered.columns:
+            editable_filtered["_sheet_row"] = editable_filtered.index + 2
 
-# -------------------- EDITOR --------------------
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
-import pandas as pd
-from st_aggrid.shared import JsCode   # 👈 for autoSizeAllColumns
+        display_cols = [
+            "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
+            "Deficiencies Noted", "Inspection By", "Action By", "Feedback",
+            "User Feedback/Remark"
+        ]
+        editable_df = editable_filtered[display_cols].copy()
 
-st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
+        if "Date of Inspection" in editable_df.columns:
+            editable_df["Date of Inspection"] = pd.to_datetime(
+                editable_df["Date of Inspection"], errors="coerce"
+            ).dt.strftime("%Y-%m-%d")
 
-# Initialize alerts log
-if "alerts_log" not in st.session_state:
-    st.session_state.alerts_log = []
+        editable_df.insert(
+            editable_df.columns.get_loc("User Feedback/Remark") + 1,
+            "Status",
+            [get_status(r["Feedback"], r["User Feedback/Remark"]) for _, r in editable_df.iterrows()]
+        )
+        editable_df["Status"] = editable_df["Status"].apply(color_text_status)
 
-editable_filtered = filtered.copy()
-if not editable_filtered.empty:
-    # ✅ Search box for Deficiency
-    search_text = st.text_input("🔍 Search Deficiencies", "").strip().lower()
-    if search_text:
-        editable_filtered = editable_filtered[
-            editable_filtered["Deficiencies Noted"].astype(str).str.lower().str.contains(search_text)
+        editable_df["_original_sheet_index"] = editable_filtered["_original_sheet_index"].values
+        editable_df["_sheet_row"] = editable_filtered["_sheet_row"].values
+
+        gb = GridOptionsBuilder.from_dataframe(editable_df)
+        gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True)
+
+        gb.configure_column(
+            "User Feedback/Remark",
+            editable=True,
+            wrapText=True,
+            autoHeight=True,
+            cellEditor="agTextCellEditor",
+            cellEditorPopup=False,
+            cellEditorParams={"maxLength": 4000}
+        )
+
+        gb.configure_column("_original_sheet_index", hide=True)
+        gb.configure_column("_sheet_row", hide=True)
+
+        gb.configure_grid_options(singleClickEdit=True)
+
+        auto_size_js = JsCode("""
+        function(params) {
+            let allColumnIds = [];
+            params.columnApi.getAllColumns().forEach(function(column) {
+                allColumnIds.push(column.getColId());
+            });
+            params.columnApi.autoSizeColumns(allColumnIds);
+        }
+        """)
+        gb.configure_grid_options(onFirstDataRendered=auto_size_js)
+
+        grid_options = gb.build()
+
+        grid_response = AgGrid(
+            editable_df,
+            gridOptions=grid_options,
+            update_mode=GridUpdateMode.VALUE_CHANGED,
+            height=600,
+            allow_unsafe_jscode=True
+        )
+
+        edited_df = pd.DataFrame(grid_response["data"])
+
+        c1, c2, _ = st.columns([1, 1, 1])
+        submitted = c1.button("✅ Submit Feedback")
+        if c2.button("🔄 Refresh Data"):
+            st.session_state.df = load_data()
+            st.success("✅ Data refreshed successfully!")
+
+        if submitted:
+            need_cols = {"_original_sheet_index", "User Feedback/Remark"}
+            if not need_cols.issubset(edited_df.columns) or "Feedback" not in editable_filtered.columns:
+                st.error("⚠️ Required columns are missing from the data.")
+            else:
+                orig = editable_filtered.set_index("_original_sheet_index")
+                new = edited_df.set_index("_original_sheet_index")
+
+                old_remarks = orig["User Feedback/Remark"].fillna("").astype(str)
+                new_remarks = new["User Feedback/Remark"].fillna("").astype(str)
+
+                common_ids = new_remarks.index.intersection(old_remarks.index)
+                diff_mask = new_remarks.loc[common_ids] != old_remarks.loc[common_ids]
+                changed_ids = diff_mask[diff_mask].index.tolist()
+
+                if changed_ids:
+                    diffs = new.loc[changed_ids].copy()
+                    diffs["_sheet_row"] = orig.loc[changed_ids, "_sheet_row"].values
+
+                    routing = {
+                        "Pertains to S&T":        ("SIGNAL & TELECOM", "Sr.DSTE"),
+                        "Pertains to OPTG":       ("OPTG", "Sr.DOM"),
+                        "Pertains to COMMERCIAL": ("COMMERCIAL", "Sr.DCM"),
+                        "Pertains to ELECT/G":    ("ELECT/G", "Sr.DEE/G"),
+                        "Pertains to ELECT/TRD":  ("ELECT/TRD", "Sr.DEE/TRD"),
+                        "Pertains to ELECT/TRO":  ("ELECT/TRO", "Sr.DEE/TRO"),
+                        "Pertains to Sr.DEN/S":   ("ENGINEERING", "Sr.DEN/S"),
+                        "Pertains to Sr.DEN/C":   ("ENGINEERING", "Sr.DEN/C"),
+                        "Pertains to Sr.DEN/Co":  ("ENGINEERING", "Sr.DEN/Co"),
+                        "Pertains to FINAINCE": ("FINANCE","Sr.DFM"),
+                        "Pertains to STORE" : ("STORE","Sr.DMM"),
+                        "Pertains to MEDICAL" : ("MEDICAL", "CMS"),
+                    }
+
+                    for oid in changed_ids:
+                        user_remark = new.loc[oid, "User Feedback/Remark"].strip()
+                        if not user_remark:
+                            continue
+
+                        for key, (head, action_by) in routing.items():
+                            if key in user_remark:
+                                st.session_state.df.at[oid, "Head"] = head
+                                st.session_state.df.at[oid, "Action By"] = action_by
+                                st.session_state.df.at[oid, "Sub Head"] = ""
+                                diffs.at[oid, "Head"] = head
+                                diffs.at[oid, "Action By"] = action_by
+                                diffs.at[oid, "Sub Head"] = ""
+
+                                date_str = orig.loc[oid, "Date of Inspection"]
+                                deficiency = orig.loc[oid, "Deficiencies Noted"]
+                                forwarded_by = orig.loc[oid, "Head"]
+
+                                alert_msg = (
+                                    f"📌 **{head} Department Alert**\n"
+                                    f"- Date: {date_str}\n"
+                                    f"- Deficiency: {deficiency}\n"
+                                    f"- Forwarded By: {forwarded_by}\n"
+                                    f"- Forwarded Remark: {user_remark}"
+                                )
+                                st.session_state.alerts_log.insert(0, alert_msg)
+
+                        diffs.at[oid, "Feedback"] = user_remark
+                        diffs.at[oid, "User Feedback/Remark"] = ""
+
+                        st.session_state.df.at[oid, "Feedback"] = user_remark
+                        st.session_state.df.at[oid, "User Feedback/Remark"] = ""
+
+                    update_feedback_column(
+                        diffs.reset_index().rename(columns={"index": "_original_sheet_index"})
+                    )
+                    st.success(f"✅ Updated {len(changed_ids)} Feedback row(s) with new remarks.")
+                else:
+                    st.info("ℹ️ No changes detected to save.")
+    else:
+        st.info("Deficiencies will be updated soon !")
+
+# -------------------- ANALYTICS TAB --------------------
+with tabs[1]:
+    st.markdown("### 📊 Pending Deficiencies Trend (Bar + Trend Line)")
+    df = st.session_state.df.copy()
+
+    if "Status" not in df.columns:
+        df["Status"] = df["Feedback"].apply(classify_feedback)
+
+    if df.empty:
+        st.info("No data available for analytics.")
+    else:
+        df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
+
+        min_date = df["Date of Inspection"].min()
+        max_date = df["Date of Inspection"].max()
+        start_date, end_date = st.date_input(
+            "Select Inspection Date Range",
+            value=(min_date, max_date),
+            min_value=min_date,
+            max_value=max_date
+        )
+        df = df[(df["Date of Inspection"] >= pd.to_datetime(start_date)) & 
+                (df["Date of Inspection"] <= pd.to_datetime(end_date))]
+
+        pending = df[
+            df["Status"].str.upper().eq("PENDING") |
+            df["Feedback"].isna() |
+            (df["Feedback"].astype(str).str.strip() == "")
+        ].copy()
+
+        pending["Head"] = pending["Head"].astype(str).str.strip().str.upper()
+
+        st.markdown("### 🏢 Department-wise Pending Counts")
+        if not pending.empty:
+            dept_counts = pending.groupby("Head").size().reset_index(name="PendingCount").sort_values("PendingCount", ascending=False)
+            total_pending = dept_counts["PendingCount"].sum()
+
+            dept_counts["color"] = "#ff7f0e"
+            dept_counts.loc[:2, "color"] = "red"
+
+            for _, row in dept_counts.iterrows():
+                st.markdown(f"- **{row['Head']}** : {row['PendingCount']}")
+            st.markdown(f"**Total Pending : {total_pending}**")
+
+            dept_chart = alt.Chart(dept_counts).mark_bar().encode(
+                x=alt.X("PendingCount:Q", title="Pending Deficiencies"),
+                y=alt.Y("Head:N", sort='-x', title="Department"),
+                color=alt.Color("color:N", scale=None),
+                tooltip=["Head","PendingCount"]
+            ).properties(width="container", height=400)
+            st.altair_chart(dept_chart, use_container_width=True)
+
+            top3 = dept_counts.head(3)
+            critical_text = ", ".join([f"{row['Head']} ({row['PendingCount']})" for _, row in top3.iterrows()])
+            st.markdown(f"**Critical Departments with Pending Compliances:** {critical_text}")
+        else:
+            st.info("No pending deficiencies to summarize.")
+
+        st.markdown("### 🚨 Top 3 Critical Locations")
+        for col in ["Location","Gate","Section"]:
+            if col not in pending.columns:
+                pending[col] = ""
+        pending["Location"] = pending["Location"].astype(str).str.strip().str.upper()
+        pending["Gate"] = pending["Gate"].astype(str).str.strip().str.upper()
+        pending["Section"] = pending["Section"].astype(str).str.strip().str.upper()
+
+        pending_stations = pending[pending["Location"].isin(STATION_LIST)]
+        pending_gates = pending[pending["Gate"].isin(GATE_LIST)]
+        pending_routes = pending[pending["Section"].isin([s.upper() for s in FOOTPLATE_ROUTES])]
+
+        combined_counts = pd.concat([
+            pending_stations.groupby("Location").size().reset_index(name="PendingCount"),
+            pending_gates.groupby("Gate").size().reset_index(name="PendingCount"),
+            pending_routes.groupby("Section").size().reset_index(name="PendingCount")
+        ])
+        combined_counts = combined_counts.groupby(combined_counts.columns[0]).sum().reset_index()
+        combined_counts = combined_counts.sort_values("PendingCount", ascending=False)
+
+        if not combined_counts.empty:
+            top3_critical = combined_counts.head(3)
+            top3_critical["color"] = "red"
+
+            critical_loc_chart = alt.Chart(top3_critical).mark_bar().encode(
+                x=alt.X("PendingCount:Q", title="Pending Deficiencies"),
+                y=alt.Y(top3_critical.columns[0]+":N", sort='-x', title="Location / Gate / Section"),
+                color=alt.Color("color:N", scale=None),
+                tooltip=[top3_critical.columns[0],"PendingCount"]
+            ).properties(width="container", height=300)
+            st.altair_chart(critical_loc_chart, use_container_width=True)
+        else:
+            st.info("No critical locations to display.")
+
+        st.markdown("### 📍 Pending Deficiencies by Location / Gate / Section")
+        selected_locations = st.multiselect("Select Locations", pending["Location"].unique(), default=pending["Location"].unique())
+        selected_gates = st.multiselect("Select Gates", pending["Gate"].unique(), default=pending["Gate"].unique())
+        selected_sections = st.multiselect("Select Sections", pending["Section"].unique(), default=pending["Section"].unique())
+
+        filtered_pending_final = pending[
+            (pending["Location"].isin(selected_locations)) |
+            (pending["Gate"].isin(selected_gates)) |
+            (pending["Section"].isin(selected_sections))
         ]
 
-    # Ensure stable IDs exist for reliable updates
-    if "_original_sheet_index" not in editable_filtered.columns:
-        editable_filtered["_original_sheet_index"] = editable_filtered.index
-    if "_sheet_row" not in editable_filtered.columns:
-        editable_filtered["_sheet_row"] = editable_filtered.index + 2  # sheet row (header + 1)
+        if not filtered_pending_final.empty:
+            loc_counts_final = pd.concat([
+                filtered_pending_final.groupby("Location").size().reset_index(name="PendingCount"),
+                filtered_pending_final.groupby("Gate").size().reset_index(name="PendingCount"),
+                filtered_pending_final.groupby("Section").size().reset_index(name="PendingCount")
+            ])
+            loc_counts_final = loc_counts_final[loc_counts_final.iloc[:,0] != ""]
+            loc_counts_final = loc_counts_final.groupby(loc_counts_final.columns[0]).sum().reset_index().sort_values("PendingCount", ascending=False)
 
-    display_cols = [
-        "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
-        "Deficiencies Noted", "Inspection By", "Action By", "Feedback",
-        "User Feedback/Remark"
-    ]
-    editable_df = editable_filtered[display_cols].copy()
+            loc_counts_final["color"] = "#ff7f0e"
+            loc_counts_final.loc[:2,"color"] = "red"
 
-    # Show only date part
-    if "Date of Inspection" in editable_df.columns:
-        editable_df["Date of Inspection"] = pd.to_datetime(
-            editable_df["Date of Inspection"], errors="coerce"
-        ).dt.strftime("%Y-%m-%d")
-
-    # Status column
-    editable_df.insert(
-        editable_df.columns.get_loc("User Feedback/Remark") + 1,
-        "Status",
-        [get_status(r["Feedback"], r["User Feedback/Remark"]) for _, r in editable_df.iterrows()]
-    )
-    editable_df["Status"] = editable_df["Status"].apply(color_text_status)
-
-    # Carry ID columns through grid (hidden)
-    editable_df["_original_sheet_index"] = editable_filtered["_original_sheet_index"].values
-    editable_df["_sheet_row"] = editable_filtered["_sheet_row"].values
-
-    # -------- AG GRID CONFIG --------
-    gb = GridOptionsBuilder.from_dataframe(editable_df)
-    gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True)
-
-    # Make ONLY "User Feedback/Remark" editable
-    gb.configure_column(
-        "User Feedback/Remark",
-        editable=True,
-        wrapText=True,
-        autoHeight=True,
-        cellEditor="agTextCellEditor",
-        cellEditorPopup=False,
-        cellEditorParams={"maxLength": 4000}
-    )
-
-    # Hide helper ID columns
-    gb.configure_column("_original_sheet_index", hide=True)
-    gb.configure_column("_sheet_row", hide=True)
-
-    # Easier editing UX
-    gb.configure_grid_options(singleClickEdit=True)
-
-    # ✅ Auto-size all columns on load
-    auto_size_js = JsCode("""
-    function(params) {
-        let allColumnIds = [];
-        params.columnApi.getAllColumns().forEach(function(column) {
-            allColumnIds.push(column.getColId());
-        });
-        params.columnApi.autoSizeColumns(allColumnIds);
-    }
-    """)
-    gb.configure_grid_options(onFirstDataRendered=auto_size_js)
-
-    grid_options = gb.build()
-
-    grid_response = AgGrid(
-        editable_df,
-        gridOptions=grid_options,
-        update_mode=GridUpdateMode.VALUE_CHANGED,
-        height=600,
-        allow_unsafe_jscode=True
-    )
-
-    edited_df = pd.DataFrame(grid_response["data"])
-
-    # ----------------- BUTTONS -----------------
-    c1, c2, _ = st.columns([1, 1, 1])
-    submitted = c1.button("✅ Submit Feedback")
-    if c2.button("🔄 Refresh Data"):
-        st.session_state.df = load_data()
-        st.success("✅ Data refreshed successfully!")
-
-    # ----------------- SUBMIT LOGIC -----------------
-    if submitted:
-        # Validate needed columns
-        need_cols = {"_original_sheet_index", "User Feedback/Remark"}
-        if not need_cols.issubset(edited_df.columns) or "Feedback" not in editable_filtered.columns:
-            st.error("⚠️ Required columns are missing from the data.")
+            loc_chart = alt.Chart(loc_counts_final).mark_bar().encode(
+                x=alt.X("PendingCount:Q", title="Pending Deficiencies"),
+                y=alt.Y(loc_counts_final.columns[0]+":N", sort='-x', title="Location / Gate / Section"),
+                color=alt.Color("color:N", scale=None),
+                tooltip=[loc_counts_final.columns[0],"PendingCount"]
+            ).properties(width="container", height=500)
+            st.altair_chart(loc_chart, use_container_width=True)
         else:
-            # Compare remarks using the stable ID to find changes
-            orig = editable_filtered.set_index("_original_sheet_index")
-            new = edited_df.set_index("_original_sheet_index")
+            st.info("No pending deficiencies for selected locations.")
 
-            old_remarks = orig["User Feedback/Remark"].fillna("").astype(str)
-            new_remarks = new["User Feedback/Remark"].fillna("").astype(str)
-
-            # Align indexes before comparing
-            common_ids = new_remarks.index.intersection(old_remarks.index)
-            diff_mask = new_remarks.loc[common_ids] != old_remarks.loc[common_ids]
-            changed_ids = diff_mask[diff_mask].index.tolist()
-
-            if changed_ids:
-                diffs = new.loc[changed_ids].copy()
-                diffs["_sheet_row"] = orig.loc[changed_ids, "_sheet_row"].values
-
-                # Routing dictionary
-                routing = {
-                    "Pertains to S&T":        ("SIGNAL & TELECOM", "Sr.DSTE"),
-                    "Pertains to OPTG":       ("OPTG", "Sr.DOM"),
-                    "Pertains to COMMERCIAL": ("COMMERCIAL", "Sr.DCM"),
-                    "Pertains to ELECT/G":    ("ELECT/G", "Sr.DEE/G"),
-                    "Pertains to ELECT/TRD":  ("ELECT/TRD", "Sr.DEE/TRD"),
-                    "Pertains to ELECT/TRO":  ("ELECT/TRO", "Sr.DEE/TRO"),
-                    "Pertains to Sr.DEN/S":   ("ENGINEERING", "Sr.DEN/S"),
-                    "Pertains to Sr.DEN/C":   ("ENGINEERING", "Sr.DEN/C"),
-                    "Pertains to Sr.DEN/Co":  ("ENGINEERING", "Sr.DEN/Co"),
-                    "Pertains to FINAINCE": ("FINANCE","Sr.DFM"),
-                    "Pertains to STORE" : ("STORE","Sr.DMM"),
-                    "Pertains to MEDICAL" : ("MEDICAL", "CMS"),
-                }
-
-                for oid in changed_ids:
-                    user_remark = new.loc[oid, "User Feedback/Remark"].strip()
-                    if not user_remark:
-                        continue
-
-                    for key, (head, action_by) in routing.items():
-                        if key in user_remark:
-                            st.session_state.df.at[oid, "Head"] = head
-                            st.session_state.df.at[oid, "Action By"] = action_by
-                            st.session_state.df.at[oid, "Sub Head"] = ""
-                            diffs.at[oid, "Head"] = head
-                            diffs.at[oid, "Action By"] = action_by
-                            diffs.at[oid, "Sub Head"] = ""
-
-                            # 👉 Collect extra info
-                            date_str = orig.loc[oid, "Date of Inspection"]
-                            deficiency = orig.loc[oid, "Deficiencies Noted"]
-                            forwarded_by = orig.loc[oid, "Head"]
-
-                            # 👉 Build alert message
-                            alert_msg = (
-                                f"📌 **{head} Department Alert**\n"
-                                f"- Date: {date_str}\n"
-                                f"- Deficiency: {deficiency}\n"
-                                f"- Forwarded By: {forwarded_by}\n"
-                                f"- Forwarded Remark: {user_remark}"
-                            )
-                            st.session_state.alerts_log.insert(0, alert_msg)
-
-                    # ✅ Replace Feedback with new remark (clear remark column)
-                    diffs.at[oid, "Feedback"] = user_remark
-                    diffs.at[oid, "User Feedback/Remark"] = ""
-
-                    st.session_state.df.at[oid, "Feedback"] = user_remark
-                    st.session_state.df.at[oid, "User Feedback/Remark"] = ""
-
-                # Persist to storage
-                update_feedback_column(
-                    diffs.reset_index().rename(columns={"index": "_original_sheet_index"})
-                )
-                st.success(f"✅ Updated {len(changed_ids)} Feedback row(s) with new remarks.")
-            else:
-                st.info("ℹ️ No changes detected to save.")
-else:
-    st.info("Deficiencies will be updated soon !")
-
-
-# ---------------- ALERT LOG SECTION ----------------
+# -------------------- ALERT LOG SECTION ----------------
 st.markdown("## 📋 Alerts Log")
 
 if st.session_state.alerts_log:
@@ -846,10 +891,9 @@ if st.session_state.alerts_log:
             st.markdown(log, unsafe_allow_html=True)
             if st.button("Mark as Read", key=f"mark_{i}"):
                 st.session_state.alerts_log.pop(i)
-                st.session_state.last_alert_clicked = i  # save position
+                st.session_state.last_alert_clicked = i
                 st.rerun()
 
-# After rerun, if we just clicked
 if "last_alert_clicked" in st.session_state:
     st.markdown(
         f"""
@@ -866,7 +910,6 @@ if "last_alert_clicked" in st.session_state:
 
 else:
     st.info("✅ No pending alerts.")
-
 
 # -------------------- FOOTER --------------------
 st.markdown(
@@ -892,7 +935,6 @@ st.markdown("""
 - For Finance Department: Pertains to **FINAINCE**
 - For Store Department: Pertains to **STORE**
 - For Medical Department: Pertains to **MEDICAL**
-
 """)
 
 
@@ -1075,4 +1117,5 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
