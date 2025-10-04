@@ -649,17 +649,72 @@ st.markdown(
 
 # -------------------- EDITOR --------------------
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+from st_aggrid.shared import JsCode
 import pandas as pd
-from st_aggrid.shared import JsCode   # 👈 for autoSizeAllColumns
+import streamlit as st
+import streamlit.components.v1 as components
 
+# -------------------- HEADER --------------------
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
-# Initialize alerts log
+# -------------------- ALERT LOG --------------------
 if "alerts_log" not in st.session_state:
     st.session_state.alerts_log = []
+if "popup_read" not in st.session_state:
+    st.session_state.popup_read = False  # For "Mark as Read"
+
+# -------------------- SAMPLE DATA LOADING --------------------
+# You can replace this with your actual filtered DataFrame
+# (already defined as `filtered` in your app)
+# filtered = load_data()
 
 editable_filtered = filtered.copy()
+
 if not editable_filtered.empty:
+    # ✅ --- CHECK PENDING DEFICIENCIES SINCE 01 JUNE 2025 ---
+    editable_filtered["Date of Inspection"] = pd.to_datetime(
+        editable_filtered["Date of Inspection"], errors="coerce"
+    )
+    june_start = pd.Timestamp("2025-06-01")
+
+    recent_pending = editable_filtered[
+        (editable_filtered["Date of Inspection"] >= june_start)
+        & (editable_filtered["Feedback"].astype(str).str.strip().eq(""))
+    ]
+
+    if "Head" in recent_pending.columns:
+        pending_counts = recent_pending.groupby("Head").size()
+        over_limit = pending_counts[pending_counts > 50]
+
+        # 🚨 Show popup if not marked as read
+        if not over_limit.empty and not st.session_state.popup_read:
+            popup_html = f"""
+            <div id='popup' style='
+                position: fixed;
+                top: 25%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: #fff3cd;
+                padding: 25px 35px;
+                border-radius: 15px;
+                box-shadow: 0 0 20px rgba(0,0,0,0.3);
+                font-size: 16px;
+                color: #856404;
+                z-index: 9999;
+                text-align: left;
+            '>
+                <h4>⚠️ Pending Deficiency Alert (Since 01 June 2025)</h4>
+                <p>The following Heads have more than <b>50 pending deficiencies</b>:</p>
+                <ul>
+                    {''.join([f"<li><b>{head}</b> — {count} pending</li>" for head, count in over_limit.items()])}
+                </ul>
+            </div>
+            """
+            components.html(popup_html, height=270)
+            if st.button("✅ Mark as Read"):
+                st.session_state.popup_read = True
+                st.rerun()
+
     # ✅ Search box for Deficiency
     search_text = st.text_input("🔍 Search Deficiencies", "").strip().lower()
     if search_text:
@@ -685,6 +740,19 @@ if not editable_filtered.empty:
         editable_df["Date of Inspection"] = pd.to_datetime(
             editable_df["Date of Inspection"], errors="coerce"
         ).dt.strftime("%Y-%m-%d")
+
+    # Helper functions
+    def get_status(feedback, remark):
+        if str(feedback).strip() == "" and str(remark).strip() == "":
+            return "Pending"
+        elif str(feedback).strip() != "" and str(remark).strip() == "":
+            return "Resolved"
+        else:
+            return "In Progress"
+
+    def color_text_status(status):
+        colors = {"Pending": "🔴 Pending", "In Progress": "🟠 In Progress", "Resolved": "🟢 Resolved"}
+        return colors.get(status, status)
 
     # Status column
     editable_df.insert(
@@ -753,19 +821,16 @@ if not editable_filtered.empty:
 
     # ----------------- SUBMIT LOGIC -----------------
     if submitted:
-        # Validate needed columns
         need_cols = {"_original_sheet_index", "User Feedback/Remark"}
         if not need_cols.issubset(edited_df.columns) or "Feedback" not in editable_filtered.columns:
             st.error("⚠️ Required columns are missing from the data.")
         else:
-            # Compare remarks using the stable ID to find changes
             orig = editable_filtered.set_index("_original_sheet_index")
             new = edited_df.set_index("_original_sheet_index")
 
             old_remarks = orig["User Feedback/Remark"].fillna("").astype(str)
             new_remarks = new["User Feedback/Remark"].fillna("").astype(str)
 
-            # Align indexes before comparing
             common_ids = new_remarks.index.intersection(old_remarks.index)
             diff_mask = new_remarks.loc[common_ids] != old_remarks.loc[common_ids]
             changed_ids = diff_mask[diff_mask].index.tolist()
@@ -774,7 +839,6 @@ if not editable_filtered.empty:
                 diffs = new.loc[changed_ids].copy()
                 diffs["_sheet_row"] = orig.loc[changed_ids, "_sheet_row"].values
 
-                # Routing dictionary
                 routing = {
                     "Pertains to S&T":        ("SIGNAL & TELECOM", "Sr.DSTE"),
                     "Pertains to OPTG":       ("OPTG", "Sr.DOM"),
@@ -785,9 +849,9 @@ if not editable_filtered.empty:
                     "Pertains to Sr.DEN/S":   ("ENGINEERING", "Sr.DEN/S"),
                     "Pertains to Sr.DEN/C":   ("ENGINEERING", "Sr.DEN/C"),
                     "Pertains to Sr.DEN/Co":  ("ENGINEERING", "Sr.DEN/Co"),
-                    "Pertains to FINAINCE": ("FINANCE","Sr.DFM"),
-                    "Pertains to STORE" : ("STORE","Sr.DMM"),
-                    "Pertains to MEDICAL" : ("MEDICAL", "CMS"),
+                    "Pertains to FINAINCE":   ("FINANCE", "Sr.DFM"),
+                    "Pertains to STORE":      ("STORE", "Sr.DMM"),
+                    "Pertains to MEDICAL":    ("MEDICAL", "CMS"),
                 }
 
                 for oid in changed_ids:
@@ -804,12 +868,10 @@ if not editable_filtered.empty:
                             diffs.at[oid, "Action By"] = action_by
                             diffs.at[oid, "Sub Head"] = ""
 
-                            # 👉 Collect extra info
                             date_str = orig.loc[oid, "Date of Inspection"]
                             deficiency = orig.loc[oid, "Deficiencies Noted"]
                             forwarded_by = orig.loc[oid, "Head"]
 
-                            # 👉 Build alert message
                             alert_msg = (
                                 f"📌 **{head} Department Alert**\n"
                                 f"- Date: {date_str}\n"
@@ -826,7 +888,6 @@ if not editable_filtered.empty:
                     st.session_state.df.at[oid, "Feedback"] = user_remark
                     st.session_state.df.at[oid, "User Feedback/Remark"] = ""
 
-                # Persist to storage
                 update_feedback_column(
                     diffs.reset_index().rename(columns={"index": "_original_sheet_index"})
                 )
@@ -834,7 +895,8 @@ if not editable_filtered.empty:
             else:
                 st.info("ℹ️ No changes detected to save.")
 else:
-    st.info("Deficiencies will be updated soon !")
+    st.info("Deficiencies will be updated soon!")
+
 
 
 # ---------------- ALERT LOG SECTION ----------------
@@ -1075,3 +1137,4 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
