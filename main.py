@@ -278,7 +278,6 @@ def classify_feedback(feedback, user_remark=""):
     return "Pending"
 
 # ---------- LOAD DATA ----------
-# ---------- LOAD DATA ----------
 @st.cache_data(ttl=0)
 def load_data():
     REQUIRED_COLS = [
@@ -1076,5 +1075,4 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
-
 
