@@ -661,32 +661,30 @@ st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 if "alerts_log" not in st.session_state:
     st.session_state.alerts_log = []
 if "popup_read" not in st.session_state:
-    st.session_state.popup_read = False  # For "Mark as Read"
+    st.session_state.popup_read = False  # for Mark as Read state
 
-# -------------------- SAMPLE DATA LOADING --------------------
-# You can replace this with your actual filtered DataFrame
-# (already defined as `filtered` in your app)
-# filtered = load_data()
-
+# -------------------- LOAD DATA --------------------
 editable_filtered = filtered.copy()
 
 if not editable_filtered.empty:
-    # ✅ --- CHECK PENDING DEFICIENCIES SINCE 01 JUNE 2025 ---
+    # ✅ Parse dates first
     editable_filtered["Date of Inspection"] = pd.to_datetime(
         editable_filtered["Date of Inspection"], errors="coerce"
     )
-    june_start = pd.Timestamp("2025-06-01")
+
+    # ✅ Check pending deficiencies from 01 July 2025 onward
+    july_start = pd.Timestamp("2025-07-01")
 
     recent_pending = editable_filtered[
-        (editable_filtered["Date of Inspection"] >= june_start)
-        & (editable_filtered["Feedback"].astype(str).str.strip().eq(""))
+        (editable_filtered["Date of Inspection"] >= july_start)
+        & (editable_filtered["Feedback"].astype(str).str.strip() == "")
     ]
 
     if "Head" in recent_pending.columns:
         pending_counts = recent_pending.groupby("Head").size()
         over_limit = pending_counts[pending_counts > 50]
 
-        # 🚨 Show popup if not marked as read
+        # ✅ Show popup if threshold exceeded and not yet marked as read
         if not over_limit.empty and not st.session_state.popup_read:
             popup_html = f"""
             <div id='popup' style='
@@ -703,7 +701,7 @@ if not editable_filtered.empty:
                 z-index: 9999;
                 text-align: left;
             '>
-                <h4>⚠️ Pending Deficiency Alert (Since 01 June 2025)</h4>
+                <h4>⚠️ Pending Deficiency Alert (Since 01 July 2025)</h4>
                 <p>The following Heads have more than <b>50 pending deficiencies</b>:</p>
                 <ul>
                     {''.join([f"<li><b>{head}</b> — {count} pending</li>" for head, count in over_limit.items()])}
@@ -715,18 +713,18 @@ if not editable_filtered.empty:
                 st.session_state.popup_read = True
                 st.rerun()
 
-    # ✅ Search box for Deficiency
+    # ✅ Search filter
     search_text = st.text_input("🔍 Search Deficiencies", "").strip().lower()
     if search_text:
         editable_filtered = editable_filtered[
             editable_filtered["Deficiencies Noted"].astype(str).str.lower().str.contains(search_text)
         ]
 
-    # Ensure stable IDs exist for reliable updates
+    # Ensure stable IDs
     if "_original_sheet_index" not in editable_filtered.columns:
         editable_filtered["_original_sheet_index"] = editable_filtered.index
     if "_sheet_row" not in editable_filtered.columns:
-        editable_filtered["_sheet_row"] = editable_filtered.index + 2  # sheet row (header + 1)
+        editable_filtered["_sheet_row"] = editable_filtered.index + 2
 
     display_cols = [
         "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
@@ -735,13 +733,10 @@ if not editable_filtered.empty:
     ]
     editable_df = editable_filtered[display_cols].copy()
 
-    # Show only date part
-    if "Date of Inspection" in editable_df.columns:
-        editable_df["Date of Inspection"] = pd.to_datetime(
-            editable_df["Date of Inspection"], errors="coerce"
-        ).dt.strftime("%Y-%m-%d")
+    # Format date
+    editable_df["Date of Inspection"] = editable_df["Date of Inspection"].dt.strftime("%Y-%m-%d")
 
-    # Helper functions
+    # Helper funcs
     def get_status(feedback, remark):
         if str(feedback).strip() == "" and str(remark).strip() == "":
             return "Pending"
@@ -754,7 +749,7 @@ if not editable_filtered.empty:
         colors = {"Pending": "🔴 Pending", "In Progress": "🟠 In Progress", "Resolved": "🟢 Resolved"}
         return colors.get(status, status)
 
-    # Status column
+    # Add status column
     editable_df.insert(
         editable_df.columns.get_loc("User Feedback/Remark") + 1,
         "Status",
@@ -762,15 +757,12 @@ if not editable_filtered.empty:
     )
     editable_df["Status"] = editable_df["Status"].apply(color_text_status)
 
-    # Carry ID columns through grid (hidden)
     editable_df["_original_sheet_index"] = editable_filtered["_original_sheet_index"].values
     editable_df["_sheet_row"] = editable_filtered["_sheet_row"].values
 
-    # -------- AG GRID CONFIG --------
+    # -------- AG GRID --------
     gb = GridOptionsBuilder.from_dataframe(editable_df)
     gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True)
-
-    # Make ONLY "User Feedback/Remark" editable
     gb.configure_column(
         "User Feedback/Remark",
         editable=True,
@@ -780,15 +772,10 @@ if not editable_filtered.empty:
         cellEditorPopup=False,
         cellEditorParams={"maxLength": 4000}
     )
-
-    # Hide helper ID columns
     gb.configure_column("_original_sheet_index", hide=True)
     gb.configure_column("_sheet_row", hide=True)
-
-    # Easier editing UX
     gb.configure_grid_options(singleClickEdit=True)
 
-    # ✅ Auto-size all columns on load
     auto_size_js = JsCode("""
     function(params) {
         let allColumnIds = [];
@@ -799,7 +786,6 @@ if not editable_filtered.empty:
     }
     """)
     gb.configure_grid_options(onFirstDataRendered=auto_size_js)
-
     grid_options = gb.build()
 
     grid_response = AgGrid(
@@ -827,10 +813,8 @@ if not editable_filtered.empty:
         else:
             orig = editable_filtered.set_index("_original_sheet_index")
             new = edited_df.set_index("_original_sheet_index")
-
             old_remarks = orig["User Feedback/Remark"].fillna("").astype(str)
             new_remarks = new["User Feedback/Remark"].fillna("").astype(str)
-
             common_ids = new_remarks.index.intersection(old_remarks.index)
             diff_mask = new_remarks.loc[common_ids] != old_remarks.loc[common_ids]
             changed_ids = diff_mask[diff_mask].index.tolist()
@@ -838,7 +822,6 @@ if not editable_filtered.empty:
             if changed_ids:
                 diffs = new.loc[changed_ids].copy()
                 diffs["_sheet_row"] = orig.loc[changed_ids, "_sheet_row"].values
-
                 routing = {
                     "Pertains to S&T":        ("SIGNAL & TELECOM", "Sr.DSTE"),
                     "Pertains to OPTG":       ("OPTG", "Sr.DOM"),
@@ -858,7 +841,6 @@ if not editable_filtered.empty:
                     user_remark = new.loc[oid, "User Feedback/Remark"].strip()
                     if not user_remark:
                         continue
-
                     for key, (head, action_by) in routing.items():
                         if key in user_remark:
                             st.session_state.df.at[oid, "Head"] = head
@@ -867,11 +849,9 @@ if not editable_filtered.empty:
                             diffs.at[oid, "Head"] = head
                             diffs.at[oid, "Action By"] = action_by
                             diffs.at[oid, "Sub Head"] = ""
-
                             date_str = orig.loc[oid, "Date of Inspection"]
                             deficiency = orig.loc[oid, "Deficiencies Noted"]
                             forwarded_by = orig.loc[oid, "Head"]
-
                             alert_msg = (
                                 f"📌 **{head} Department Alert**\n"
                                 f"- Date: {date_str}\n"
@@ -880,14 +860,10 @@ if not editable_filtered.empty:
                                 f"- Forwarded Remark: {user_remark}"
                             )
                             st.session_state.alerts_log.insert(0, alert_msg)
-
-                    # ✅ Replace Feedback with new remark (clear remark column)
                     diffs.at[oid, "Feedback"] = user_remark
                     diffs.at[oid, "User Feedback/Remark"] = ""
-
                     st.session_state.df.at[oid, "Feedback"] = user_remark
                     st.session_state.df.at[oid, "User Feedback/Remark"] = ""
-
                 update_feedback_column(
                     diffs.reset_index().rename(columns={"index": "_original_sheet_index"})
                 )
@@ -1137,4 +1113,5 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
