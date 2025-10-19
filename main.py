@@ -777,10 +777,12 @@ if not editable_filtered.empty:
                 # Routing dictionary
                 routing = {
                     "Pertains to S&T":        ("SIGNAL & TELECOM", "Sr.DSTE"),
+                    "Pertains to SECURITY": ("SECURITY","DSC"),
                     "Pertains to OPTG":       ("OPTG", "Sr.DOM"),
                     "Pertains to COMMERCIAL": ("COMMERCIAL", "Sr.DCM"),
                     "Pertains to ELECT/G":    ("ELECT/G", "Sr.DEE/G"),
                     "Pertains to ELECT/TRD":  ("ELECT/TRD", "Sr.DEE/TRD"),
+                    "Pertains to MECHANICAL":  ("MECHANICAL", "Sr.DME"),
                     "Pertains to ELECT/TRO":  ("ELECT/TRO", "Sr.DEE/TRO"),
                     "Pertains to Sr.DEN/S":   ("ENGINEERING", "Sr.DEN/S"),
                     "Pertains to Sr.DEN/C":   ("ENGINEERING", "Sr.DEN/C"),
@@ -789,7 +791,6 @@ if not editable_filtered.empty:
                     "Pertains to STORE" : ("STORE","Sr.DMM"),
                     "Pertains to MEDICAL" : ("MEDICAL", "CMS"),
                 }
-
                 for oid in changed_ids:
                     user_remark = new.loc[oid, "User Feedback/Remark"].strip()
                     if not user_remark:
@@ -885,6 +886,7 @@ st.markdown("""
 - For Signal & Telecom: Pertains to **S&T** 
 - For Commercial: Pertains to **COMMERCIAL**
 - For ELECT/G: Pertains to **ELECT/G**
+- For MECHANICAL: Pertains to **MECHANICAL**
 - For ELECT/TRD: Pertains to **ELECT/TRD**
 - For ELECT/TRO: Pertains to **ELECT/TRO**
 - For Engineering South: Pertains to **Sr.DEN/S**
@@ -892,7 +894,7 @@ st.markdown("""
 - For Finance Department: Pertains to **FINAINCE**
 - For Store Department: Pertains to **STORE**
 - For Medical Department: Pertains to **MEDICAL**
-
+- For Security Department: Pertains to **SECURITY**
 """)
 
 
@@ -1075,5 +1077,6 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
