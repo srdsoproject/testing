@@ -648,9 +648,8 @@ st.markdown(
 )
 
 # -------------------- EDITOR --------------------
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+import streamlit as st
 import pandas as pd
-from st_aggrid.shared import JsCode   # 👈 for autoSizeAllColumns
 
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
@@ -658,14 +657,17 @@ st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 if "alerts_log" not in st.session_state:
     st.session_state.alerts_log = []
 
+# Assuming filtered is a DataFrame loaded elsewhere
 editable_filtered = filtered.copy()
 if not editable_filtered.empty:
-    # ✅ Search box for Deficiency (specific filter)
-    search_text = st.text_input("🔍 Search Deficiencies", "").strip().lower()
+    # ✅ Search box for all columns (mimicking st.dataframe's interactive filter)
+    search_text = st.text_input("🔍 Search Table (All Columns)", "").strip().lower()
     if search_text:
-        editable_filtered = editable_filtered[
-            editable_filtered["Deficiencies Noted"].astype(str).str.lower().str.contains(search_text, na=False)
-        ]
+        # Filter across all string-convertible columns
+        mask = pd.Series(False, index=editable_filtered.index)
+        for col in editable_filtered.columns:
+            mask |= editable_filtered[col].astype(str).str.lower().str.contains(search_text, na=False)
+        editable_filtered = editable_filtered[mask]
 
     # Ensure stable IDs exist for reliable updates
     if "_original_sheet_index" not in editable_filtered.columns:
@@ -686,137 +688,104 @@ if not editable_filtered.empty:
             editable_df["Date of Inspection"], errors="coerce"
         ).dt.strftime("%Y-%m-%d")
 
-    # Ensure all columns have string-compatible data
+    # Ensure all columns have string-compatible data to avoid e.toUpperCase error
     for col in editable_df.columns:
-        editable_df[col] = editable_df[col].astype(str).replace("nan", "")
+        editable_df[col] = editable_filtered[col].astype(str).replace("nan", "")
 
     # Status column
+    def get_status(feedback, remark):
+        # Replace with your actual logic, ensuring string output
+        if feedback and remark:
+            return "Updated"
+        elif feedback:
+            return "Feedback Received"
+        elif remark:
+            return "Pending Feedback"
+        return "Open"
+
+    def color_text_status(status):
+        # Return plain string to avoid rendering issues
+        return str(status)
+
     editable_df.insert(
         editable_df.columns.get_loc("User Feedback/Remark") + 1,
         "Status",
         [get_status(r["Feedback"], r["User Feedback/Remark"]) for _, r in editable_df.iterrows()]
     )
-
-    # Modified color_text_status to return plain strings (assuming this is the issue)
-    def color_text_status(status):
-        # Replace this with your actual logic, ensuring it returns a plain string
-        # Example: Return the status as a string without HTML or markdown
-        return str(status)  # Ensure plain string output
-
     editable_df["Status"] = editable_df["Status"].apply(color_text_status)
 
-    # Carry ID columns through grid (hidden)
+    # Carry ID columns (not displayed but needed for updates)
     editable_df["_original_sheet_index"] = editable_filtered["_original_sheet_index"].values
     editable_df["_sheet_row"] = editable_filtered["_sheet_row"].values
 
-    # -------- AG GRID CONFIG --------
-    gb = GridOptionsBuilder.from_dataframe(editable_df)
-    gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True)
-
-    # Make ONLY "User Feedback/Remark" editable
-    gb.configure_column(
-        "User Feedback/Remark",
-        editable=True,
-        wrapText=True,
-        autoHeight=True,
-        cellEditor="agTextCellEditor",
-        cellEditorPopup=False,
-        cellEditorParams={"maxLength": 4000}
+    # ✅ Display table using st.dataframe
+    st.dataframe(
+        editable_df[display_cols + ["Status"]],  # Exclude ID columns from display
+        use_container_width=True,
+        height=600
     )
 
-    # Hide helper ID columns
-    gb.configure_column("_original_sheet_index", hide=True)
-    gb.configure_column("_sheet_row", hide=True)
+    # ✅ Allow editing User Feedback/Remark via text inputs
+    st.markdown("#### Edit User Feedback/Remark")
+    with st.form(key="feedback_form"):
+        # Store edited remarks in a dictionary
+        edited_remarks = {}
+        for idx, row in editable_df.iterrows():
+            remark = st.text_input(
+                f"User Feedback/Remark for Row {row['_sheet_row']}",
+                value=row["User Feedback/Remark"],
+                key=f"remark_{row['_original_sheet_index']}"
+            )
+            edited_remarks[row["_original_sheet_index"]] = remark
 
-    # Easier editing UX
-    gb.configure_grid_options(singleClickEdit=True)
+        # ----------------- BUTTONS -----------------
+        c1, c2, _ = st.columns([1, 1, 1])
+        submitted = c1.form_submit_button("✅ Submit Feedback")
+        refresh_clicked = c2.button("🔄 Refresh Data")
 
-    # ✅ Auto-size all columns on load
-    auto_size_js = JsCode("""
-    function(params) {
-        let allColumnIds = [];
-        params.columnApi.getAllColumns().forEach(function(column) {
-            allColumnIds.push(column.getColId());
-        });
-        params.columnApi.autoSizeColumns(allColumnIds);
-    }
-    """)
-    gb.configure_grid_options(onFirstDataRendered=auto_size_js)
-
-    # ✅ Enable internal search (quick filter)
-    gb.configure_grid_options(
-        enableQuickFilter=True,  # Enable quick filter
-        quickFilterPlaceholder="Search table..."  # Placeholder text
-    )
-
-    grid_options = gb.build()
-
-    # ✅ Add a text input for the AgGrid internal search
-    grid_search_text = st.text_input("🔍 Search Table (All Columns)", "", key="grid_search").strip()
-
-    # Ensure grid_search_text is a string
-    grid_search_text = str(grid_search_text) if grid_search_text else ""
-
-    grid_response = AgGrid(
-        editable_df,
-        gridOptions=grid_options,
-        update_mode=GridUpdateMode.VALUE_CHANGED,
-        height=600,
-        allow_unsafe_jscode=True,
-        quickFilterText=grid_search_text  # Bind the search input to the quick filter
-    )
-
-    edited_df = pd.DataFrame(grid_response["data"])
-
-    # ----------------- BUTTONS -----------------
-    c1, c2, _ = st.columns([1, 1, 1])
-    submitted = c1.button("✅ Submit Feedback")
-    if c2.button("🔄 Refresh Data"):
-        st.session_state.df = load_data()
+    if refresh_clicked:
+        st.session_state.df = load_data()  # Assuming load_data is defined
         st.success("✅ Data refreshed successfully!")
 
     # ----------------- SUBMIT LOGIC -----------------
     if submitted:
         # Validate needed columns
         need_cols = {"_original_sheet_index", "User Feedback/Remark"}
-        if not need_cols.issubset(edited_df.columns) or "Feedback" not in editable_filtered.columns:
+        if not need_cols.issubset(editable_df.columns) or "Feedback" not in editable_filtered.columns:
             st.error("⚠️ Required columns are missing from the data.")
         else:
             # Compare remarks using the stable ID to find changes
             orig = editable_filtered.set_index("_original_sheet_index")
-            new = edited_df.set_index("_original_sheet_index")
+            new_remarks = pd.Series(edited_remarks, dtype=str).fillna("")
 
             old_remarks = orig["User Feedback/Remark"].fillna("").astype(str)
-            new_remarks = new["User Feedback/Remark"].fillna("").astype(str)
-
-            # Align indexes before comparing
             common_ids = new_remarks.index.intersection(old_remarks.index)
             diff_mask = new_remarks.loc[common_ids] != old_remarks.loc[common_ids]
             changed_ids = diff_mask[diff_mask].index.tolist()
 
             if changed_ids:
-                diffs = new.loc[changed_ids].copy()
-                diffs["_sheet_row"] = orig.loc[changed_ids, "_sheet_row"].values
+                diffs = orig.loc[changed_ids].copy()
+                diffs["User Feedback/Remark"] = [new_remarks[oid] for oid in changed_ids]
 
                 # Routing dictionary
                 routing = {
-                    "Pertains to S&T":        ("SIGNAL & TELECOM", "Sr.DSTE"),
-                    "Pertains to SECURITY": ("SECURITY","DSC"),
-                    "Pertains to OPTG":       ("OPTG", "Sr.DOM"),
+                    "Pertains to S&T": ("SIGNAL & TELECOM", "Sr.DSTE"),
+                    "Pertains to SECURITY": ("SECURITY", "DSC"),
+                    "Pertains to OPTG": ("OPTG", "Sr.DOM"),
                     "Pertains to COMMERCIAL": ("COMMERCIAL", "Sr.DCM"),
-                    "Pertains to ELECT/G":    ("ELECT/G", "Sr.DEE/G"),
-                    "Pertains to ELECT/TRD":  ("ELECT/TRD", "Sr.DEE/TRD"),
-                    "Pertains to MECHANICAL":  ("MECHANICAL", "Sr.DME"),
-                    "Pertains to ELECT/TRO":  ("ELECT/TRO", "Sr.DEE/TRO"),
-                    "Pertains to Sr.DEN/S":   ("ENGINEERING", "Sr.DEN/S"),
-                    "Pertains to Sr.DEN/C":   ("ENGINEERING", "Sr.DEN/C"),
-                    "Pertains to Sr.DEN/Co":  ("ENGINEERING", "Sr.DEN/Co"),
-                    "Pertains to FINAINCE": ("FINANCE","Sr.DFM"),
-                    "Pertains to STORE" : ("STORE","Sr.DMM"),
-                    "Pertains to MEDICAL" : ("MEDICAL", "CMS"),
+                    "Pertains to ELECT/G": ("ELECT/G", "Sr.DEE/G"),
+                    "Pertains to ELECT/TRD": ("ELECT/TRD", "Sr.DEE/TRD"),
+                    "Pertains to MECHANICAL": ("MECHANICAL", "Sr.DME"),
+                    "Pertains to ELECT/TRO": ("ELECT/TRO", "Sr.DEE/TRO"),
+                    "Pertains to Sr.DEN/S": ("ENGINEERING", "Sr.DEN/S"),
+                    "Pertains to Sr.DEN/C": ("ENGINEERING", "Sr.DEN/C"),
+                    "Pertains to Sr.DEN/Co": ("ENGINEERING", "Sr.DEN/Co"),
+                    "Pertains to FINAINCE": ("FINANCE", "Sr.DFM"),
+                    "Pertains to STORE": ("STORE", "Sr.DMM"),
+                    "Pertains to MEDICAL": ("MEDICAL", "CMS"),
                 }
                 for oid in changed_ids:
-                    user_remark = new.loc[oid, "User Feedback/Remark"].strip()
+                    user_remark = new_remarks[oid].strip()
                     if not user_remark:
                         continue
 
@@ -829,12 +798,12 @@ if not editable_filtered.empty:
                             diffs.at[oid, "Action By"] = action_by
                             diffs.at[oid, "Sub Head"] = ""
 
-                            # 👉 Collect extra info
+                            # Collect extra info
                             date_str = orig.loc[oid, "Date of Inspection"]
                             deficiency = orig.loc[oid, "Deficiencies Noted"]
                             forwarded_by = orig.loc[oid, "Head"]
 
-                            # 👉 Build alert message
+                            # Build alert message
                             alert_msg = (
                                 f"📌 **{head} Department Alert**\n"
                                 f"- Date: {date_str}\n"
@@ -844,7 +813,7 @@ if not editable_filtered.empty:
                             )
                             st.session_state.alerts_log.insert(0, alert_msg)
 
-                    # ✅ Replace Feedback with new remark (clear remark column)
+                    # Replace Feedback with new remark (clear remark column)
                     diffs.at[oid, "Feedback"] = user_remark
                     diffs.at[oid, "User Feedback/Remark"] = ""
 
@@ -859,8 +828,7 @@ if not editable_filtered.empty:
             else:
                 st.info("ℹ️ No changes detected to save.")
 else:
-    st.info("Deficiencies will be updated soon !")
-
+    st.info("Deficiencies will be updated soon!")
 # ---------------- ALERT LOG SECTION ----------------
 st.markdown("## 📋 Alerts Log")
 
@@ -1101,6 +1069,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
