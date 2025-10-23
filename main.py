@@ -660,7 +660,7 @@ if "alerts_log" not in st.session_state:
 
 editable_filtered = filtered.copy()
 if not editable_filtered.empty:
-    # ✅ Search box for Deficiency
+    # ✅ Search box for Deficiency (specific filter)
     search_text = st.text_input("🔍 Search Deficiencies", "").strip().lower()
     if search_text:
         editable_filtered = editable_filtered[
@@ -732,14 +732,25 @@ if not editable_filtered.empty:
     """)
     gb.configure_grid_options(onFirstDataRendered=auto_size_js)
 
+    # ✅ Enable internal search (quick filter)
+    gb.configure_grid_options(
+        quickFilterText=True,  # Enables the quick filter
+        enableQuickFilter=True,  # Required for quick filter to work
+        quickFilterPlaceholder="Search table..."  # Placeholder text for the search bar
+    )
+
     grid_options = gb.build()
 
+    # ✅ Add a text input for the AgGrid internal search
+    grid_search_text = st.text_input("🔍 Search Table (All Columns)", "").strip()
+    
     grid_response = AgGrid(
         editable_df,
         gridOptions=grid_options,
         update_mode=GridUpdateMode.VALUE_CHANGED,
         height=600,
-        allow_unsafe_jscode=True
+        allow_unsafe_jscode=True,
+        quickFilterText=grid_search_text  # Bind the search input to the quick filter
     )
 
     edited_df = pd.DataFrame(grid_response["data"])
@@ -1078,6 +1089,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
