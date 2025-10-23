@@ -653,51 +653,85 @@ import pandas as pd
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from st_aggrid.shared import JsCode
 
-st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
+# Custom CSS for professional styling
+st.markdown("""
+<style>
+    .main { padding: 20px; }
+    .stButton>button { 
+        background-color: #005B99; 
+        color: white; 
+        border-radius: 5px; 
+        padding: 8px 16px; 
+    }
+    .stButton>button:hover { 
+        background-color: #003F66; 
+    }
+    .stTextInput input { 
+        border-radius: 5px; 
+        border: 1px solid #005B99; 
+    }
+    h1, h3 { color: #005B99; font-family: 'Arial', sans-serif; }
+    .sidebar .sidebar-content { background-color: #F5F6F5; }
+</style>
+""", unsafe_allow_html=True)
 
-# Initialize alerts log
-if "alerts_log" not in st.session_state:
-    st.session_state.alerts_log = []
+# App header
+st.title("📋 Inspection Feedback Dashboard")
+st.markdown("Manage and update inspection feedback efficiently. Search, edit, and submit remarks with ease.")
+
+# Sidebar for alerts
+with st.sidebar:
+    st.header("🔔 Recent Alerts")
+    if "alerts_log" not in st.session_state:
+        st.session_state.alerts_log = []
+    if st.session_state.alerts_log:
+        for alert in st.session_state.alerts_log[:5]:  # Show last 5 alerts
+            st.markdown(alert, unsafe_allow_html=True)
+    else:
+        st.info("No alerts yet.")
 
 # Assuming filtered is a pre-loaded DataFrame
-editable_filtered = filtered.copy()
+try:
+    editable_filtered = filtered.copy()
+except NameError:
+    editable_filtered = pd.DataFrame()  # Fallback for testing
+
 if not editable_filtered.empty:
-    # Ensure stable IDs exist for reliable updates
+    # Ensure stable IDs
     if "_original_sheet_index" not in editable_filtered.columns:
         editable_filtered["_original_sheet_index"] = editable_filtered.index
     if "_sheet_row" not in editable_filtered.columns:
-        editable_filtered["_sheet_row"] = editable_filtered.index + 2  # sheet row (header + 1)
+        editable_filtered["_sheet_row"] = editable_filtered.index + 2
 
-    # Combine Deficiencies Noted, Inspection By, and Action By into a single column
+    # Combine Deficiencies Noted, Inspection By, and Action By into a Details column
     editable_filtered["Details"] = editable_filtered.apply(
         lambda row: (
-            f"Deficiency: {row['Deficiencies Noted']}\n"
-            f"Inspected By: {row['Inspection By']}\n"
-            f"Action By: {row['Action By']}"
+            f"**Deficiency**: {row['Deficiencies Noted']}<br>"
+            f"**Inspected By**: {row['Inspection By']}<br>"
+            f"**Action By**: {row['Action By']}"
         ),
         axis=1
     )
 
-    # Define display columns (reduced set)
+    # Define display columns
     display_cols = [
         "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
         "Details", "Feedback", "User Feedback/Remark"
     ]
     editable_df = editable_filtered[display_cols].copy()
 
-    # Show only date part
+    # Format date
     if "Date of Inspection" in editable_df.columns:
         editable_df["Date of Inspection"] = pd.to_datetime(
             editable_df["Date of Inspection"], errors="coerce"
         ).dt.strftime("%Y-%m-%d")
 
-    # Ensure all columns have string-compatible data to avoid e.toUpperCase error
+    # Ensure string-compatible data to avoid e.toUpperCase error
     for col in editable_df.columns:
         editable_df[col] = editable_df[col].astype(str).replace("nan", "")
 
-    # Status column
+    # Status column logic
     def get_status(feedback, remark):
-        # Replace with your actual logic, ensuring string output
         if feedback and remark:
             return "Updated"
         elif feedback:
@@ -706,44 +740,65 @@ if not editable_filtered.empty:
             return "Pending Feedback"
         return "Open"
 
-    def color_text_status(status):
-        # Return plain string to avoid rendering issues
-        return str(status)
-
     editable_df.insert(
         editable_df.columns.get_loc("User Feedback/Remark") + 1,
         "Status",
         [get_status(r["Feedback"], r["User Feedback/Remark"]) for _, r in editable_df.iterrows()]
     )
-    editable_df["Status"] = editable_df["Status"].apply(color_text_status)
 
-    # Carry ID columns through grid (hidden)
-    editable_df["_original_sheet_index"] = editable_filtered["_original_sheet_index"].values
-    editable_df["_sheet_row"] = editable_filtered["_sheet_row"].values
+    # Search inputs
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        grid_search_text = st.text_input("🔍 Search Table (All Columns)", "", key="grid_search").strip()
+    with col2:
+        if st.button("🗑️ Clear Search"):
+            grid_search_text = ""
+            st.experimental_rerun()
 
     # -------- AG GRID CONFIG --------
     gb = GridOptionsBuilder.from_dataframe(editable_df)
     gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True)
 
-    # Configure columns with specific widths for better visibility
-    gb.configure_column("Date of Inspection", width=120)
-    gb.configure_column("Type of Inspection", width=150)
+    # Configure columns with professional widths
+    gb.configure_column("Date of Inspection", width=120, headerName="Date")
+    gb.configure_column("Type of Inspection", width=150, headerName="Inspection Type")
     gb.configure_column("Location", width=150)
     gb.configure_column("Head", width=100)
-    gb.configure_column("Sub Head", width=100)
-    gb.configure_column("Details", width=300, wrapText=True, autoHeight=True)
+    gb.configure_column("Sub Head", width=100, headerName="Sub-Head")
+    gb.configure_column("Details", width=350, wrapText=True, autoHeight=True, cellRenderer="markdown")
     gb.configure_column("Feedback", width=200)
-    gb.configure_column("User Feedback/Remark", width=200, editable=True, cellEditor="agTextCellEditor", cellEditorParams={"maxLength": 4000})
-    gb.configure_column("Status", width=120)
+    gb.configure_column(
+        "User Feedback/Remark", 
+        width=250, 
+        editable=True, 
+        cellEditor="agTextCellEditor", 
+        cellEditorParams={"maxLength": 4000},
+        headerName="User Remark"
+    )
+    gb.configure_column(
+        "Status", 
+        width=120,
+        cellStyle=JsCode("""
+        function(params) {
+            if (params.value === 'Updated') return { 'color': '#005B99', 'fontWeight': 'bold' };
+            if (params.value === 'Feedback Received') return { 'color': '#2E7D32', 'fontWeight': 'bold' };
+            if (params.value === 'Pending Feedback') return { 'color': '#EF6C00', 'fontWeight': 'bold' };
+            if (params.value === 'Open') return { 'color': '#D32F2F', 'fontWeight': 'bold' };
+            return {};
+        }
+        """)
+    )
 
     # Hide helper ID columns
+    editable_df["_original_sheet_index"] = editable_filtered["_original_sheet_index"].values
+    editable_df["_sheet_row"] = editable_filtered["_sheet_row"].values
     gb.configure_column("_original_sheet_index", hide=True)
     gb.configure_column("_sheet_row", hide=True)
 
-    # Easier editing UX
+    # Enable single-click editing
     gb.configure_grid_options(singleClickEdit=True)
 
-    # Auto-size columns on load (except Details, which has fixed width)
+    # Auto-size columns (except Details)
     auto_size_js = JsCode("""
     function(params) {
         let allColumnIds = [];
@@ -757,7 +812,7 @@ if not editable_filtered.empty:
     """)
     gb.configure_grid_options(onFirstDataRendered=auto_size_js)
 
-    # Enable internal search (quick filter)
+    # Enable quick filter
     gb.configure_grid_options(
         enableQuickFilter=True,
         quickFilterPlaceholder="Search table..."
@@ -765,36 +820,34 @@ if not editable_filtered.empty:
 
     grid_options = gb.build()
 
-    # Add a text input for the AgGrid internal search
-    grid_search_text = st.text_input("🔍 Search Table (All Columns)", "", key="grid_search").strip()
-    grid_search_text = str(grid_search_text) if grid_search_text else ""
-
+    # Render AgGrid
     grid_response = AgGrid(
         editable_df,
         gridOptions=grid_options,
         update_mode=GridUpdateMode.VALUE_CHANGED,
         height=600,
         allow_unsafe_jscode=True,
-        quickFilterText=grid_search_text
+        theme="alpine",  # Professional theme
+        quickFilterText=str(grid_search_text) if grid_search_text else ""
     )
 
     edited_df = pd.DataFrame(grid_response["data"])
 
-    # ----------------- BUTTONS -----------------
-    c1, c2, _ = st.columns([1, 1, 1])
-    submitted = c1.button("✅ Submit Feedback")
-    if c2.button("🔄 Refresh Data"):
-        st.session_state.df = load_data()  # Assuming load_data is defined
-        st.success("✅ Data refreshed successfully!")
+    # Buttons
+    c1, c2, c3 = st.columns([1, 1, 3])
+    with c1:
+        submitted = st.button("✅ Submit Feedback")
+    with c2:
+        if st.button("🔄 Refresh Data"):
+            st.session_state.df = load_data()  # Assuming load_data is defined
+            st.success("✅ Data refreshed successfully!")
 
-    # ----------------- SUBMIT LOGIC -----------------
+    # Submit logic
     if submitted:
-        # Validate needed columns
         need_cols = {"_original_sheet_index", "User Feedback/Remark"}
         if not need_cols.issubset(edited_df.columns) or "Feedback" not in editable_filtered.columns:
             st.error("⚠️ Required columns are missing from the data.")
         else:
-            # Compare remarks using the stable ID to find changes
             orig = editable_filtered.set_index("_original_sheet_index")
             new = edited_df.set_index("_original_sheet_index")
 
@@ -809,7 +862,6 @@ if not editable_filtered.empty:
                 diffs = new.loc[changed_ids].copy()
                 diffs["_sheet_row"] = orig.loc[changed_ids, "_sheet_row"].values
 
-                # Routing dictionary
                 routing = {
                     "Pertains to S&T": ("SIGNAL & TELECOM", "Sr.DSTE"),
                     "Pertains to SECURITY": ("SECURITY", "DSC"),
@@ -840,37 +892,42 @@ if not editable_filtered.empty:
                             diffs.at[oid, "Action By"] = action_by
                             diffs.at[oid, "Sub Head"] = ""
 
-                            # Collect extra info
                             date_str = orig.loc[oid, "Date of Inspection"]
                             deficiency = orig.loc[oid, "Deficiencies Noted"]
                             forwarded_by = orig.loc[oid, "Head"]
 
-                            # Build alert message
                             alert_msg = (
-                                f"📌 **{head} Department Alert**\n"
-                                f"- Date: {date_str}\n"
-                                f"- Deficiency: {deficiency}\n"
-                                f"- Forwarded By: {forwarded_by}\n"
-                                f"- Forwarded Remark: {user_remark}"
+                                f"<b>{head} Department Alert</b><br>"
+                                f"Date: {date_str}<br>"
+                                f"Deficiency: {deficiency}<br>"
+                                f"Forwarded By: {forwarded_by}<br>"
+                                f"Remark: {user_remark}"
                             )
                             st.session_state.alerts_log.insert(0, alert_msg)
 
-                    # Replace Feedback with new remark (clear remark column)
                     diffs.at[oid, "Feedback"] = user_remark
                     diffs.at[oid, "User Feedback/Remark"] = ""
-
                     st.session_state.df.at[oid, "Feedback"] = user_remark
                     st.session_state.df.at[oid, "User Feedback/Remark"] = ""
 
-                # Persist to storage
                 update_feedback_column(
                     diffs.reset_index().rename(columns={"index": "_original_sheet_index"})
                 )
-                st.success(f"✅ Updated {len(changed_ids)} Feedback row(s) with new remarks.")
+                st.success(f"✅ Updated {len(changed_ids)} Feedback row(s).")
             else:
-                st.info("ℹ️ No changes detected to save.")
+                st.info("ℹ️ No changes detected.")
 else:
-    st.info("Deficiencies will be updated soon!")
+    st.warning("⚠️ No inspection data available. Please upload or refresh data.")
+
+# Placeholder for load_data and update_feedback_column
+def load_data():
+    try:
+        return pd.read_excel("responses.xlsx")
+    except FileNotFoundError:
+        return pd.DataFrame()
+
+def update_feedback_column(diffs):
+    st.session_state.df.to_excel("responses.xlsx", index=False)
 # ---------------- ALERT LOG SECTION ----------------
 st.markdown("## 📋 Alerts Log")
 
@@ -1111,6 +1168,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
