@@ -76,7 +76,7 @@ if not user_ack_done:
         with st.form("ack_form"):
             responder_name = st.text_input("✍️ Your Name")
             ack_submitted = st.form_submit_button("Submit Acknowledgment")
-
+            
             if ack_submitted:
                 if responder_name.strip():
                     # Save acknowledgment (per user)
@@ -101,10 +101,7 @@ try:
         st.write("No responses submitted yet.")
 except FileNotFoundError:
     st.write("No responses submitted yet.")
-if st.button("🗑️ Clear All Responses", key="clear_responses_btn"):
-    df = pd.DataFrame(columns=["Name"])
-    df.to_excel("responses.xlsx", index=False)
-    st.success("✅ All responses have been cleared.")
+
 # ---------- GOOGLE SHEETS CONNECTION ----------
 import pandas as pd
 import gspread
@@ -168,8 +165,7 @@ GATE_LIST = list(dict.fromkeys([
     'LC-6/C','LC-11','LC-03','LC-15/C','LC-21','LC-26-A','LC-60'
 ]))
 
-FOOTPLATE_ROUTES = ["SUR-DD","SUR-WADI","LUR-KWV",'KWV-MRJ','DD-SUR','WADI-SUR','KWV-LUR','MRJ-KWV', 'SUR-KWV', 'KWV-SUR', 'SUR-KLBG', 'KLBG-SUR', 'KLBG-WADI', 'WADI-KLBG', 'KLBG-TJSP', 'TJSP-KLBG', 'KWV-PVR', 'PVR-MRJ']
-FOOTPLATE_ROUTES = ["SUR-DD","SUR-WADI","LUR-KWV",'KWV-MRJ','DD-SUR','WADI-SUR','KWV-LUR','MRJ-KWV', 'SUR-KWV', 'KWV-SUR', 'SUR-KLBG', 'KLBG-SUR', 'KLBG-WADI', 'WADI-KLBG', 'KLBG-TJSP', 'TJSP-KLBG', 'KWV-PVR', 'PVR-MRJ', 'PVR-KWV']
+FOOTPLATE_ROUTES = ["SUR-DD","SUR-WADI","LUR-KWV",'KWV-MRJ','DD-SUR','WADI-SUR','KWV-LUR','MRJ-KWV']
 
 HEAD_LIST = ["", "ELECT/TRD", "ELECT/G", "ELECT/TRO", "SIGNAL & TELECOM", "OPTG","MECHANICAL",
              "ENGINEERING", "COMMERCIAL", "C&W", 'PERSONNEL', 'SECURITY',  "FINANCE", "MEDICAL", "STORE"]
@@ -407,7 +403,7 @@ st.markdown(
     </div>
     <h1 style="margin-top:0;color:var(--text-color);">📋 S.A.R.A.L</h1>
     <h3 style="margin-top:-10px;font-weight:normal;color:var(--text-color);">
-        (Safety Abnormality Report & Action List – Version 1.1.8)
+        (Safety Abnormality Report & Action List – Version 1.2.0)
     </h3>
     """,
     unsafe_allow_html=True
@@ -474,7 +470,7 @@ with tabs[0]:
     pending_count     = (filtered["Status"] == "Pending").sum()
     no_response_count = filtered["Feedback"].isna().sum() + (filtered["Feedback"].astype(str).str.strip() == "").sum()
     resolved_count    = (filtered["Status"] == "Resolved").sum()
-
+    
     col_a.metric("🟨 Pending", pending_count)
     col_b.metric("⚠️ No Response", no_response_count)
     col_c.metric("🟩 Resolved", resolved_count)
@@ -556,36 +552,36 @@ with tabs[0]:
     from io import BytesIO
     import pandas as pd
     from openpyxl.styles import Alignment, Font, Border, Side, NamedStyle
-
+    
     # Export dataframe
     export_df = filtered[[
         "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
         "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "User Feedback/Remark",
         "Status"
     ]].copy()
-
+    
     # 🔹 Ensure date column is only a date (no time part)
     export_df["Date of Inspection"] = pd.to_datetime(export_df["Date of Inspection"]).dt.date
-
+    
     towb = BytesIO()
     with pd.ExcelWriter(towb, engine="openpyxl") as writer:
         export_df.to_excel(writer, index=False, sheet_name="Filtered Records")
         ws = writer.sheets["Filtered Records"]
-
+    
         # 🔹 Define date format style
         date_style = NamedStyle(name="date_style", number_format="DD-MM-YYYY")
-
+    
         # Apply alignment + wrap text for ALL cells
         for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
             for cell in row:
                 cell.alignment = Alignment(wrap_text=True, vertical="top")
-
+    
         # Apply date format only to "Date of Inspection" column
         date_col_idx = export_df.columns.get_loc("Date of Inspection") + 1
         for row in ws.iter_rows(min_row=2, min_col=date_col_idx, max_col=date_col_idx, max_row=len(export_df) + 1):
             for cell in row:
                 cell.style = date_style
-
+    
         # Auto column widths
         for col in ws.columns:
             max_length = 0
@@ -598,7 +594,7 @@ with tabs[0]:
                     pass
             adjusted_width = (max_length + 2) if max_length < 50 else 50  # cap width
             ws.column_dimensions[col_letter].width = adjusted_width
-
+    
         # Apply border to all cells
         thin_border = Border(left=Side(style='thin'),
                              right=Side(style='thin'),
@@ -607,7 +603,7 @@ with tabs[0]:
         for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
             for cell in row:
                 cell.border = thin_border
-
+    
         # Apply color formatting to Status column
         status_col_idx = export_df.columns.get_loc("Status") + 1
         for row in ws.iter_rows(min_row=2, min_col=status_col_idx, max_col=status_col_idx, max_row=len(export_df) + 1):
@@ -616,9 +612,9 @@ with tabs[0]:
                     cell.font = Font(color="FF0000")  # Red
                 elif str(cell.value).strip().lower() == "resolved":
                     cell.font = Font(color="008000")  # Green
-
+    
     towb.seek(0)
-
+    
     # Streamlit download button
     st.download_button(
         "📥 Export Filtered Records to Excel", 
@@ -917,9 +913,7 @@ GATE_LIST = list(dict.fromkeys([
     'LC-6/C','LC-11','LC-03','LC-15/C','LC-21','LC-26-A','LC-60'
 ]))
 
-FOOTPLATE_ROUTES = ["SUR-DD","SUR-WADI","LUR-KWV",'KWV-MRJ','DD-SUR','WADI-SUR','KWV-LUR','MRJ-KWV', 'SUR-KWV', 'KWV-SUR', 'SUR-KLBG', 'KLBG-SUR', 'KLBG-WADI', 'WADI-KLBG', 'KLBG-TJSP', 'TJSP-KLBG', 'KWV-PVR', 'PVR-MRJ']
-FOOTPLATE_ROUTES = ["SUR-DD","SUR-WADI","LUR-KWV",'KWV-MRJ','DD-SUR','WADI-SUR','KWV-LUR','MRJ-KWV', 'SUR-KWV', 'KWV-SUR', 'SUR-KLBG', 'KLBG-SUR', 'KLBG-WADI', 'WADI-KLBG', 'KLBG-TJSP', 'TJSP-KLBG', 'KWV-PVR', 'PVR-MRJ', 'PVR-KWV'
-                ]
+FOOTPLATE_ROUTES = ["SUR-DD","SUR-WADI","LUR-KWV",'KWV-MRJ','DD-SUR','WADI-SUR','KWV-LUR','MRJ-KWV']
 
 
 ALL_LOCATIONS = STATION_LIST + GATE_LIST + FOOTPLATE_ROUTES   # combined master list
@@ -1080,3 +1074,10 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
+
+
+
+
+
+
