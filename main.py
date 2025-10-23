@@ -647,7 +647,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# -------------------- EDITOR --------------------
 import streamlit as st
 import pandas as pd
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
@@ -658,57 +657,102 @@ st.markdown("""
 <style>
     .main { padding: 20px; }
     .stButton>button { 
-        background-color: #005B99; 
+        background-color: #1E88E5; 
         color: white; 
         border-radius: 5px; 
         padding: 8px 16px; 
+        font-weight: bold;
     }
     .stButton>button:hover { 
-        background-color: #003F66; 
+        background-color: #1565C0; 
     }
     .stTextInput input { 
         border-radius: 5px; 
-        border: 1px solid #005B99; 
+        border: 1px solid #1E88E5; 
+        padding: 8px;
     }
-    h1, h3 { color: #005B99; font-family: 'Arial', sans-serif; }
-    .sidebar .sidebar-content { background-color: #F5F6F5; }
+    h1, h3 { 
+        color: #1E88E5; 
+        font-family: 'Arial', sans-serif; 
+    }
+    .sidebar .sidebar-content { 
+        background-color: #F5F6F5; 
+        padding: 10px;
+    }
+    .stAlert { 
+        border-radius: 5px; 
+    }
+    .stDataFrame { 
+        border: 1px solid #E0E0E0; 
+        border-radius: 5px; 
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # App header
-st.title("📋 Inspection Feedback Dashboard")
-st.markdown("Manage and update inspection feedback efficiently. Search, edit, and submit remarks with ease.")
+st.title("📋 Inspection Feedback Management")
+st.markdown("Effortlessly manage inspection feedback. Search, edit, and submit remarks with a professional interface.")
 
-# Sidebar for alerts
+# Sidebar for alerts and metadata
 with st.sidebar:
     st.header("🔔 Recent Alerts")
     if "alerts_log" not in st.session_state:
         st.session_state.alerts_log = []
     if st.session_state.alerts_log:
-        for alert in st.session_state.alerts_log[:5]:  # Show last 5 alerts
+        for alert in st.session_state.alerts_log[:5]:
             st.markdown(alert, unsafe_allow_html=True)
     else:
         st.info("No alerts yet.")
+    st.markdown("---")
+    st.caption(f"Last updated: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+# Placeholder for load_data and update_feedback_column
+def load_data():
+    try:
+        return pd.read_excel("responses.xlsx")
+    except FileNotFoundError:
+        return pd.DataFrame()
+
+def update_feedback_column(diffs):
+    st.session_state.df.to_excel("responses.xlsx", index=False)
+
+# Status logic
+def get_status(feedback, remark):
+    if feedback and remark:
+        return "Updated"
+    elif feedback:
+        return "Feedback Received"
+    elif remark:
+        return "Pending Feedback"
+    return "Open"
 
 # Assuming filtered is a pre-loaded DataFrame
 try:
     editable_filtered = filtered.copy()
 except NameError:
-    editable_filtered = pd.DataFrame()  # Fallback for testing
+    editable_filtered = load_data()
 
 if not editable_filtered.empty:
+    # Search inputs
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        search_text = st.text_input("🔍 Search Table (All Columns)", "", key="grid_search").strip().lower()
+    with col2:
+        if st.button("🗑️ Clear Search"):
+            st.experimental_rerun()
+
     # Ensure stable IDs
     if "_original_sheet_index" not in editable_filtered.columns:
         editable_filtered["_original_sheet_index"] = editable_filtered.index
     if "_sheet_row" not in editable_filtered.columns:
         editable_filtered["_sheet_row"] = editable_filtered.index + 2
 
-    # Combine Deficiencies Noted, Inspection By, and Action By into a Details column
+    # Combine Deficiencies Noted, Inspection By, and Action By
     editable_filtered["Details"] = editable_filtered.apply(
         lambda row: (
-            f"**Deficiency**: {row['Deficiencies Noted']}<br>"
-            f"**Inspected By**: {row['Inspection By']}<br>"
-            f"**Action By**: {row['Action By']}"
+            f"<b>Deficiency</b>: {row['Deficiencies Noted']}<br>"
+            f"<b>Inspected By</b>: {row['Inspection By']}<br>"
+            f"<b>Action By</b>: {row['Action By']}"
         ),
         axis=1
     )
@@ -726,40 +770,26 @@ if not editable_filtered.empty:
             editable_df["Date of Inspection"], errors="coerce"
         ).dt.strftime("%Y-%m-%d")
 
-    # Ensure string-compatible data to avoid e.toUpperCase error
+    # Ensure string-compatible data
     for col in editable_df.columns:
         editable_df[col] = editable_df[col].astype(str).replace("nan", "")
 
-    # Status column logic
-    def get_status(feedback, remark):
-        if feedback and remark:
-            return "Updated"
-        elif feedback:
-            return "Feedback Received"
-        elif remark:
-            return "Pending Feedback"
-        return "Open"
-
+    # Status column
     editable_df.insert(
         editable_df.columns.get_loc("User Feedback/Remark") + 1,
         "Status",
         [get_status(r["Feedback"], r["User Feedback/Remark"]) for _, r in editable_df.iterrows()]
     )
 
-    # Search inputs
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        grid_search_text = st.text_input("🔍 Search Table (All Columns)", "", key="grid_search").strip()
-    with col2:
-        if st.button("🗑️ Clear Search"):
-            grid_search_text = ""
-            st.experimental_rerun()
+    # Carry ID columns
+    editable_df["_original_sheet_index"] = editable_filtered["_original_sheet_index"].values
+    editable_df["_sheet_row"] = editable_filtered["_sheet_row"].values
 
     # -------- AG GRID CONFIG --------
     gb = GridOptionsBuilder.from_dataframe(editable_df)
     gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True)
 
-    # Configure columns with professional widths
+    # Configure columns
     gb.configure_column("Date of Inspection", width=120, headerName="Date")
     gb.configure_column("Type of Inspection", width=150, headerName="Inspection Type")
     gb.configure_column("Location", width=150)
@@ -768,19 +798,21 @@ if not editable_filtered.empty:
     gb.configure_column("Details", width=350, wrapText=True, autoHeight=True, cellRenderer="markdown")
     gb.configure_column("Feedback", width=200)
     gb.configure_column(
-        "User Feedback/Remark", 
-        width=250, 
-        editable=True, 
-        cellEditor="agTextCellEditor", 
+        "User Feedback/Remark",
+        width=250,
+        editable=True,
+        wrapText=True,
+        autoHeight=True,
+        cellEditor="agTextCellEditor",
         cellEditorParams={"maxLength": 4000},
         headerName="User Remark"
     )
     gb.configure_column(
-        "Status", 
+        "Status",
         width=120,
         cellStyle=JsCode("""
         function(params) {
-            if (params.value === 'Updated') return { 'color': '#005B99', 'fontWeight': 'bold' };
+            if (params.value === 'Updated') return { 'color': '#1E88E5', 'fontWeight': 'bold' };
             if (params.value === 'Feedback Received') return { 'color': '#2E7D32', 'fontWeight': 'bold' };
             if (params.value === 'Pending Feedback') return { 'color': '#EF6C00', 'fontWeight': 'bold' };
             if (params.value === 'Open') return { 'color': '#D32F2F', 'fontWeight': 'bold' };
@@ -790,8 +822,6 @@ if not editable_filtered.empty:
     )
 
     # Hide helper ID columns
-    editable_df["_original_sheet_index"] = editable_filtered["_original_sheet_index"].values
-    editable_df["_sheet_row"] = editable_filtered["_sheet_row"].values
     gb.configure_column("_original_sheet_index", hide=True)
     gb.configure_column("_sheet_row", hide=True)
 
@@ -827,20 +857,24 @@ if not editable_filtered.empty:
         update_mode=GridUpdateMode.VALUE_CHANGED,
         height=600,
         allow_unsafe_jscode=True,
-        theme="alpine",  # Professional theme
-        quickFilterText=str(grid_search_text) if grid_search_text else ""
+        theme="alpine",
+        quickFilterText=str(search_text) if search_text else ""
     )
 
     edited_df = pd.DataFrame(grid_response["data"])
 
     # Buttons
-    c1, c2, c3 = st.columns([1, 1, 3])
+    c1, c2, c3 = st.columns([1, 1, 2])
     with c1:
         submitted = st.button("✅ Submit Feedback")
     with c2:
         if st.button("🔄 Refresh Data"):
-            st.session_state.df = load_data()  # Assuming load_data is defined
+            st.session_state.df = load_data()
             st.success("✅ Data refreshed successfully!")
+    with c3:
+        if st.button("📥 Export Table"):
+            csv = editable_df[display_cols + ["Status"]].to_csv(index=False)
+            st.download_button("Download CSV", csv, "inspection_feedback.csv", "text/csv")
 
     # Submit logic
     if submitted:
@@ -918,16 +952,6 @@ if not editable_filtered.empty:
                 st.info("ℹ️ No changes detected.")
 else:
     st.warning("⚠️ No inspection data available. Please upload or refresh data.")
-
-# Placeholder for load_data and update_feedback_column
-def load_data():
-    try:
-        return pd.read_excel("responses.xlsx")
-    except FileNotFoundError:
-        return pd.DataFrame()
-
-def update_feedback_column(diffs):
-    st.session_state.df.to_excel("responses.xlsx", index=False)
 # ---------------- ALERT LOG SECTION ----------------
 st.markdown("## 📋 Alerts Log")
 
@@ -1168,14 +1192,5 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
-
-
-
-
-
-
-
-
-
 
 
