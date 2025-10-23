@@ -664,7 +664,7 @@ if not editable_filtered.empty:
     search_text = st.text_input("🔍 Search Deficiencies", "").strip().lower()
     if search_text:
         editable_filtered = editable_filtered[
-            editable_filtered["Deficiencies Noted"].astype(str).str.lower().str.contains(search_text)
+            editable_filtered["Deficiencies Noted"].astype(str).str.lower().str.contains(search_text, na=False)
         ]
 
     # Ensure stable IDs exist for reliable updates
@@ -686,12 +686,23 @@ if not editable_filtered.empty:
             editable_df["Date of Inspection"], errors="coerce"
         ).dt.strftime("%Y-%m-%d")
 
+    # Ensure all columns have string-compatible data
+    for col in editable_df.columns:
+        editable_df[col] = editable_df[col].astype(str).replace("nan", "")
+
     # Status column
     editable_df.insert(
         editable_df.columns.get_loc("User Feedback/Remark") + 1,
         "Status",
         [get_status(r["Feedback"], r["User Feedback/Remark"]) for _, r in editable_df.iterrows()]
     )
+
+    # Modified color_text_status to return plain strings (assuming this is the issue)
+    def color_text_status(status):
+        # Replace this with your actual logic, ensuring it returns a plain string
+        # Example: Return the status as a string without HTML or markdown
+        return str(status)  # Ensure plain string output
+
     editable_df["Status"] = editable_df["Status"].apply(color_text_status)
 
     # Carry ID columns through grid (hidden)
@@ -734,16 +745,18 @@ if not editable_filtered.empty:
 
     # ✅ Enable internal search (quick filter)
     gb.configure_grid_options(
-        quickFilterText=True,  # Enables the quick filter
-        enableQuickFilter=True,  # Required for quick filter to work
-        quickFilterPlaceholder="Search table..."  # Placeholder text for the search bar
+        enableQuickFilter=True,  # Enable quick filter
+        quickFilterPlaceholder="Search table..."  # Placeholder text
     )
 
     grid_options = gb.build()
 
     # ✅ Add a text input for the AgGrid internal search
-    grid_search_text = st.text_input("🔍 Search Table (All Columns)", "").strip()
-    
+    grid_search_text = st.text_input("🔍 Search Table (All Columns)", "", key="grid_search").strip()
+
+    # Ensure grid_search_text is a string
+    grid_search_text = str(grid_search_text) if grid_search_text else ""
+
     grid_response = AgGrid(
         editable_df,
         gridOptions=grid_options,
@@ -847,7 +860,6 @@ if not editable_filtered.empty:
                 st.info("ℹ️ No changes detected to save.")
 else:
     st.info("Deficiencies will be updated soon !")
-
 
 # ---------------- ALERT LOG SECTION ----------------
 st.markdown("## 📋 Alerts Log")
@@ -1089,6 +1101,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
