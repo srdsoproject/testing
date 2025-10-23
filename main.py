@@ -101,10 +101,7 @@ try:
         st.write("No responses submitted yet.")
 except FileNotFoundError:
     st.write("No responses submitted yet.")
-if st.button("🗑️ Clear All Responses", key="clear_responses_btn"):
-    df = pd.DataFrame(columns=["Name"])
-    df.to_excel("responses.xlsx", index=False)
-    st.success("✅ All responses have been cleared.")
+
 # ---------- GOOGLE SHEETS CONNECTION ----------
 import pandas as pd
 import gspread
@@ -168,7 +165,7 @@ GATE_LIST = list(dict.fromkeys([
     'LC-6/C','LC-11','LC-03','LC-15/C','LC-21','LC-26-A','LC-60'
 ]))
 
-FOOTPLATE_ROUTES = ["SUR-DD","SUR-WADI","LUR-KWV",'KWV-MRJ','DD-SUR','WADI-SUR','KWV-LUR','MRJ-KWV', 'SUR-KWV', 'KWV-SUR', 'SUR-KLBG', 'KLBG-SUR', 'KLBG-WADI', 'WADI-KLBG', 'KLBG-TJSP', 'TJSP-KLBG', 'KWV-PVR', 'PVR-MRJ', 'PVR-KWV']
+FOOTPLATE_ROUTES = ["SUR-DD","SUR-WADI","LUR-KWV",'KWV-MRJ','DD-SUR','WADI-SUR','KWV-LUR','MRJ-KWV']
 
 HEAD_LIST = ["", "ELECT/TRD", "ELECT/G", "ELECT/TRO", "SIGNAL & TELECOM", "OPTG","MECHANICAL",
              "ENGINEERING", "COMMERCIAL", "C&W", 'PERSONNEL', 'SECURITY',  "FINANCE", "MEDICAL", "STORE"]
@@ -406,7 +403,7 @@ st.markdown(
     </div>
     <h1 style="margin-top:0;color:var(--text-color);">📋 S.A.R.A.L</h1>
     <h3 style="margin-top:-10px;font-weight:normal;color:var(--text-color);">
-        (Safety Abnormality Report & Action List – Version 1.1.8)
+        (Safety Abnormality Report & Action List – Version 1.2.0)
     </h3>
     """,
     unsafe_allow_html=True
@@ -916,8 +913,7 @@ GATE_LIST = list(dict.fromkeys([
     'LC-6/C','LC-11','LC-03','LC-15/C','LC-21','LC-26-A','LC-60'
 ]))
 
-FOOTPLATE_ROUTES = ["SUR-DD","SUR-WADI","LUR-KWV",'KWV-MRJ','DD-SUR','WADI-SUR','KWV-LUR','MRJ-KWV', 'SUR-KWV', 'KWV-SUR', 'SUR-KLBG', 'KLBG-SUR', 'KLBG-WADI', 'WADI-KLBG', 'KLBG-TJSP', 'TJSP-KLBG', 'KWV-PVR', 'PVR-MRJ', 'PVR-KWV'
-                ]
+FOOTPLATE_ROUTES = ["SUR-DD","SUR-WADI","LUR-KWV",'KWV-MRJ','DD-SUR','WADI-SUR','KWV-LUR','MRJ-KWV']
 
 
 ALL_LOCATIONS = STATION_LIST + GATE_LIST + FOOTPLATE_ROUTES   # combined master list
@@ -1078,8 +1074,6 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
-
-
 
 
 
