@@ -168,7 +168,7 @@ GATE_LIST = list(dict.fromkeys([
     'LC-6/C','LC-11','LC-03','LC-15/C','LC-21','LC-26-A','LC-60'
 ]))
 
-FOOTPLATE_ROUTES = ["SUR-DD","SUR-WADI","LUR-KWV",'KWV-MRJ','DD-SUR','WADI-SUR','KWV-LUR','MRJ-KWV', 'SUR-KWV', 'KWV-SUR', 'SUR-KLBG', 'KLBG-SUR', 'KLBG-WADI', 'WADI-KLBG', 'KLBG-TJSP', 'TJSP-KLBG', 'KWV-PVR', 'PVR-MRJ', 'PVR-KWV']
+FOOTPLATE_ROUTES = ["SUR-DD","SUR-WADI","LUR-KWV",'KWV-MRJ','DD-SUR','WADI-SUR','KWV-LUR','MRJ-KWV']
 
 HEAD_LIST = ["", "ELECT/TRD", "ELECT/G", "ELECT/TRO", "SIGNAL & TELECOM", "OPTG","MECHANICAL",
              "ENGINEERING", "COMMERCIAL", "C&W", 'PERSONNEL', 'SECURITY',  "FINANCE", "MEDICAL", "STORE"]
@@ -183,7 +183,7 @@ SUBHEAD_LIST = {
                          "STATION(VDU/BLOCK INSTRUMENT)", "MISC", "CCTV", "DISPLAY BOARDS"],
     "OPTG": [ "SWR/CSR/CSL/TWRD", "COMPETENCY RELATED", "STATION RECORDS", "STATION DEFICIENCIES",
              "SM OFFICE DEFICIENCIES", "MISC"],
-    "ENGINEERING": [ "IOW WORKS","GSU","ROUGH RIDING", "TRACK NEEDS ATTENTION", "PWI WORKS"],
+    "ENGINEERING": [ "IOW WORKS","GSU","ROUGH RIDING", "TRACK NEEDS ATTENTION", "MISC"],
     "COMMERCIAL": [ "TICKETING RELATED/MACHINE", "IRCTC", "MISC"],
     "C&W": [ "BRAKE BINDING", 'WHEEL DEFECT', 'TRAIN PARTING', 'PASSENGER AMENITIES', 'AIR PRESSURE LEAKAGE',
             'DAMAGED UNDER GEAR PARTS', 'MISC'],
@@ -418,8 +418,10 @@ if "df" not in st.session_state:
 df = st.session_state.df
 
 tabs = st.tabs(["📊 View Records", "📈 Analytics"])
-
 with tabs[0]:
+    if df.empty:
+        st.warning("Deficiencies will be updated soon !")
+        st.stop()
 
     # Ensure required cols exist
     for col in ["Type of Inspection", "Location", "Head", "Sub Head", "Deficiencies Noted",
@@ -775,12 +777,10 @@ if not editable_filtered.empty:
                 # Routing dictionary
                 routing = {
                     "Pertains to S&T":        ("SIGNAL & TELECOM", "Sr.DSTE"),
-                    "Pertains to SECURITY": ("SECURITY","DSC"),
                     "Pertains to OPTG":       ("OPTG", "Sr.DOM"),
                     "Pertains to COMMERCIAL": ("COMMERCIAL", "Sr.DCM"),
                     "Pertains to ELECT/G":    ("ELECT/G", "Sr.DEE/G"),
                     "Pertains to ELECT/TRD":  ("ELECT/TRD", "Sr.DEE/TRD"),
-                    "Pertains to MECHANICAL":  ("MECHANICAL", "Sr.DME"),
                     "Pertains to ELECT/TRO":  ("ELECT/TRO", "Sr.DEE/TRO"),
                     "Pertains to Sr.DEN/S":   ("ENGINEERING", "Sr.DEN/S"),
                     "Pertains to Sr.DEN/C":   ("ENGINEERING", "Sr.DEN/C"),
@@ -789,6 +789,7 @@ if not editable_filtered.empty:
                     "Pertains to STORE" : ("STORE","Sr.DMM"),
                     "Pertains to MEDICAL" : ("MEDICAL", "CMS"),
                 }
+
                 for oid in changed_ids:
                     user_remark = new.loc[oid, "User Feedback/Remark"].strip()
                     if not user_remark:
@@ -884,7 +885,6 @@ st.markdown("""
 - For Signal & Telecom: Pertains to **S&T** 
 - For Commercial: Pertains to **COMMERCIAL**
 - For ELECT/G: Pertains to **ELECT/G**
-- For MECHANICAL: Pertains to **MECHANICAL**
 - For ELECT/TRD: Pertains to **ELECT/TRD**
 - For ELECT/TRO: Pertains to **ELECT/TRO**
 - For Engineering South: Pertains to **Sr.DEN/S**
@@ -892,7 +892,7 @@ st.markdown("""
 - For Finance Department: Pertains to **FINAINCE**
 - For Store Department: Pertains to **STORE**
 - For Medical Department: Pertains to **MEDICAL**
-- For Security Department: Pertains to **SECURITY**
+
 """)
 
 
@@ -914,8 +914,7 @@ GATE_LIST = list(dict.fromkeys([
     'LC-6/C','LC-11','LC-03','LC-15/C','LC-21','LC-26-A','LC-60'
 ]))
 
-FOOTPLATE_ROUTES = ["SUR-DD","SUR-WADI","LUR-KWV",'KWV-MRJ','DD-SUR','WADI-SUR','KWV-LUR','MRJ-KWV', 'SUR-KWV', 'KWV-SUR', 'SUR-KLBG', 'KLBG-SUR', 'KLBG-WADI', 'WADI-KLBG', 'KLBG-TJSP', 'TJSP-KLBG', 'KWV-PVR', 'PVR-MRJ', 'PVR-KWV'
-                ]
+FOOTPLATE_ROUTES = ["SUR-DD","SUR-WADI","LUR-KWV",'KWV-MRJ','DD-SUR','WADI-SUR','KWV-LUR','MRJ-KWV']
 
 
 ALL_LOCATIONS = STATION_LIST + GATE_LIST + FOOTPLATE_ROUTES   # combined master list
@@ -1076,12 +1075,6 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
-
-
-
-
-
-
 
 
 
