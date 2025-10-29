@@ -895,60 +895,70 @@ st.markdown("""
 
 """)
 
+
 st.markdown("""
-<div style="text-align: center; margin: 30px 0; padding: 10px;">
-  <p style="
-    font-family: 'Roboto', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    font-size: 15px;
-    font-weight: 500;
-    color: #c62828;
-    text-shadow: 
-      0 0 8px rgba(173, 216, 230, 0.9),
-      0 0 16px rgba(173, 216, 230, 0.7),
-      0 0 24px rgba(173, 216, 230, 0.5),
-      0 0 32px rgba(173, 216, 230, 0.3);
-    letter-spacing: 0.8px;
-    padding: 12px 32px;
-    background: linear-gradient(135deg, 
-      rgba(255, 248, 248, 0.6) 0%, 
-      rgba(255, 235, 238, 0.4) 50%, 
-      rgba(255, 245, 247, 0.6) 100%);
-    border-radius: 16px;
-    display: inline-block;
-    box-shadow: 
-      0 6px 20px rgba(198, 40, 40, 0.18),
-      0 0 30px rgba(173, 216, 230, 0.5),
-      inset 0 1px 3px rgba(255, 255, 255, 0.8);
-    border: 1.5px solid rgba(211, 47, 47, 0.25);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    transition: all 0.3s ease;
-  ">
-    <strong>Designed & Developed by</strong> 
-    <span style="
-      color: #b71c1c;
-      font-weight: 700;
-      text-shadow: 0 0 10px rgba(173, 216, 230, 1);
-    ">Safety Department</span>, 
-    <em style="color: #c62828; font-style: normal;">Solapur Division</em>
-  </p>
+<div style="text-align: center; margin: 35px 0;">
+  <div class="glow-credit">
+    <p>
+      <strong>Designed & Developed by</strong> 
+      <span class="highlight">Safety Department</span>, 
+      <em>Solapur Division</em>
+    </p>
+  </div>
 </div>
 
 <style>
-  p:hover {
-    transform: translateY(-2px);
-    box-shadow: 
-      0 10px 25px rgba(198, 40, 40, 0.22),
-      0 0 40px rgba(173, 216, 230, 0.7) !important;
-    text-shadow: 
-      0 0 10px rgba(173, 216, 230, 1),
-      0 0 20px rgba(173, 216, 230, 0.8),
-      0 0 30px rgba(173, 216, 230, 0.6),
-      0 0 40px rgba(173, 216, 230, 0.4) !important;
-  }
+.glow-credit {
+  display: inline-block;
+  padding: 14px 36px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 2px solid #40c4ff;
+  border-radius: 18px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 8px 25px rgba(64, 196, 255, 0.15);
+  transition: all 0.4s ease;
+  font-family: 'Roboto', sans-serif;
+}
+
+.glow-credit p {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+  color: #ffffff;
+  letter-spacing: 0.8px;
+  text-shadow: none;
+  transition: text-shadow 0.4s ease;
+}
+
+.glow-credit p span.highlight {
+  color: #e3f2fd;
+  font-weight: 700;
+}
+
+.glow-credit p em {
+  font-style: normal;
+  color: #bbdefb;
+}
+
+/* Hover Effect: Glow Appears */
+.glow-credit:hover {
+  box-shadow: 
+    0 12px 35px rgba(64, 196, 255, 0.3),
+    0 0 40px rgba(179, 229, 252, 0.8),
+    0 0 0 1px rgba(64, 196, 255, 0.4);
+  transform: translateY(-3px);
+}
+
+.glow-credit:hover p {
+  text-shadow: 
+    0 0 10px rgba(179, 229, 252, 0.9),
+    0 0 20px rgba(179, 229, 252, 0.7),
+    0 0 30px rgba(179, 229, 252, 0.5),
+    0 0 40px rgba(179, 229, 252, 0.3);
+}
 </style>
 """, unsafe_allow_html=True)
-
 
 # ---- PREDEFINED LISTS ----
 STATION_LIST = list(dict.fromkeys([
@@ -1129,6 +1139,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
