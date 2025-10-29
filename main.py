@@ -121,15 +121,56 @@ def connect_to_gsheet():
     service_account_info = dict(st.secrets["gcp_service_account"])
     if "private_key" in service_account_info:
         service_account_info["private_key"] = service_account_info["private_key"].replace("\\n", "\n")
-
     creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPES)
     gc = gspread.authorize(creds)
     SHEET_ID = "1_WQyJCtdXuAIQn3IpFTI4KfkrveOHosNsvsZn42jAvw"
     SHEET_NAME = "Sheet1"
     return gc.open_by_key(SHEET_ID).worksheet(SHEET_NAME)
 
-sheet = connect_to_gsheet()
-st.sidebar.success("✅ Connected to Google Sheets!")
+# CONNECT EARLY
+try:
+    sheet = connect_to_gsheet()
+    st.sidebar.success("Connected to Google Sheets!")
+except Exception as e:
+    st.error(f"Failed to connect to Google Sheets: {e}")
+    sheet = None
+    st.sidebar.error("Google Sheets offline")
+
+# ---------- LOAD DATA ----------
+@st.cache_data(ttl=0)
+def load_data():
+    REQUIRED_COLS = [
+        "Date of Inspection", "Type of Inspection", "Location",
+        "Head", "Sub Head", "Deficiencies Noted",
+        "Inspection By", "Action By", "Feedback",
+        "User Feedback/Remark"
+    ]
+    empty_df = pd.DataFrame(columns=REQUIRED_COLS)
+
+    if sheet is None:
+        st.error("Google Sheet not connected.")
+        return empty_df
+
+    try:
+        data = sheet.get_all_values()
+        if not data or len(data) < 2:
+            return empty_df
+
+        headers = [c.strip() for c in data[0]]
+        df = pd.DataFrame(data[1:], columns=headers)
+
+        for col in REQUIRED_COLS:
+            if col not in df.columns:
+                df[col] = ""
+
+        df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
+        df["Location"] = df["Location"].astype(str).str.strip().str.upper()
+        df["_sheet_row"] = df.index + 2
+        return df
+
+    except Exception as e:
+        st.error(f"Failed to load data: {e}")
+        return empty_df
 
 # ---------- SIDEBAR ----------
 st.sidebar.markdown(f"👤 Logged in as: **{st.session_state.user['name']}**")
@@ -1090,4 +1131,5 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
