@@ -393,24 +393,119 @@ def apply_common_filters(df, prefix=""):
 
 
 # -------------------- HEADER --------------------
-st.markdown(
-    """
-    <div style="display:flex;align-items:center;margin-top:10px;margin-bottom:20px;">
+st.markdown("""
+<div style="
+    text-align: center;
+    padding: 25px 20px;
+    margin: 20px 0;
+    background: linear-gradient(135deg, 
+        rgba(0, 71, 171, 0.08) 0%, 
+        rgba(0, 105, 148, 0.05) 100%);
+    border-radius: 20px;
+    border: 1.5px solid rgba(0, 105, 148, 0.25);
+    box-shadow: 
+        0 8px 25px rgba(0, 71, 171, 0.12),
+        0 0 0 1px rgba(0, 105, 148, 0.1);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    position: relative;
+    overflow: hidden;
+">
+    <!-- Top Railway Line -->
+    <div style="
+        position: absolute;
+        top: 0; left: 0; right: 0; height: 5px;
+        background: linear-gradient(90deg, 
+            #d32f2f 0%, #f57c00 33%, #fbc02d 66%, #388e3c 100%);
+        box-shadow: 0 2px 8px rgba(211, 47, 47, 0.4);
+    "></div>
+
+    <div style="display: flex; justify-content: center; align-items: center; gap: 20px; flex-wrap: wrap;">
+        <!-- Central Railway Logo -->
         <img src="https://raw.githubusercontent.com/srdsoproject/testing/main/Central%20Railway%20Logo.png"
-             height="55" style="margin-right:15px;object-fit:contain;">
-        <div>
-            <h3 style="margin:0;font-weight:bold;color:var(--text-color);">
-                An initiative by <b>Safety Department</b>, Solapur Division
+             height="70" style="filter: drop-shadow(0 2px 6px rgba(0,0,0,0.2));">
+
+        <!-- Text Content -->
+        <div style="text-align: left; min-width: 280px;">
+            <h3 style="
+                margin: 0 0 6px 0;
+                font-family: 'Roboto', 'Segoe UI', sans-serif;
+                font-weight: 700;
+                font-size: 1.45rem;
+                color: #003366;
+                letter-spacing: 0.5px;
+                text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            ">
+                An initiative by <span style="
+                    color: #c62828;
+                    font-weight: 800;
+                    text-shadow: 0 0 8px rgba(198, 40, 40, 0.3);
+                ">Safety Department</span>, Solapur Division
+            </h3>
+
+            <!-- S.A.R.A.L Title -->
+            <h1 style="
+                margin: 8px 0 0 0;
+                font-family: 'Montserrat', 'Roboto', sans-serif;
+                font-weight: 900;
+                font-size: 3.2rem;
+                background: linear-gradient(90deg, #003366, #006699, #0088cc);
+                -webkit-background-clip: text;
+                background-clip: text;
+                -webkit-text-fill-color: transparent;
+                letter-spacing: 2px;
+                text-shadow: 0 2px 4px rgba(0,0,0,0.15);
+            ">
+                S.A.R.A.L
+            </h1>
+
+            <!-- Subtitle -->
+            <h3 style="
+                margin: 2px 0 0 0;
+                font-weight: 500;
+                font-size: 1.1rem;
+                color: #2e7d32;
+                font-style: italic;
+                letter-spacing: 0.6px;
+            ">
+                (Safety Abnormality Report & Action List – Version 1.1.8)
             </h3>
         </div>
+
+        <!-- IR Logo (Optional) -->
+        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/5d/Indian_Railways_logo.svg/512px-Indian_Railways_logo.svg.png"
+             height="65" style="
+                 filter: grayscale(20%) brightness(1.1);
+                 opacity: 0.9;
+             ">
     </div>
-    <h1 style="margin-top:0;color:var(--text-color);">📋 S.A.R.A.L</h1>
-    <h3 style="margin-top:-10px;font-weight:normal;color:var(--text-color);">
-        (Safety Abnormality Report & Action List – Version 1.1.8)
-    </h3>
-    """,
-    unsafe_allow_html=True
-)
+
+    <!-- Bottom Accent -->
+    <div style="
+        margin-top: 18px;
+        height: 3px;
+        background: linear-gradient(90deg, 
+            transparent 0%, 
+            #006699 30%, 
+            #0088cc 50%, 
+            #006699 70%, 
+            transparent 100%);
+        border-radius: 2px;
+    "></div>
+</div>
+
+<style>
+/* Hover Glow Effect */
+div[data-testid="stVerticalBlock"] > div:first-child:hover {
+    transform: translateY(-2px);
+    box-shadow: 
+        0 15px 35px rgba(0, 71, 171, 0.18),
+        0 0 0 1px rgba(0, 105, 148, 0.2),
+        0 0 30px rgba(0, 136, 204, 0.3) !important;
+    transition: all 0.4s ease;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # -------------------- SESSION DATA --------------------
 if "df" not in st.session_state:
@@ -1168,6 +1263,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
