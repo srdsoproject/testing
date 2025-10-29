@@ -895,32 +895,58 @@ st.markdown("""
 
 """)
 
-
 st.markdown("""
-<div style="text-align: center; margin: 20px 0;">
+<div style="text-align: center; margin: 30px 0; padding: 10px;">
   <p style="
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    font-size: 16px;
-    font-weight: 600;
-    color: #d32f2f;
+    font-family: 'Roboto', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-size: 15px;
+    font-weight: 500;
+    color: #c62828;
     text-shadow: 
-      0 0 5px rgba(173, 216, 230, 0.9),
-      0 0 10px rgba(173, 216, 230, 0.7),
-      0 0 15px rgba(173, 216, 230, 0.5),
-      0 0 20px rgba(173, 216, 230, 0.3);
-    letter-spacing: 0.5px;
-    padding: 10px 25px;
-    background: linear-gradient(135deg, rgba(255, 240, 240, 0.4), rgba(255, 182, 193, 0.15));
-    border-radius: 12px;
+      0 0 8px rgba(173, 216, 230, 0.9),
+      0 0 16px rgba(173, 216, 230, 0.7),
+      0 0 24px rgba(173, 216, 230, 0.5),
+      0 0 32px rgba(173, 216, 230, 0.3);
+    letter-spacing: 0.8px;
+    padding: 12px 32px;
+    background: linear-gradient(135deg, 
+      rgba(255, 248, 248, 0.6) 0%, 
+      rgba(255, 235, 238, 0.4) 50%, 
+      rgba(255, 245, 247, 0.6) 100%);
+    border-radius: 16px;
     display: inline-block;
     box-shadow: 
-      0 4px 15px rgba(211, 47, 47, 0.2),
-      0 0 20px rgba(173, 216, 230, 0.4);
-    border: 1px solid rgba(211, 47, 47, 0.2);
+      0 6px 20px rgba(198, 40, 40, 0.18),
+      0 0 30px rgba(173, 216, 230, 0.5),
+      inset 0 1px 3px rgba(255, 255, 255, 0.8);
+    border: 1.5px solid rgba(211, 47, 47, 0.25);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: all 0.3s ease;
   ">
-    Designed & Developed by Safety Department, Solapur Division
+    <strong>Designed & Developed by</strong> 
+    <span style="
+      color: #b71c1c;
+      font-weight: 700;
+      text-shadow: 0 0 10px rgba(173, 216, 230, 1);
+    ">Safety Department</span>, 
+    <em style="color: #c62828; font-style: normal;">Solapur Division</em>
   </p>
 </div>
+
+<style>
+  p:hover {
+    transform: translateY(-2px);
+    box-shadow: 
+      0 10px 25px rgba(198, 40, 40, 0.22),
+      0 0 40px rgba(173, 216, 230, 0.7) !important;
+    text-shadow: 
+      0 0 10px rgba(173, 216, 230, 1),
+      0 0 20px rgba(173, 216, 230, 0.8),
+      0 0 30px rgba(173, 216, 230, 0.6),
+      0 0 40px rgba(173, 216, 230, 0.4) !important;
+  }
+</style>
 """, unsafe_allow_html=True)
 
 
@@ -1103,6 +1129,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
