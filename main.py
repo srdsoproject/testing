@@ -675,10 +675,10 @@ if not editable_filtered.empty:
     if "_sheet_row" not in editable_filtered.columns:
         editable_filtered["_sheet_row"] = editable_filtered.index + 2
 
-    # ---- visible columns ----------------------------------------
+    # ---- visible columns (User Feedback/Remark is now in card) ---
     display_cols = [
         "Date of Inspection", "Type of Inspection", "Location",
-        "Deficiencies Noted", "Action By", "Feedback", "User Feedback/Remark"
+        "Deficiencies Noted", "Action By", "Feedback"
     ]
     df = editable_filtered[display_cols].copy()
 
@@ -690,8 +690,8 @@ if not editable_filtered.empty:
 
     # ---- status (colored) ---------------------------------------
     df["Status"] = [
-        get_status(r["Feedback"], r["User Feedback/Remark"])
-        for _, r in df.iterrows()
+        get_status(r["Feedback"], r.get("User Feedback/Remark", ""))
+        for _, r in editable_filtered.iterrows()
     ]
     df["Status"] = df["Status"].apply(color_text_status)
 
@@ -712,7 +712,6 @@ if not editable_filtered.empty:
         cellStyle={"fontSize": "13px", "fontFamily": "Inter, system-ui, sans-serif"},
     )
 
-    # Theme & layout
     gb.configure_grid_options(
         rowHeight=48,
         headerHeight=44,
@@ -721,32 +720,23 @@ if not editable_filtered.empty:
         domLayout="normal",
     )
 
-    # === COLUMN SIZES (Deficiency = ~70%) ===
+    # === COLUMN SIZES ===
     gb.configure_column("Deficiencies Noted", flex=70, minWidth=420, wrapText=True, autoHeight=True)
-    gb.configure_column("Date of Inspection",   flex=9,  minWidth=115)
-    gb.configure_column("Type of Inspection",  flex=11, minWidth=130)
-    gb.configure_column("Location",            flex=12, minWidth=140)
-    gb.configure_column("Action By",           flex=9,  minWidth=110)
-    gb.configure_column("Feedback",            flex=14, minWidth=150)
-    gb.configure_column(
-        "User Feedback/Remark",
-        flex=18,
-        minWidth=190,
-        editable=True,
-        cellEditor="agLargeTextCellEditor",
-        cellEditorPopup=True,
-        cellEditorParams={"maxLength": 4000},
-    )
+    gb.configure_column("Date of Inspection", flex=9, minWidth=115)
+    gb.configure_column("Type of Inspection", flex=11, minWidth=130)
+    gb.configure_column("Location", flex=12, minWidth=140)
+    gb.configure_column("Action By", flex=9, minWidth=110)
+    gb.configure_column("Feedback", flex=14, minWidth=150)
     gb.configure_column("Status", flex=8, minWidth=90)
 
     # Hide helpers
     gb.configure_column("_original_sheet_index", hide=True)
     gb.configure_column("_sheet_row", hide=True)
 
-    # === DETAILS BUTTON (opens expander) ===
+    # === DETAILS BUTTON ===
     details_btn_js = JsCode("""
     function(e) {
-        return `<button 
+        return `<button
             style="
                 background:#0068c9; color:white; border:none; border-radius:4px;
                 padding:4px 8px; font-size:11px; cursor:pointer;
@@ -767,10 +757,7 @@ if not editable_filtered.empty:
         editable=False,
     )
 
-    # Single-click edit
-    gb.configure_grid_options(singleClickEdit=True)
-
-    # Auto-size on load
+    gb.configure_grid_options(singleClickEdit=False)
     autosize_js = JsCode("""
     function(params) {
         const cols = params.columnApi.getAllColumns()
@@ -791,7 +778,7 @@ if not editable_filtered.empty:
         gridOptions=grid_options,
         height=560,
         fit_columns_on_grid_load=False,
-        update_mode=GridUpdateMode.VALUE_CHANGED,
+        update_mode=GridUpdateMode.NO_UPDATE,  # We edit in card now
         allow_unsafe_jscode=True,
         theme="balham",
         custom_css={
@@ -802,23 +789,16 @@ if not editable_filtered.empty:
     )
 
     # ------------------------------------------------------------------
-    # 4. CAPTURE EDITS
+    # 5. HIDDEN BUTTONS (trigger card)
     # ------------------------------------------------------------------
-    edited_df = pd.DataFrame(grid_response["data"])
-
-    # ------------------------------------------------------------------
-    # 5. HIDDEN BUTTONS (one per row) – triggered by JS
-    # ------------------------------------------------------------------
-    # Create a hidden button for every row
     for idx in df["_original_sheet_index"]:
-        # Use a unique key
         btn_key = f"detail_btn_{idx}"
         if st.button("Open Details", key=btn_key, type="secondary"):
             st.session_state.detail_idx = idx
             st.rerun()
 
     # ------------------------------------------------------------------
-    # 6. SHOW EXPANDER WHEN DETAIL IS REQUESTED
+    # 6. INSPECTION CARD + EDITABLE USER REMARK
     # ------------------------------------------------------------------
     if st.session_state.get("detail_idx") is not None:
         idx = st.session_state.detail_idx
@@ -826,27 +806,137 @@ if not editable_filtered.empty:
             editable_filtered["_original_sheet_index"] == idx
         ].iloc[0]
 
-        with st.expander(f"Details – Row {idx + 1}", expanded=True):
-            c1, c2 = st.columns(2)
-            with c1:
-                st.markdown("**Head**");           st.write(full_row.get("Head", "-"))
-                st.markdown("**Sub Head**");       st.write(full_row.get("Sub Head", "-"))
-                st.markdown("**Inspection By**");  st.write(full_row.get("Inspection By", "-"))
-            with c2:
-                st.markdown("**Date**");           st.write(full_row.get("Date of Inspection", "-"))
-                st.markdown("**Location**");       st.write(full_row.get("Location", "-"))
-                st.markdown("**Action By**");      st.write(full_row.get("Action By", "-"))
-            st.markdown("---")
-            st.markdown("**Deficiency**")
-            st.write(full_row["Deficiencies Noted"])
-            if full_row.get("Feedback"):
-                st.markdown("**Feedback**")
-                st.write(full_row["Feedback"])
+        # === CARD LAYOUT ===
+        st.markdown(
+            f"""
+            <div style="
+                border: 1px solid #e2e8f0;
+                border-radius: 12px;
+                padding: 20px;
+                background: #fafbfc;
+                font-family: 'Inter', system-ui, sans-serif;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+                margin-bottom: 16px;
+            ">
+                <h4 style="margin:0 0 16px 0; color:#1e293b; display:flex; align-items:center; gap:8px;">
+                    Details – Row {idx + 1}
+                    <span style="font-size:14px; color:#64748b;">Sheet Row: {full_row.get('_sheet_row', '')}</span>
+                </h4>
 
-        # Optional: Add a close button
-        if st.button("Close Details", key=f"close_{idx}"):
-            st.session_state.detail_idx = None
-            st.rerun()
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; font-size:14px;">
+                    <div><strong style="color:#475569;">Head</strong><br>
+                        <span style="background:#e0f2fe; color:#0369a1; padding:2px 8px; border-radius:4px; font-weight:600;">
+                            {full_row.get("Head", "-")}
+                        </span>
+                    </div>
+                    <div><strong style="color:#475569;">Sub Head</strong><br>
+                        <span style="background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:4px; font-weight:600;">
+                            {full_row.get("Sub Head", "-")}
+                        </span>
+                    </div>
+                    <div><strong style="color:#475569;">Inspection By</strong><br>
+                        <span style="color:#1e293b;">{full_row.get("Inspection By", "-")}</span>
+                    </div>
+                    <div><strong style="color:#475569;">Date</strong><br>
+                        <span style="color:#1e293b;">
+                            {pd.to_datetime(full_row.get("Date of Inspection"), errors='coerce').strftime('%d.%m.%Y') if pd.notna(full_row.get("Date of Inspection")) else "-"}
+                        </span>
+                    </div>
+                    <div><strong style="color:#475569;">Location</strong><br>
+                        <span style="background:#ecfdf5; color:#065f46; padding:2px 8px; border-radius:4px; font-weight:600;">
+                            {full_row.get("Location", "-")}
+                        </span>
+                    </div>
+                    <div><strong style="color:#475569;">Action By</strong><br>
+                        <span style="color:#1e293b;">{full_row.get("Action By", "-")}</span>
+                    </div>
+                </div>
+
+                <hr style="border:0; border-top:1px solid #e2e8f0; margin:20px 0;">
+
+                <div>
+                    <strong style="color:#475569;">Deficiency</strong><br>
+                    <div style="
+                        background:#fefce8; padding:12px; border-radius:8px; 
+                        border-left:4px solid #f59e0b; font-size:14px; line-height:1.6;
+                        color:#92400e; margin-top:8px;
+                    ">
+                        {full_row["Deficiencies Noted"].replace('|', ' | ')}
+                    </div>
+                </div>
+
+                <!-- Feedback -->
+                {f'''
+                <div style="margin-top:16px;">
+                    <strong style="color:#475569;">Feedback</strong><br>
+                    <div style="background:#f0fdf4; padding:10px; border-radius:6px; 
+                                 border-left:4px solid #22c55e; font-size:14px; color:#166534;">
+                        {full_row.get("Feedback", "— No feedback yet —")}
+                    </div>
+                </div>
+                ''' if full_row.get("Feedback") else ""}
+
+                <!-- USER REMARK (EDITABLE) -->
+                <div style="margin-top:20px;">
+                    <strong style="color:#475569;">User Feedback / Remark</strong><br>
+                    <textarea 
+                        id="remark_{idx}" 
+                        style="width:100%; min-height:100px; padding:10px; border:1px solid #cbd5e1; 
+                               border-radius:6px; font-family:inherit; font-size:14px; margin-top:6px;"
+                        placeholder="Type your remark here..."
+                    >{full_row.get("User Feedback/Remark", "")}</textarea>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px;">
+                    <button onclick="navigator.clipboard.writeText(`{full_row['Deficiencies Noted']}`)" 
+                            style="background:#f1f5f9; border:1px solid #cbd5e1; color:#475569; 
+                                   padding:6px 12px; border-radius:6px; font-size:13px; cursor:pointer;">
+                        Copy Deficiency
+                    </button>
+                    <span style="font-size:13px; color:#64748b;">
+                        Status: {color_text_status(get_status(full_row["Feedback"], full_row.get("User Feedback/Remark", ""))).split('</span>')[0].split('>')[-1]}
+                    </span>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        # === SAVE BUTTON ===
+        col_save, col_close = st.columns([1, 1])
+        with col_save:
+            if st.button("Save Remark", key=f"save_remark_{idx}", use_container_width=True):
+                new_remark = st.session_state.get(f"remark_{idx}", "")
+                # Update the original filtered DataFrame
+                editable_filtered.loc[
+                    editable_filtered["_original_sheet_index"] == idx,
+                    "User Feedback/Remark"
+                ] = new_remark
+                # Optionally save to Excel or DB here
+                st.success("Remark saved!")
+                st.session_state.detail_idx = None
+                st.rerun()
+        with col_close:
+            if st.button("Close", key=f"close_card_{idx}", use_container_width=True):
+                st.session_state.detail_idx = None
+                st.rerun()
+
+        # === CAPTURE TEXTAREA INPUT ===
+        st.markdown(
+            f"""
+            <script>
+            const textarea = document.getElementById('remark_{idx}');
+            textarea.addEventListener('input', function() {{
+                Streamlit.setComponentValue({{key: 'remark_{idx}', value: this.value}});
+            }});
+            </script>
+            """,
+            unsafe_allow_html=True
+        )
+        # Store in session_state
+        if f"remark_{idx}" in st.session_state:
+            pass  # Already captured
+
 else:
     st.info("No data to display.")
     # ----------------- BUTTONS -----------------
@@ -941,6 +1031,7 @@ else:
                 st.info("ℹ️ No changes detected to save.")
 #else:
     #st.info("Deficiencies will be updated soon !")
+
 
 
 
