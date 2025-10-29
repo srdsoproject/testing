@@ -894,7 +894,6 @@ st.markdown("""
 - For Security Department: Pertains to **SECURITY**
 """)
 
-
 # ---- PREDEFINED LISTS ----
 STATION_LIST = list(dict.fromkeys([
     'BRB','MLM','BGVN','JNTR','PRWD','WSB','PPJ','JEUR','KEM','BLNI','DHS','KWV','WDS','MA','AAG',
@@ -1074,6 +1073,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
