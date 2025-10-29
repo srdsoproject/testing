@@ -962,7 +962,8 @@ else:
                 st.success(f"✅ Updated {len(changed_ids)} Feedback row(s) with new remarks.")
             else:
                 st.info("ℹ️ No changes detected to save.")
-else:
-    st.info("Deficiencies will be updated soon !")
+#else:
+    #st.info("Deficiencies will be updated soon !")
+
 
 
