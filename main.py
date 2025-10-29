@@ -418,11 +418,8 @@ if "df" not in st.session_state:
 df = st.session_state.df
 
 tabs = st.tabs(["📊 View Records", "📈 Analytics"])
-df = st.session_state.df or pd.DataFrame()
+
 with tabs[0]:
-    if df.empty:
-        st.warning("Deficiencies will be updated soon !")
-        st.stop()
 
     # Ensure required cols exist
     for col in ["Type of Inspection", "Location", "Head", "Sub Head", "Deficiencies Noted",
@@ -1079,6 +1076,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
