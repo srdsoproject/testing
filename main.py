@@ -395,148 +395,23 @@ def apply_common_filters(df, prefix=""):
 # -------------------- HEADER --------------------
 st.markdown(
     """
-    <style>
-    /* ── Adaptive colour palette (light / dark) ─────────────────────── */
-    @media (prefers-color-scheme: light) {
-        :root {
-            --bg-card: rgba(255,255,255,0.78);
-            --border-card: rgba(0,105,148,0.28);
-            --shadow-card: rgba(0,71,171,0.12);
-            --text-main: #003366;
-            --text-safety: #c62828;
-            --text-sub: #2e7d32;
-            --track-colors: #d32f2f, #f57c00, #fbc02d, #388e3c;
-        }
-    }
-    @media (prefers-color-scheme: dark) {
-        :root {
-            --bg-card: rgba(15,25,45,0.68);
-            --border-card: rgba(0,136,204,0.35);
-            --shadow-card: rgba(0,136,204,0.18);
-            --text-main: #e0f7fa;
-            --text-safety: #ff5252;
-            --text-sub: #81c784;
-            --track-colors: #ff5252, #ff8a65, #fff176, #66bb6a;
-        }
-    }
-
-    /* ── Card container ─────────────────────────────────────────────── */
-    .saral-header {
-        position: relative;
-        padding: 28px 22px;
-        margin: 20px 0;
-        background: var(--bg-card);
-        border: 1.5px solid var(--border-card);
-        border-radius: 22px;
-        box-shadow: 0 8px 25px var(--shadow-card),
-                    0 0 0 1px var(--border-card);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        overflow: hidden;
-        transition: transform .4s ease, box-shadow .4s ease;
-    }
-    .saral-header:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 16px 38px var(--shadow-card),
-                    0 0 0 1px var(--border-card),
-                    0 0 30px rgba(0,136,204,.3);
-    }
-
-    /* ── Top railway-track bar ─────────────────────────────────────── */
-    .track-bar {
-        position: absolute;
-        top: 0; left: 0; right: 0; height: 6px;
-        background: linear-gradient(90deg,
-            var(--track-colors));
-        box-shadow: 0 2px 8px rgba(211,47,47,.4);
-    }
-
-    /* ── Version badge ─────────────────────────────────────────────── */
-    .version-badge {
-        position: absolute;
-        top: 12px; right: 16px;
-        background: #c62828;
-        color: #fff;
-        font-size: .78rem;
-        font-weight: 600;
-        padding: 4px 11px;
-        border-radius: 20px;
-        box-shadow: 0 2px 6px rgba(198,40,40,.4);
-    }
-    </style>
-
-    <div class="saral-header">
-        <div class="track-bar"></div>
-        <span class="version-badge">v1.1.8</span>
-
-        <div style="display:flex;justify-content:center;align-items:center;
-                    gap:20px;flex-wrap:wrap;">
-            <!-- Central Railway Logo -->
-            <img src="https://raw.githubusercontent.com/srdsoproject/testing/main/Central%20Railway%20Logo.png"
-                 height="70"
-                 style="filter:drop-shadow(0 2px 6px rgba(0,0,0,.2));">
-
-            <!-- Text block -->
-            <div style="text-align:left;min-width:280px;">
-                <h3 style="
-                    margin:0 0 6px 0;
-                    font-family:'Roboto','Segoe UI',sans-serif;
-                    font-weight:700;
-                    font-size:1.45rem;
-                    color:var(--text-main);
-                    letter-spacing:.5px;
-                    text-shadow:0 1px 2px rgba(0,0,0,.1);
-                ">
-                    An initiative by <span style="
-                        color:var(--text-safety);
-                        font-weight:800;
-                        text-shadow:0 0 8px rgba(198,40,40,.3);
-                    ">Safety Department</span>, Solapur Division
-                </h3>
-
-                <h1 style="
-                    margin:8px 0 0 0;
-                    font-family:'Montserrat','Roboto',sans-serif;
-                    font-weight:900;
-                    font-size:3.2rem;
-                    background:linear-gradient(90deg,#003366,#006699,#0088cc);
-                    -webkit-background-clip:text;
-                    background-clip:text;
-                    -webkit-text-fill-color:transparent;
-                    letter-spacing:2px;
-                    text-shadow:0 2px 4px rgba(0,0,0,.15);
-                ">S.A.R.A.L</h1>
-
-                <h3 style="
-                    margin:2px 0 0 0;
-                    font-weight:500;
-                    font-size:1.1rem;
-                    color:var(--text-sub);
-                    font-style:italic;
-                    letter-spacing:.6px;
-                ">
-                    (Safety Abnormality Report & Action List – Version 1.1.8)
-                </h3>
-            </div>
-
-            <!-- Indian Railways logo -->
-            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/5d/Indian_Railways_logo.svg/512px-Indian_Railways_logo.svg.png"
-                 height="65"
-                 style="filter:grayscale(20%) brightness(1.1);opacity:.9;">
+    <div style="display:flex;align-items:center;margin-top:10px;margin-bottom:20px;">
+        <img src="https://raw.githubusercontent.com/srdsoproject/testing/main/Central%20Railway%20Logo.png"
+             height="55" style="margin-right:15px;object-fit:contain;">
+        <div>
+            <h3 style="margin:0;font-weight:bold;color:var(--text-color);">
+                An initiative by <b>Safety Department</b>, Solapur Division
+            </h3>
         </div>
-
-        <!-- Bottom accent line -->
-        <div style="
-            margin-top:18px;height:3px;
-            background:linear-gradient(90deg,
-                transparent 0%, #006699 30%, #0088cc 50%,
-                #006699 70%, transparent 100%);
-            border-radius:2px;
-        "></div>
     </div>
+    <h1 style="margin-top:0;color:var(--text-color);">📋 S.A.R.A.L</h1>
+    <h3 style="margin-top:-10px;font-weight:normal;color:var(--text-color);">
+        (Safety Abnormality Report & Action List – Version 1.1.8)
+    </h3>
     """,
-    unsafe_allow_html=True,
+    unsafe_allow_html=True
 )
+
 # -------------------- SESSION DATA --------------------
 if "df" not in st.session_state:
     st.session_state.df = load_data()
@@ -1293,7 +1168,6 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
-
 
 
 
