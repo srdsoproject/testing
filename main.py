@@ -894,7 +894,30 @@ st.markdown("""
 - For Medical Department: Pertains to **MEDICAL**
 
 """)
-st.markdown("Designed & Developed by Safety Department, Solapur Division")
+
+st.markdown("""
+<div style="text-align: center; margin: 20px 0;">
+  <p style="
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    color: #0077be;
+    text-shadow: 
+      0 0 5px rgba(173, 216, 230, 0.8),
+      0 0 10px rgba(173, 216, 230, 0.6),
+      0 0 15px rgba(173, 216, 230, 0.4),
+      0 0 20px rgba(173, 216, 230, 0.2);
+    letter-spacing: 0.5px;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, rgba(240, 248, 255, 0.3), rgba(173, 216, 230, 0.1));
+    border-radius: 12px;
+    display: inline-block;
+    box-shadow: 0 4px 15px rgba(173, 216, 230, 0.3);
+  ">
+    Designed & Developed by Safety Department, Solapur Division
+  </p>
+</div>
+""", unsafe_allow_html=True)
 
 
 # ---- PREDEFINED LISTS ----
@@ -1076,6 +1099,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
