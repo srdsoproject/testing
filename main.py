@@ -750,7 +750,6 @@ if not editable_filtered.empty:
         gridOptions=grid_options,
         update_mode=GridUpdateMode.VALUE_CHANGED,
         height=600,
-        allow_unsafe_jscode=True
         allow_unsafe_jscode=True,
         quickFilterText=grid_search_text  # Bind the search input to the quick filter
     )
@@ -1091,3 +1090,4 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
