@@ -651,16 +651,19 @@ st.markdown(
 import streamlit as st
 import pandas as pd
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
-from st_aggrid.shared import JsCode
 
 # -------------------------------------------------
-# 1. PREPARE DATA (same as before, just trimmed)
+# 1. PREPARE DATA (same as before)
 # -------------------------------------------------
 editable_filtered = filtered.copy()
 
 if not editable_filtered.empty:
     # ---- search -------------------------------------------------
-    search_text = st.text_input("Search Deficiencies", "", placeholder="type here…").strip().lower()
+    search_text = st.text_input(
+        "Search Deficiencies",
+        "",
+        placeholder="type to filter…"
+    ).strip().lower()
     if search_text:
         editable_filtered = editable_filtered[
             editable_filtered["Deficiencies Noted"].astype(str).str.lower().str.contains(search_text)
@@ -670,71 +673,56 @@ if not editable_filtered.empty:
     if "_original_sheet_index" not in editable_filtered.columns:
         editable_filtered["_original_sheet_index"] = editable_filtered.index
     if "_sheet_row" not in editable_filtered.columns:
-        editable_filtered["_sheet_row"] = editable_filtered.index + 2   # Excel row
+        editable_filtered["_sheet_row"] = editable_filtered.index + 2
 
-    # ---- columns we *display* ------------------------------------
+    # ---- visible columns ----------------------------------------
     display_cols = [
         "Date of Inspection", "Type of Inspection", "Location",
-        "Deficiencies Noted", "Action By", "Feedback",
-        "User Feedback/Remark"
+        "Deficiencies Noted", "Action By", "Feedback", "User Feedback/Remark"
     ]
     df = editable_filtered[display_cols].copy()
 
-    # ---- date formatting -----------------------------------------
+    # ---- format date --------------------------------------------
     if "Date of Inspection" in df.columns:
         df["Date of Inspection"] = pd.to_datetime(
             df["Date of Inspection"], errors="coerce"
         ).dt.strftime("%Y-%m-%d")
 
-    # ---- status (colored) ----------------------------------------
+    # ---- status (colored) ---------------------------------------
     df["Status"] = [
         get_status(r["Feedback"], r["User Feedback/Remark"])
         for _, r in df.iterrows()
     ]
     df["Status"] = df["Status"].apply(color_text_status)
 
-    # ---- keep hidden helper columns -------------------------------
+    # ---- keep hidden IDs ----------------------------------------
     df["_original_sheet_index"] = editable_filtered["_original_sheet_index"].values
-    df["_sheet_row"]          = editable_filtered["_sheet_row"].values
+    df["_sheet_row"] = editable_filtered["_sheet_row"].values
 
     # -------------------------------------------------
-    # 2. GRID CONFIG – PROFESSIONAL LOOK
+    # 2. GRID CONFIG – PROFESSIONAL & RESPONSIVE
     # -------------------------------------------------
     gb = GridOptionsBuilder.from_dataframe(df)
 
-    # ----- base styling (compact, modern) -----
     gb.configure_default_column(
         editable=False,
         wrapText=True,
         autoHeight=True,
         resizable=True,
-        cellStyle={"fontFamily": "Inter, system-ui, sans-serif", "fontSize": "13px"},
+        cellStyle={"fontSize": "13px", "fontFamily": "Inter, system-ui, sans-serif"},
     )
 
-    # ----- theme (AG-Grid “balham” – clean & corporate) -----
+    # Theme & layout
     gb.configure_grid_options(
-        domLayout="normal",
+        rowHeight=48,
+        headerHeight=44,
         animateRows=True,
-        rowHeight=46,                     # compact rows
-        headerHeight=42,
-        suppressRowHoverHighlight=False,
-        rowSelection="single",
-        enableCellTextSelection=True,
         suppressHorizontalScroll=False,
+        domLayout="normal",
     )
 
-    # ----- column definitions -------------------------------------------------
-    # 70 % for the big deficiency column
-    gb.configure_column(
-        "Deficiencies Noted",
-        flex=70,
-        minWidth=420,
-        wrapText=True,
-        autoHeight=True,
-        cellStyle={"whiteSpace": "normal"},
-    )
-
-    # other visible columns – modest flex
+    # === COLUMN SIZES (Deficiency = ~70%) ===
+    gb.configure_column("Deficiencies Noted", flex=70, minWidth=420, wrapText=True, autoHeight=True)
     gb.configure_column("Date of Inspection",   flex=9,  minWidth=115)
     gb.configure_column("Type of Inspection",  flex=11, minWidth=130)
     gb.configure_column("Location",            flex=12, minWidth=140)
@@ -751,12 +739,12 @@ if not editable_filtered.empty:
     )
     gb.configure_column("Status", flex=8, minWidth=90)
 
-    # hide helper columns
+    # Hide helpers
     gb.configure_column("_original_sheet_index", hide=True)
     gb.configure_column("_sheet_row", hide=True)
 
-    # ----- “Details” button (opens modal) -----
-    details_js = JsCode("""
+    # === DETAILS BUTTON (opens modal) ===
+    details_btn_js = JsCode("""
     function(e) {
         return `<button style="
             background:#0068c9; color:white; border:none; border-radius:4px;
@@ -767,8 +755,8 @@ if not editable_filtered.empty:
     gb.configure_column(
         "Details",
         headerName="",
-        cellRenderer=details_js,
-        width=80,
+        cellRenderer=details_btn_js,
+        width=82,
         pinned="right",
         lockPinned=True,
         sortable=False,
@@ -776,28 +764,28 @@ if not editable_filtered.empty:
         editable=False,
     )
 
-    # ----- click handler for the Details button -----
-    detail_click_js = JsCode("""
+    # Click handler → sends row to Streamlit
+    click_js = JsCode("""
     function(params) {
         if (params.column.colId === 'Details') {
-            // send the whole row (including hidden fields) to Streamlit
             const row = params.node.data;
-            window.parent.postMessage({type: 'aggrid_row_detail', payload: row}, '*');
+            // Send to Streamlit via custom component
+            window.agGridDetailCallback(row);
         }
     }
     """)
-    gb.configure_grid_options(onCellClicked=detail_click_js)
+    gb.configure_grid_options(onCellClicked=click_js)
 
-    # ----- single-click edit on remark column only -----
+    # Single-click edit
     gb.configure_grid_options(singleClickEdit=True)
 
-    # ----- auto-size fallback (runs once) -----
+    # Auto-size on load
     autosize_js = JsCode("""
     function(params) {
-        const allColumnIds = params.columnApi.getAllColumns()
+        const cols = params.columnApi.getAllColumns()
             .filter(c => c.colId !== 'Details')
             .map(c => c.colId);
-        params.columnApi.autoSizeColumns(allColumnIds, false);
+        params.columnApi.autoSizeColumns(cols, false);
     }
     """)
     gb.configure_grid_options(onFirstDataRendered=autosize_js)
@@ -814,9 +802,8 @@ if not editable_filtered.empty:
         fit_columns_on_grid_load=False,
         update_mode=GridUpdateMode.VALUE_CHANGED,
         allow_unsafe_jscode=True,
-        theme="balham",                 # professional theme
+        theme="balham",
         custom_css={
-            "#gridToolBar": {"padding-bottom": "0px !important"},
             ".ag-header-cell-label": {"font-weight": "600"},
             ".ag-row:hover": {"background-color": "#f5f7fa !important"},
             ".ag-cell": {"border-right": "1px solid #e2e8f0 !important"},
@@ -824,66 +811,66 @@ if not editable_filtered.empty:
     )
 
     # -------------------------------------------------
-    # 4. CAPTURE EDITS (same as before)
+    # 4. CAPTURE EDITS
     # -------------------------------------------------
     edited_df = pd.DataFrame(grid_response["data"])
 
     # -------------------------------------------------
-    # 5. MODAL FOR “Details” (all hidden columns)
+    # 5. DETAILS MODAL (via JavaScript callback)
     # -------------------------------------------------
-    # Listen for the postMessage from AG-Grid
-    detail_payload = st.session_state.get("aggrid_detail_row")
-    if detail_payload:
-        row = pd.Series(detail_payload)
-        # Build a nice two-column table for the modal
-        hidden_info = editable_filtered.loc[
-            editable_filtered["_original_sheet_index"] == row["_original_sheet_index"]
-        ].iloc[0]
+    # Initialize session state
+    if "detail_row" not in st.session_state:
+        st.session_state.detail_row = None
 
-        with st.modal("Row Details", width=800):
-            col1, col2 = st.columns(2)
-            with col1:
-                st.write("**Head**");            st.write(hidden_info.get("Head", "-"))
-                st.write("**Sub Head**");        st.write(hidden_info.get("Sub Head", "-"))
-                st.write("**Inspection By**");   st.write(hidden_info.get("Inspection By", "-"))
-            with col2:
-                st.write("**Date of Inspection**"); st.write(hidden_info.get("Date of Inspection", "-"))
-                st.write("**Location**");          st.write(hidden_info.get("Location", "-"))
-                st.write("**Action By**");         st.write(hidden_info.get("Action By", "-"))
-            st.markdown("---")
-            st.write("**Full Deficiency**")
-            st.write(hidden_info["Deficiencies Noted"])
-
-        # clear the payload so modal doesn’t reopen on every rerun
-        st.session_state.aggrid_detail_row = None
-
-    # -------------------------------------------------
-    # 6. JavaScript bridge to receive the detail row
-    # -------------------------------------------------
-    # This tiny script runs once per session
-    st.components.v1.html(
+    # === JavaScript Bridge (robust, no st._is_running) ===
+    detail_bridge = st.components.v1.html(
         """
         <script>
-        window.addEventListener('message', function(event) {
-            if (event.data.type === 'aggrid_row_detail') {
-                // forward to Streamlit
-                Streamlit.setComponentValue(event.data.payload);
-            }
-        });
-        // tell Streamlit we are ready
+        // Global callback set by Streamlit
+        window.agGridDetailCallback = function(row) {
+            // Forward to Streamlit
+            Streamlit.setComponentValue(row);
+        };
+        // Ready
         Streamlit.setComponentReady();
         </script>
         """,
         height=0,
+        key="aggrid_detail_bridge",
     )
 
-    # Capture the forwarded row in session_state
-    if st._is_running_with_streamlit:
-        # the component value is automatically placed in st.session_state
-        if "aggrid_detail_row" not in st.session_state:
-            st.session_state.aggrid_detail_row = None
-        # The value comes from the JS above via setComponentValue
-        # (Streamlit automatically updates session_state when a component sends data)
+    # The component returns the clicked row
+    clicked_row = detail_bridge
+
+    if clicked_row is not None:
+        # Find full row from original data
+        idx = clicked_row["_original_sheet_index"]
+        full_row = editable_filtered.loc[editable_filtered["_original_sheet_index"] == idx].iloc[0]
+
+        with st.modal("Row Details", width=820):
+            c1, c2 = st.columns(2)
+            with c1:
+                st.markdown("**Head**");           st.write(full_row.get("Head", "-"))
+                st.markdown("**Sub Head**");       st.write(full_row.get("Sub Head", "-"))
+                st.markdown("**Inspection By**");  st.write(full_row.get("Inspection By", "-"))
+            with c2:
+                st.markdown("**Date**");           st.write(full_row.get("Date of Inspection", "-"))
+                st.markdown("**Location**");       st.write(full_row.get("Location", "-"))
+                st.markdown("**Action By**");      st.write(full_row.get("Action By", "-"))
+            st.markdown("---")
+            st.markdown("**Deficiency**")
+            st.write(full_row["Deficiencies Noted"])
+            if full_row["Feedback"]:
+                st.markdown("**Feedback**")
+                st.write(full_row["Feedback"])
+
+        # Reset so modal doesn’t reopen
+        st.session_state.detail_row = None
+        # Rerun to clear component value
+        st.experimental_rerun()
+
+else:
+    st.info("No data to display.")
 
     # ----------------- BUTTONS -----------------
     c1, c2, _ = st.columns([1, 1, 1])
@@ -977,4 +964,5 @@ if not editable_filtered.empty:
                 st.info("ℹ️ No changes detected to save.")
 else:
     st.info("Deficiencies will be updated soon !")
+
 
