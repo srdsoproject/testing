@@ -652,24 +652,24 @@ import streamlit as st
 import pandas as pd
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
 
-# -------------------------------------------------
+# ------------------------------------------------------------------
 # 1. PREPARE DATA (same as before)
-# -------------------------------------------------
+# ------------------------------------------------------------------
 editable_filtered = filtered.copy()
 
 if not editable_filtered.empty:
     # ---- search -------------------------------------------------
     search_text = st.text_input(
         "Search Deficiencies",
-        "",
         placeholder="type to filter…"
     ).strip().lower()
     if search_text:
         editable_filtered = editable_filtered[
-            editable_filtered["Deficiencies Noted"].astype(str).str.lower().str.contains(search_text)
+            editable_filtered["Deficiencies Noted"]
+            .astype(str).str.lower().str.contains(search_text)
         ]
 
-    # ---- stable row IDs -----------------------------------------
+    # ---- stable IDs --------------------------------------------
     if "_original_sheet_index" not in editable_filtered.columns:
         editable_filtered["_original_sheet_index"] = editable_filtered.index
     if "_sheet_row" not in editable_filtered.columns:
@@ -699,9 +699,9 @@ if not editable_filtered.empty:
     df["_original_sheet_index"] = editable_filtered["_original_sheet_index"].values
     df["_sheet_row"] = editable_filtered["_sheet_row"].values
 
-    # -------------------------------------------------
+    # ------------------------------------------------------------------
     # 2. GRID CONFIG – PROFESSIONAL & RESPONSIVE
-    # -------------------------------------------------
+    # ------------------------------------------------------------------
     gb = GridOptionsBuilder.from_dataframe(df)
 
     gb.configure_default_column(
@@ -743,7 +743,7 @@ if not editable_filtered.empty:
     gb.configure_column("_original_sheet_index", hide=True)
     gb.configure_column("_sheet_row", hide=True)
 
-    # === DETAILS BUTTON (opens modal) ===
+    # === DETAILS BUTTON (opens expander) ===
     details_btn_js = JsCode("""
     function(e) {
         return `<button style="
@@ -764,13 +764,18 @@ if not editable_filtered.empty:
         editable=False,
     )
 
-    # Click handler → sends row to Streamlit
+    # Click → store row index in session_state
     click_js = JsCode("""
     function(params) {
         if (params.column.colId === 'Details') {
-            const row = params.node.data;
-            // Send to Streamlit via custom component
-            window.agGridDetailCallback(row);
+            // Send the hidden index to Streamlit via session_state hack
+            const idx = params.node.data._original_sheet_index;
+            // Use a dummy element to trigger rerun
+            const el = document.createElement('input');
+            el.setAttribute('value', idx);
+            el.setAttribute('id', 'aggrid_detail_idx');
+            document.body.appendChild(el);
+            el.dispatchEvent(new Event('change', {bubbles: true}));
         }
     }
     """)
@@ -792,9 +797,9 @@ if not editable_filtered.empty:
 
     grid_options = gb.build()
 
-    # -------------------------------------------------
+    # ------------------------------------------------------------------
     # 3. RENDER GRID
-    # -------------------------------------------------
+    # ------------------------------------------------------------------
     grid_response = AgGrid(
         df,
         gridOptions=grid_options,
@@ -810,44 +815,46 @@ if not editable_filtered.empty:
         },
     )
 
-    # -------------------------------------------------
+    # ------------------------------------------------------------------
     # 4. CAPTURE EDITS
-    # -------------------------------------------------
+    # ------------------------------------------------------------------
     edited_df = pd.DataFrame(grid_response["data"])
 
-    # -------------------------------------------------
-    # 5. DETAILS MODAL (via JavaScript callback)
-    # -------------------------------------------------
-    # Initialize session state
-    if "detail_row" not in st.session_state:
-        st.session_state.detail_row = None
-
-    # === JavaScript Bridge (robust, no st._is_running) ===
-    detail_bridge = st.components.v1.html(
+    # ------------------------------------------------------------------
+    # 5. DETAILS EXPANDER (triggered by hidden input change)
+    # ------------------------------------------------------------------
+    # Create a hidden input that JS will change
+    st.markdown(
         """
+        <input type="hidden" id="aggrid_detail_idx" value="">
         <script>
-        // Global callback set by Streamlit
-        window.agGridDetailCallback = function(row) {
-            // Forward to Streamlit
-            Streamlit.setComponentValue(row);
-        };
-        // Ready
-        Streamlit.setComponentReady();
+        document.getElementById('aggrid_detail_idx').addEventListener('change', function(e) {
+            // Trigger Streamlit rerun
+            Streamlit.setComponentValue(e.target.value);
+        });
         </script>
         """,
-        height=0,
-        key="aggrid_detail_bridge",
+        unsafe_allow_html=True,
     )
 
-    # The component returns the clicked row
-    clicked_row = detail_bridge
+    # Streamlit will rerun when the value changes
+    detail_idx = st.get_query_params().get("detail_idx", [None])[0]
 
-    if clicked_row is not None:
-        # Find full row from original data
-        idx = clicked_row["_original_sheet_index"]
-        full_row = editable_filtered.loc[editable_filtered["_original_sheet_index"] == idx].iloc[0]
+    # Alternative: use session_state + rerun
+    if "detail_idx" not in st.session_state:
+        st.session_state.detail_idx = None
 
-        with st.modal("Row Details", width=820):
+    # Capture JS change via query param or session_state
+    if detail_idx:
+        st.session_state.detail_idx = int(detail_idx)
+
+    if st.session_state.detail_idx is not None:
+        idx = st.session_state.detail_idx
+        full_row = editable_filtered.loc[
+            editable_filtered["_original_sheet_index"] == idx
+        ].iloc[0]
+
+        with st.expander(f"Details – Row {idx + 1}", expanded=True):
             c1, c2 = st.columns(2)
             with c1:
                 st.markdown("**Head**");           st.write(full_row.get("Head", "-"))
@@ -860,18 +867,16 @@ if not editable_filtered.empty:
             st.markdown("---")
             st.markdown("**Deficiency**")
             st.write(full_row["Deficiencies Noted"])
-            if full_row["Feedback"]:
+            if full_row.get("Feedback"):
                 st.markdown("**Feedback**")
                 st.write(full_row["Feedback"])
 
-        # Reset so modal doesn’t reopen
-        st.session_state.detail_row = None
-        # Rerun to clear component value
-        st.experimental_rerun()
+        # Reset
+        st.session_state.detail_idx = None
+        st.rerun()
 
 else:
     st.info("No data to display.")
-
     # ----------------- BUTTONS -----------------
     c1, c2, _ = st.columns([1, 1, 1])
     submitted = c1.button("✅ Submit Feedback")
@@ -964,6 +969,7 @@ else:
                 st.info("ℹ️ No changes detected to save.")
 #else:
     #st.info("Deficiencies will be updated soon !")
+
 
 
 
