@@ -895,24 +895,28 @@ st.markdown("""
 
 """)
 
+
 st.markdown("""
 <div style="text-align: center; margin: 20px 0;">
   <p style="
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     font-size: 16px;
     font-weight: 600;
-    color: #0077be;
+    color: #d32f2f;
     text-shadow: 
-      0 0 5px rgba(173, 216, 230, 0.8),
-      0 0 10px rgba(173, 216, 230, 0.6),
-      0 0 15px rgba(173, 216, 230, 0.4),
-      0 0 20px rgba(173, 216, 230, 0.2);
+      0 0 5px rgba(173, 216, 230, 0.9),
+      0 0 10px rgba(173, 216, 230, 0.7),
+      0 0 15px rgba(173, 216, 230, 0.5),
+      0 0 20px rgba(173, 216, 230, 0.3);
     letter-spacing: 0.5px;
-    padding: 10px 20px;
-    background: linear-gradient(135deg, rgba(240, 248, 255, 0.3), rgba(173, 216, 230, 0.1));
+    padding: 10px 25px;
+    background: linear-gradient(135deg, rgba(255, 240, 240, 0.4), rgba(255, 182, 193, 0.15));
     border-radius: 12px;
     display: inline-block;
-    box-shadow: 0 4px 15px rgba(173, 216, 230, 0.3);
+    box-shadow: 
+      0 4px 15px rgba(211, 47, 47, 0.2),
+      0 0 20px rgba(173, 216, 230, 0.4);
+    border: 1px solid rgba(211, 47, 47, 0.2);
   ">
     Designed & Developed by Safety Department, Solapur Division
   </p>
@@ -1099,6 +1103,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
