@@ -653,7 +653,7 @@ import pandas as pd
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
 
 # ------------------------------------------------------------------
-# 1. PREPARE DATA (same as before)
+# 1. PREPARE DATA
 # ------------------------------------------------------------------
 editable_filtered = filtered.copy()
 
@@ -746,10 +746,13 @@ if not editable_filtered.empty:
     # === DETAILS BUTTON (opens expander) ===
     details_btn_js = JsCode("""
     function(e) {
-        return `<button style="
-            background:#0068c9; color:white; border:none; border-radius:4px;
-            padding:4px 8px; font-size:11px; cursor:pointer;
-        ">Details</button>`;
+        return `<button 
+            style="
+                background:#0068c9; color:white; border:none; border-radius:4px;
+                padding:4px 8px; font-size:11px; cursor:pointer;
+            "
+            onclick="document.getElementById('detail_btn_' + e.data._original_sheet_index).click();"
+        >Details</button>`;
     }
     """)
     gb.configure_column(
@@ -763,23 +766,6 @@ if not editable_filtered.empty:
         filter=False,
         editable=False,
     )
-
-    # Click → store row index in session_state
-    click_js = JsCode("""
-    function(params) {
-        if (params.column.colId === 'Details') {
-            // Send the hidden index to Streamlit via session_state hack
-            const idx = params.node.data._original_sheet_index;
-            // Use a dummy element to trigger rerun
-            const el = document.createElement('input');
-            el.setAttribute('value', idx);
-            el.setAttribute('id', 'aggrid_detail_idx');
-            document.body.appendChild(el);
-            el.dispatchEvent(new Event('change', {bubbles: true}));
-        }
-    }
-    """)
-    gb.configure_grid_options(onCellClicked=click_js)
 
     # Single-click edit
     gb.configure_grid_options(singleClickEdit=True)
@@ -821,34 +807,20 @@ if not editable_filtered.empty:
     edited_df = pd.DataFrame(grid_response["data"])
 
     # ------------------------------------------------------------------
-    # 5. DETAILS EXPANDER (triggered by hidden input change)
+    # 5. HIDDEN BUTTONS (one per row) – triggered by JS
     # ------------------------------------------------------------------
-    # Create a hidden input that JS will change
-    st.markdown(
-        """
-        <input type="hidden" id="aggrid_detail_idx" value="">
-        <script>
-        document.getElementById('aggrid_detail_idx').addEventListener('change', function(e) {
-            // Trigger Streamlit rerun
-            Streamlit.setComponentValue(e.target.value);
-        });
-        </script>
-        """,
-        unsafe_allow_html=True,
-    )
+    # Create a hidden button for every row
+    for idx in df["_original_sheet_index"]:
+        # Use a unique key
+        btn_key = f"detail_btn_{idx}"
+        if st.button("Open Details", key=btn_key, type="secondary"):
+            st.session_state.detail_idx = idx
+            st.rerun()
 
-    # Streamlit will rerun when the value changes
-    detail_idx = st.get_query_params().get("detail_idx", [None])[0]
-
-    # Alternative: use session_state + rerun
-    if "detail_idx" not in st.session_state:
-        st.session_state.detail_idx = None
-
-    # Capture JS change via query param or session_state
-    if detail_idx:
-        st.session_state.detail_idx = int(detail_idx)
-
-    if st.session_state.detail_idx is not None:
+    # ------------------------------------------------------------------
+    # 6. SHOW EXPANDER WHEN DETAIL IS REQUESTED
+    # ------------------------------------------------------------------
+    if st.session_state.get("detail_idx") is not None:
         idx = st.session_state.detail_idx
         full_row = editable_filtered.loc[
             editable_filtered["_original_sheet_index"] == idx
@@ -871,10 +843,10 @@ if not editable_filtered.empty:
                 st.markdown("**Feedback**")
                 st.write(full_row["Feedback"])
 
-        # Reset
-        st.session_state.detail_idx = None
-        st.rerun()
-
+        # Optional: Add a close button
+        if st.button("Close Details", key=f"close_{idx}"):
+            st.session_state.detail_idx = None
+            st.rerun()
 else:
     st.info("No data to display.")
     # ----------------- BUTTONS -----------------
@@ -969,6 +941,7 @@ else:
                 st.info("ℹ️ No changes detected to save.")
 #else:
     #st.info("Deficiencies will be updated soon !")
+
 
 
 
