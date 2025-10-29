@@ -381,8 +381,7 @@ st.markdown("""
     For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
 </marquee>
 """, unsafe_allow_html=True)
-else:
-    st.info("No data to display.")
+
     # ----------------- BUTTONS -----------------
     c1, c2, _ = st.columns([1, 1, 1])
     submitted = c1.button("✅ Submit Feedback")
@@ -475,6 +474,7 @@ else:
                 st.info("ℹ️ No changes detected to save.")
 #else:
     #st.info("Deficiencies will be updated soon !")
+
 
 
 
