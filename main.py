@@ -898,7 +898,7 @@ st.markdown("""
 
 st.markdown("""
 <div style="text-align: center; margin: 35px 0;">
-  <div class="glow-credit">
+  <div class="adaptive-credit">
     <p>
       <strong>Designed & Developed by</strong> 
       <span class="highlight">Safety Department</span>, 
@@ -908,54 +908,83 @@ st.markdown("""
 </div>
 
 <style>
-.glow-credit {
+/* Adaptive Colors for Light & Dark Mode */
+@media (prefers-color-scheme: light) {
+  :root {
+    --text-color: #1a1a1a;
+    --text-highlight: #0d47a1;
+    --text-sub: #1565c0;
+    --bg-glass: rgba(255, 255, 255, 0.75);
+    --border-color: #40c4ff;
+    --shadow-base: rgba(64, 196, 255, 0.2);
+    --shadow-hover: rgba(64, 196, 255, 0.35);
+    --glow-color: rgba(179, 229, 252, 0.9);
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text-color: #ffffff;
+    --text-highlight: #e3f2fd;
+    --text-sub: #bbdefb;
+    --bg-glass: rgba(15, 25, 45, 0.65);
+    --border-color: #40c4ff;
+    --shadow-base: rgba(64, 196, 255, 0.15);
+    --shadow-hover: rgba(64, 196, 255, 0.4);
+    --glow-color: rgba(179, 229, 252, 0.95);
+  }
+}
+
+/* Credit Card Style */
+.adaptive-credit {
   display: inline-block;
   padding: 14px 36px;
-  background: rgba(255, 255, 255, 0.12);
-  border: 2px solid #40c4ff;
+  background: var(--bg-glass);
+  border: 2px solid var(--border-color);
   border-radius: 18px;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 8px 25px rgba(64, 196, 255, 0.15);
-  transition: all 0.4s ease;
-  font-family: 'Roboto', sans-serif;
+  box-shadow: 0 8px 25px var(--shadow-base);
+  transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+  font-family: 'Roboto', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
 }
 
-.glow-credit p {
+.adaptive-credit p {
   margin: 0;
-  font-size: 15px;
+  color: var(--text-color);
   font-weight: 500;
-  color: #ffffff;
   letter-spacing: 0.8px;
   text-shadow: none;
   transition: text-shadow 0.4s ease;
 }
 
-.glow-credit p span.highlight {
-  color: #e3f2fd;
+.adaptive-credit p span.highlight {
+  color: var(--text-highlight);
   font-weight: 700;
 }
 
-.glow-credit p em {
+.adaptive-credit p em {
   font-style: normal;
-  color: #bbdefb;
+  color: var(--text-sub);
 }
 
-/* Hover Effect: Glow Appears */
-.glow-credit:hover {
+/* Hover: Glow + Lift */
+.adaptive-credit:hover {
+  transform: translateY(-4px);
   box-shadow: 
-    0 12px 35px rgba(64, 196, 255, 0.3),
-    0 0 40px rgba(179, 229, 252, 0.8),
-    0 0 0 1px rgba(64, 196, 255, 0.4);
-  transform: translateY(-3px);
+    0 14px 35px var(--shadow-hover),
+    0 0 40px var(--glow-color),
+    0 0 0 1px var(--border-color);
 }
 
-.glow-credit:hover p {
+.adaptive-credit:hover p {
   text-shadow: 
-    0 0 10px rgba(179, 229, 252, 0.9),
-    0 0 20px rgba(179, 229, 252, 0.7),
-    0 0 30px rgba(179, 229, 252, 0.5),
-    0 0 40px rgba(179, 229, 252, 0.3);
+    0 0 10px var(--glow-color),
+    0 0 20px var(--glow-color),
+    0 0 30px var(--glow-color),
+    0 0 40px rgba(179, 229, 252, 0.6);
 }
 </style>
 """, unsafe_allow_html=True)
@@ -1139,6 +1168,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
