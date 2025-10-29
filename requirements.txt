@@ -13,3 +13,4 @@ openpyxl
 transformers
 torch
 altair
+pywhatkit
