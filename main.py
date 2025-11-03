@@ -347,7 +347,7 @@ def apply_common_filters(df, prefix=""):
         )]
     if st.session_state.get(prefix + "from_date") and st.session_state.get(prefix + "to_date"):
         from_date = st.session_state[prefix + "from_date"]
-        to_date = st.session_state[prefix + "to_date"]
+        to_date = st.session_state[prefix + "to_date")
         out = out[
             (out["Date of Inspection"] >= pd.to_datetime(from_date)) &
             (out["Date of Inspection"] <= pd.to_datetime(to_date))
@@ -594,7 +594,7 @@ with tabs[0]:
         if "Date of Inspection" in editable_df.columns:
             editable_df["Date of Inspection"] = pd.to_datetime(
                 editable_df["Date of Inspection"], errors="coerce"
-            ).dt.strftime("%Y-%m-%d")
+            ).dt.date  # Changed to .dt.date for Excel compatibility
         # Add Status column
         if "Feedback" in editable_df.columns and "User Feedback/Remark" in editable_df.columns:
             editable_df.insert(
@@ -658,14 +658,53 @@ with tabs[0]:
             allow_unsafe_jscode=True
         )
         edited_df = pd.DataFrame(grid_response["data"])
-        # Download button for filtered/edited results
+        # Download button for filtered/edited results as Excel
         export_cols = [col for col in valid_cols if col not in ["_original_sheet_index", "_sheet_row"]] + ["Status"]
-        csv = edited_df[export_cols].to_csv(index=False).encode('utf-8')
+        export_edited_df = edited_df[export_cols].copy()
+        export_edited_df["Date of Inspection"] = pd.to_datetime(export_edited_df["Date of Inspection"]).dt.date
+        towb_edited = BytesIO()
+        with pd.ExcelWriter(towb_edited, engine="openpyxl") as writer:
+            export_edited_df.to_excel(writer, index=False, sheet_name="Edited Records")
+            ws = writer.sheets["Edited Records"]
+            date_style = NamedStyle(name="date_style", number_format="DD-MM-YYYY")
+            for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
+                for cell in row:
+                    cell.alignment = Alignment(wrap_text=True, vertical="top")
+            date_col_idx = export_edited_df.columns.get_loc("Date of Inspection") + 1
+            for row in ws.iter_rows(min_row=2, min_col=date_col_idx, max_col=date_col_idx, max_row=len(export_edited_df) + 1):
+                for cell in row:
+                    cell.style = date_style
+            for col in ws.columns:
+                max_length = 0
+                col_letter = col[0].column_letter
+                for cell in col:
+                    try:
+                        if cell.value:
+                            max_length = max(max_length, len(str(cell.value)))
+                    except:
+                        pass
+                adjusted_width = (max_length + 2) if max_length < 50 else 50
+                ws.column_dimensions[col_letter].width = adjusted_width
+            thin_border = Border(left=Side(style='thin'),
+                                 right=Side(style='thin'),
+                                 top=Side(style='thin'),
+                                 bottom=Side(style='thin'))
+            for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
+                for cell in row:
+                    cell.border = thin_border
+            status_col_idx = export_edited_df.columns.get_loc("Status") + 1
+            for row in ws.iter_rows(min_row=2, min_col=status_col_idx, max_col=status_col_idx, max_row=len(export_edited_df) + 1):
+                for cell in row:
+                    if str(cell.value).strip().lower() == "pending":
+                        cell.font = Font(color="FF0000")  # Red
+                    elif str(cell.value).strip().lower() == "resolved":
+                        cell.font = Font(color="008000")  # Green
+        towb_edited.seek(0)
         st.download_button(
-            label="📥 Download Edited Records as CSV",
-            data=csv,
-            file_name=f"edited_records_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv"
+            label="📥 Export Edited Records to Excel",
+            data=towb_edited,
+            file_name=f"edited_records_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
         # Buttons
         c1, c2, _ = st.columns([1, 1, 1])
@@ -739,7 +778,6 @@ with tabs[0]:
                     st.info("ℹ️ No changes detected to save.")
     else:
         st.info("Deficiencies will be updated soon!")
-
 # ---------------- ALERT LOG SECTION ----------------
 st.markdown("## 📋 Alerts Log")
 
@@ -1071,6 +1109,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
