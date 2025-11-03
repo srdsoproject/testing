@@ -662,7 +662,7 @@ editable_filtered = filtered.copy()
 if not editable_filtered.empty:
     # ✅ Search box for Deficiency
     search_text = st.text_input("🔍 Search Deficiencies", "").strip().lower()
-   if search_text:
+    if search_text:
         editable_filtered = editable_filtered[editable_filtered["Deficiencies Noted"].astype(str).str.lower().str.contains(search_text, case=False, na=False)][["Deficiencies Noted", "Inspection By", "Action By", "Location"]]
 
     # Ensure stable IDs exist for reliable updates
@@ -1166,6 +1166,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
