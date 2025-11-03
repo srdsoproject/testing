@@ -1,3 +1,4 @@
+wheel
 streamlit==1.37.1
 numpy>=1.26,<3.0
 pandas>=2.2,<3.0
@@ -12,5 +13,3 @@ openpyxl
 transformers
 torch
 altair
-pywhatkit
-streamlit-dataframe-editor
