@@ -516,7 +516,7 @@ with tabs[0]:
             st.download_button("📥 Download Sub Head Distribution (PNG)", data=buf,
                                file_name="subhead_distribution.png", mime="image/png")
     export_df = filtered[[
-        "-upper", "lower"], key=f"case_{column}")
+        "-upper", "lower"], key=f"case_{column}"]
             search_term = st.text_input(f"Filter {column}", key=f"search_{column}")
             if search_term:
                 if case == "upper":
@@ -1343,6 +1343,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
