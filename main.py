@@ -758,7 +758,7 @@ if not editable_filtered.empty:
     if c2.button("🔄 Refresh Data"):
         st.session_state.df = load_data()
         st.success("✅ Data refreshed successfully!")
-        st.experimental_rerun()  # Rerun to refresh the table
+        st.rerun()  # Updated to st.rerun() for Streamlit compatibility
 
     # ----------------- SUBMIT LOGIC -----------------
     if submitted:
@@ -1157,6 +1157,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
