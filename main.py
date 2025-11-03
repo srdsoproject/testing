@@ -514,6 +514,7 @@ with tabs[0]:
 from streamlit_dataframe_editor import st_grid
 
 # ---------- EDITOR ----------
+# ---------- EDITOR ----------
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 
 if not filtered.empty:
@@ -557,87 +558,66 @@ if not filtered.empty:
         editable_df["Status"] = editable_df["Status"].apply(color_text_status)
 
     # Global Search (inbuilt search across all columns)
-    search_text = st.text_input("🔍 Search All Columns (case-insensitive)", "").strip().lower()
+    st.markdown("#### 🔍 Search and Filter")
+    search_text = st.text_input("Search All Columns (case-insensitive)", "").strip().lower()
     if search_text:
-        # Filter rows containing search_text in any column
         mask = editable_df[valid_cols].astype(str).apply(
             lambda col: col.str.contains(search_text, case=False, na=False)
         ).any(axis=1)
         editable_df = editable_df[mask].copy()
         st.info(f"Found {len(editable_df)} matching rows after search.")
 
-    # Excel-like Column Filtering (using filter_dataframe)
-    my_columns = valid_cols  # Columns to filter on
-    max_cols = st.slider("Max columns to filter on", 1, len(my_columns), 5)  # Limit for performance
-    candidate_columns = my_columns[:max_cols]
-    column_selection = st.multiselect("Select columns to filter", candidate_columns)
-    if len(column_selection) > 0:
-        # Custom filter_dataframe function (paste this if not already in your code)
-        def filter_dataframe(df: pd.DataFrame, include_index: bool = False) -> pd.DataFrame:
-            df_filtered = df.copy()
-            for column in column_selection:
-                if is_categorical_dtype(df[column]):
-                    df_filtered = df_filtered[df_filtered[column].isin(df[column].dropna().unique())]
-                elif is_numeric_dtype(df[column]):
-                    _min = float(df[column].min())
-                    _max = float(df[column].max())
-                    step = (_max - _min) / 100
-                    df_filtered = df_filtered[df_filtered[column].between(_min, _max)]
-                elif is_datetime(df[column]):
-                    _min = df[column].min()
-                    _max = df[column].max()
-                    df_filtered = df_filtered[df_filtered[column].between(_min, _max)]
-                else:
-                    case = st.selectbox("Case sensitive?", ["both", "upper", "lower"], key=f"case_{column}")
-                    search_term = st.text_input(f"Filter {column}", key=f"search_{column}")
-                    if search_term:
-                        df_filtered = df_filtered[df_filtered[column].str.contains(search_term, case=case == "both")]
-            return df_filtered
-
-        # Apply filters
+    # Excel-like Column Filtering
+    max_cols = st.slider("Max columns to filter on", 1, len(valid_cols), min(5, len(valid_cols)), key="max_cols_filter")
+    candidate_columns = valid_cols[:max_cols]
+    column_selection = st.multiselect("Select columns to filter", candidate_columns, key="column_select_filter")
+    if column_selection:
         editable_df = filter_dataframe(editable_df)
         st.info(f"Applied filters to {len(editable_df)} rows.")
 
-    # Define column config for st.data_editor (editable only "User Feedback/Remark", dropdowns for categoricals)
-    column_config = {}
-    for col in valid_cols:
-        if col == "User Feedback/Remark":
-            column_config[col] = st.column_config.TextColumn(
-                "User Feedback/Remark",
-                help="Enter your feedback/remark here (max 4000 chars)",
-                width="large",
-                required=False
-            )
-        elif col in ["Head", "Sub Head", "Type of Inspection", "Status"]:
-            unique_vals = sorted(editable_df[col].dropna().unique())
-            column_config[col] = st.column_config.SelectboxColumn(
-                col,
-                options=unique_vals,
-                required=False
-            )
-        elif col == "Date of Inspection":
-            column_config[col] = st.column_config.DateColumn(col, format="YYYY-MM-DD")
-        else:
-            column_config[col] = st.column_config.TextColumn(col, disabled=True)  # Non-editable by default
+    # AgGrid Configuration
+    gb = GridOptionsBuilder.from_dataframe(editable_df)
+    gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True)
+    if "User Feedback/Remark" in editable_df.columns:
+        gb.configure_column(
+            "User Feedback/Remark",
+            editable=True,
+            wrapText=True,
+            autoHeight=True,
+            cellEditor="agTextCellEditor",
+            cellEditorPopup=False,
+            cellEditorParams={"maxLength": 4000}
+        )
+    gb.configure_column("_original_sheet_index", hide=True)
+    gb.configure_column("_sheet_row", hide=True)
+    gb.configure_grid_options(singleClickEdit=True)
+    auto_size_js = JsCode("""
+    function(params) {
+        let allColumnIds = [];
+        params.columnApi.getAllColumns().forEach(function(column) {
+            allColumnIds.push(column.getColId());
+        });
+        params.columnApi.autoSizeColumns(allColumnIds);
+    }
+    """)
+    gb.configure_grid_options(onFirstDataRendered=auto_size_js)
+    grid_options = gb.build()
 
-    # Editable Table (st.data_editor)
-    st.caption("Edit 'User Feedback/Remark' column directly. Use the toolbar for sort/search/copy.")
-    edited_df = st.data_editor(
-        editable_df[valid_cols + ["Status"]],
-        column_config=column_config,
-        num_rows="dynamic",  # Allow adding rows if needed
-        use_container_width=True,
-        hide_index=True,
-        disabled=["_original_sheet_index", "_sheet_row"]  # Hidden IDs not shown
+    # Render AgGrid
+    st.markdown("#### 📋 Editable Table")
+    st.caption("Edit 'User Feedback/Remark' column. Use column headers to sort.")
+    grid_response = AgGrid(
+        editable_df,
+        gridOptions=grid_options,
+        update_mode=GridUpdateMode.VALUE_CHANGED,
+        height=600,
+        allow_unsafe_jscode=True
     )
-
-    # Preview non-editable version with built-in search/sort (optional, for large datasets)
-    st.caption("Preview (sortable/searchable):")
-    st.dataframe(edited_df, use_container_width=True, height=200)
+    edited_df = pd.DataFrame(grid_response["data"])
 
     # Download button for filtered/edited results
-    export_cols = [col for col in valid_cols if col not in ["_original_sheet_index", "_sheet_row"]]
-    csv = edited_df.to_csv(index=False).encode('utf-8')
+    export_cols = [col for col in valid_cols if col not in ["_original_sheet_index", "_sheet_row"]] + ["Status"]
+    csv = edited_df[export_cols].to_csv(index=False).encode('utf-8')
     st.download_button(
         label="📥 Download Edited Records as CSV",
         data=csv,
@@ -653,18 +633,14 @@ if not filtered.empty:
         st.success("✅ Data refreshed successfully!")
         st.rerun()
 
-    # Submit logic (merge edited_df back with IDs for updates)
+    # Submit logic
     if submitted:
-        # Merge edited changes back to full DF with IDs
-        edited_full = pd.merge(
-            edited_df, editable_filtered[["_original_sheet_index", "_sheet_row"]], left_index=True, right_index=True, how="left"
-        )
         need_cols = {"_original_sheet_index", "User Feedback/Remark"}
-        if not need_cols.issubset(edited_full.columns) or "Feedback" not in editable_filtered.columns:
+        if not need_cols.issubset(edited_df.columns) or "Feedback" not in editable_filtered.columns:
             st.error("⚠️ Required columns are missing from the data.")
         else:
             orig = editable_filtered.set_index("_original_sheet_index")
-            new = edited_full.set_index("_original_sheet_index")
+            new = edited_df.set_index("_original_sheet_index")
             old_remarks = orig["User Feedback/Remark"].fillna("").astype(str)
             new_remarks = new["User Feedback/Remark"].fillna("").astype(str)
             common_ids = new_remarks.index.intersection(old_remarks.index)
@@ -1054,4 +1030,5 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
