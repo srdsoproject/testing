@@ -515,17 +515,56 @@ with tabs[0]:
             st.image(buf, use_column_width=True)
             st.download_button("📥 Download Sub Head Distribution (PNG)", data=buf,
                                file_name="subhead_distribution.png", mime="image/png")
-    export_df = filtered[(
-        "-upper", "lower"], key=f"case_{column}")
-            search_term = st.text_input(f"Filter {column}", key=f"search_{column}")
-            if search_term:
-                if case == "upper":
-                    df_filtered = df_filtered[df_filtered[column].str.upper().str.contains(search_term.upper(), na=False)]
-                elif case == "lower":
-                    df_filtered = df_filtered[df_filtered[column].str.lower().str.contains(search_term.lower(), na=False)]
-                else:
-                    df_filtered = df_filtered[df_filtered[column].str.contains(search_term, case=False, na=False)]
-    return df_filtered
+    # Corrected export_df assignment and Excel export
+    export_df = filtered[[
+        "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
+        "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "User Feedback/Remark",
+        "Status"
+    ]].copy()
+    towb = BytesIO()
+    with pd.ExcelWriter(towb, engine="openpyxl") as writer:
+        export_df.to_excel(writer, index=False, sheet_name="Filtered Records")
+        ws = writer.sheets["Filtered Records"]
+        date_style = NamedStyle(name="date_style", number_format="DD-MM-YYYY")
+        for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
+            for cell in row:
+                cell.alignment = Alignment(wrap_text=True, vertical="top")
+        date_col_idx = export_df.columns.get_loc("Date of Inspection") + 1
+        for row in ws.iter_rows(min_row=2, min_col=date_col_idx, max_col=date_col_idx, max_row=len(export_df) + 1):
+            for cell in row:
+                cell.style = date_style
+        for col in ws.columns:
+            max_length = 0
+            col_letter = col[0].column_letter
+            for cell in col:
+                try:
+                    if cell.value:
+                        max_length = max(max_length, len(str(cell.value)))
+                except:
+                    pass
+            adjusted_width = (max_length + 2) if max_length < 50 else 50
+            ws.column_dimensions[col_letter].width = adjusted_width
+        thin_border = Border(left=Side(style='thin'),
+                            right=Side(style='thin'),
+                            top=Side(style='thin'),
+                            bottom=Side(style='thin'))
+        for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
+            for cell in row:
+                cell.border = thin_border
+        status_col_idx = export_df.columns.get_loc("Status") + 1
+        for row in ws.iter_rows(min_row=2, min_col=status_col_idx, max_col=status_col_idx, max_row=len(export_df) + 1):
+            for cell in row:
+                if str(cell.value).strip().lower() == "pending":
+                    cell.font = Font(color="FF0000")  # Red
+                elif str(cell.value).strip().lower() == "resolved":
+                    cell.font = Font(color="008000")  # Green
+    towb.seek(0)
+    st.download_button(
+        "📥 Export Filtered Records to Excel",
+        data=towb,
+        file_name="filtered_records.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
 # ---------- GOOGLE SHEET UPDATE ----------
 def update_feedback_column(edited_df):
@@ -1343,6 +1382,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
