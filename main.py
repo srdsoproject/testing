@@ -348,7 +348,7 @@ def apply_common_filters(df, prefix=""):
         )]
     if st.session_state.get(prefix + "from_date") and st.session_state.get(prefix + "to_date"):
         from_date = st.session_state[prefix + "from_date"]
-        to_date = st.session_state[prefix + "to_date")
+        to_date = st.session_state[prefix + "to_date"]
         out = out[
             (out["Date of Inspection"] >= pd.to_datetime(from_date)) &
             (out["Date of Inspection"] <= pd.to_datetime(to_date))
@@ -1168,6 +1168,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
