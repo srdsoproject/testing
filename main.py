@@ -660,65 +660,65 @@ if "alerts_log" not in st.session_state:
 
 editable_filtered = filtered.copy()
 if not editable_filtered.empty:
-    # ✅ Search box for Deficiency
-    search_text = st.text_input("🔍 Search Deficiencies", "").strip().lower()
+    # Search box for Deficiency
+    search_text = st.text_input("🔍 Search Deficiencies (case-insensitive)", "").strip().lower()
+
+    # Filter the DataFrame based on search
     if search_text:
-        editable_filtered = editable_filtered[editable_filtered["Deficiencies Noted"].astype(str).str.lower().str.contains(search_text, case=False, na=False)][["Deficiencies Noted", "Inspection By", "Action By", "Location"]]
+        filtered_df = editable_filtered[
+            editable_filtered["Deficiencies Noted"].astype(str).str.lower().str.contains(
+                search_text, case=False, na=False
+            )
+        ][valid_cols + ["_original_sheet_index", "_sheet_row"]].copy()
+        st.info(f"Found {len(filtered_df)} matching rows.")
+    else:
+        filtered_df = editable_filtered[valid_cols + ["_original_sheet_index", "_sheet_row"]].copy()
+        st.info(f"Showing all {len(filtered_df)} rows.")
 
-    # Ensure stable IDs exist for reliable updates
-    if "_original_sheet_index" not in editable_filtered.columns:
-        editable_filtered["_original_sheet_index"] = editable_filtered.index
-    if "_sheet_row" not in editable_filtered.columns:
-        editable_filtered["_sheet_row"] = editable_filtered.index + 2  # sheet row (header + 1)
+    # Ensure stable ID columns exist
+    if "_original_sheet_index" not in filtered_df.columns:
+        filtered_df["_original_sheet_index"] = filtered_df.index
+    if "_sheet_row" not in filtered_df.columns:
+        filtered_df["_sheet_row"] = filtered_df.index + 2  # Sheet row (header + 1)
 
-    display_cols = [
-        "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
-        "Deficiencies Noted", "Inspection By", "Action By", "Feedback",
-        "User Feedback/Remark"
-    ]
-    editable_df = editable_filtered[display_cols].copy()
+    # Create editable DataFrame
+    editable_df = filtered_df[valid_cols + ["_original_sheet_index", "_sheet_row"]].copy()
 
-    # Show only date part
+    # Format Date of Inspection
     if "Date of Inspection" in editable_df.columns:
         editable_df["Date of Inspection"] = pd.to_datetime(
             editable_df["Date of Inspection"], errors="coerce"
         ).dt.strftime("%Y-%m-%d")
 
-    # Status column
-    editable_df.insert(
-        editable_df.columns.get_loc("User Feedback/Remark") + 1,
-        "Status",
-        [get_status(r["Feedback"], r["User Feedback/Remark"]) for _, r in editable_df.iterrows()]
-    )
-    editable_df["Status"] = editable_df["Status"].apply(color_text_status)
-
-    # Carry ID columns through grid (hidden)
-    editable_df["_original_sheet_index"] = editable_filtered["_original_sheet_index"].values
-    editable_df["_sheet_row"] = editable_filtered["_sheet_row"].values
+    # Add Status column
+    if "Feedback" in editable_df.columns and "User Feedback/Remark" in editable_df.columns:
+        editable_df.insert(
+            editable_df.columns.get_loc("User Feedback/Remark") + 1,
+            "Status",
+            [get_status(r["Feedback"], r["User Feedback/Remark"]) for _, r in editable_df.iterrows()]
+        )
+        editable_df["Status"] = editable_df["Status"].apply(color_text_status)
 
     # -------- AG GRID CONFIG --------
     gb = GridOptionsBuilder.from_dataframe(editable_df)
     gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True)
-
-    # Make ONLY "User Feedback/Remark" editable
-    gb.configure_column(
-        "User Feedback/Remark",
-        editable=True,
-        wrapText=True,
-        autoHeight=True,
-        cellEditor="agTextCellEditor",
-        cellEditorPopup=False,
-        cellEditorParams={"maxLength": 4000}
-    )
-
+    # Make ONLY "User Feedback/Remark" editable if it exists
+    if "User Feedback/Remark" in editable_df.columns:
+        gb.configure_column(
+            "User Feedback/Remark",
+            editable=True,
+            wrapText=True,
+            autoHeight=True,
+            cellEditor="agTextCellEditor",
+            cellEditorPopup=False,
+            cellEditorParams={"maxLength": 4000}
+        )
     # Hide helper ID columns
     gb.configure_column("_original_sheet_index", hide=True)
     gb.configure_column("_sheet_row", hide=True)
-
     # Easier editing UX
     gb.configure_grid_options(singleClickEdit=True)
-
-    # ✅ Auto-size all columns on load
+    # Auto-size all columns on load
     auto_size_js = JsCode("""
     function(params) {
         let allColumnIds = [];
@@ -729,9 +729,9 @@ if not editable_filtered.empty:
     }
     """)
     gb.configure_grid_options(onFirstDataRendered=auto_size_js)
-
     grid_options = gb.build()
 
+    # Render AgGrid
     grid_response = AgGrid(
         editable_df,
         gridOptions=grid_options,
@@ -740,7 +740,17 @@ if not editable_filtered.empty:
         allow_unsafe_jscode=True
     )
 
+    # Get edited data
     edited_df = pd.DataFrame(grid_response["data"])
+
+    # Download button for filtered results
+    csv = editable_df[valid_cols].to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="📥 Download Filtered Results as CSV",
+        data=csv,
+        file_name=f"search_results_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
+        mime="text/csv"
+    )
 
     # ----------------- BUTTONS -----------------
     c1, c2, _ = st.columns([1, 1, 1])
@@ -748,51 +758,42 @@ if not editable_filtered.empty:
     if c2.button("🔄 Refresh Data"):
         st.session_state.df = load_data()
         st.success("✅ Data refreshed successfully!")
+        st.experimental_rerun()  # Rerun to refresh the table
 
     # ----------------- SUBMIT LOGIC -----------------
     if submitted:
-        # Validate needed columns
         need_cols = {"_original_sheet_index", "User Feedback/Remark"}
         if not need_cols.issubset(edited_df.columns) or "Feedback" not in editable_filtered.columns:
             st.error("⚠️ Required columns are missing from the data.")
         else:
-            # Compare remarks using the stable ID to find changes
             orig = editable_filtered.set_index("_original_sheet_index")
             new = edited_df.set_index("_original_sheet_index")
-
             old_remarks = orig["User Feedback/Remark"].fillna("").astype(str)
             new_remarks = new["User Feedback/Remark"].fillna("").astype(str)
-
-            # Align indexes before comparing
             common_ids = new_remarks.index.intersection(old_remarks.index)
             diff_mask = new_remarks.loc[common_ids] != old_remarks.loc[common_ids]
             changed_ids = diff_mask[diff_mask].index.tolist()
-
             if changed_ids:
                 diffs = new.loc[changed_ids].copy()
                 diffs["_sheet_row"] = orig.loc[changed_ids, "_sheet_row"].values
-
-                # Routing dictionary
                 routing = {
-                    "Pertains to S&T":        ("SIGNAL & TELECOM", "Sr.DSTE"),
-                    "Pertains to OPTG":       ("OPTG", "Sr.DOM"),
+                    "Pertains to S&T": ("SIGNAL & TELECOM", "Sr.DSTE"),
+                    "Pertains to OPTG": ("OPTG", "Sr.DOM"),
                     "Pertains to COMMERCIAL": ("COMMERCIAL", "Sr.DCM"),
-                    "Pertains to ELECT/G":    ("ELECT/G", "Sr.DEE/G"),
-                    "Pertains to ELECT/TRD":  ("ELECT/TRD", "Sr.DEE/TRD"),
-                    "Pertains to ELECT/TRO":  ("ELECT/TRO", "Sr.DEE/TRO"),
-                    "Pertains to Sr.DEN/S":   ("ENGINEERING", "Sr.DEN/S"),
-                    "Pertains to Sr.DEN/C":   ("ENGINEERING", "Sr.DEN/C"),
-                    "Pertains to Sr.DEN/Co":  ("ENGINEERING", "Sr.DEN/Co"),
-                    "Pertains to FINAINCE": ("FINANCE","Sr.DFM"),
-                    "Pertains to STORE" : ("STORE","Sr.DMM"),
-                    "Pertains to MEDICAL" : ("MEDICAL", "CMS"),
+                    "Pertains to ELECT/G": ("ELECT/G", "Sr.DEE/G"),
+                    "Pertains to ELECT/TRD": ("ELECT/TRD", "Sr.DEE/TRD"),
+                    "Pertains to ELECT/TRO": ("ELECT/TRO", "Sr.DEE/TRO"),
+                    "Pertains to Sr.DEN/S": ("ENGINEERING", "Sr.DEN/S"),
+                    "Pertains to Sr.DEN/C": ("ENGINEERING", "Sr.DEN/C"),
+                    "Pertains to Sr.DEN/Co": ("ENGINEERING", "Sr.DEN/Co"),
+                    "Pertains to FINAINCE": ("FINANCE", "Sr.DFM"),
+                    "Pertains to STORE": ("STORE", "Sr.DMM"),
+                    "Pertains to MEDICAL": ("MEDICAL", "CMS"),
                 }
-
                 for oid in changed_ids:
                     user_remark = new.loc[oid, "User Feedback/Remark"].strip()
                     if not user_remark:
                         continue
-
                     for key, (head, action_by) in routing.items():
                         if key in user_remark:
                             st.session_state.df.at[oid, "Head"] = head
@@ -801,13 +802,9 @@ if not editable_filtered.empty:
                             diffs.at[oid, "Head"] = head
                             diffs.at[oid, "Action By"] = action_by
                             diffs.at[oid, "Sub Head"] = ""
-
-                            # 👉 Collect extra info
                             date_str = orig.loc[oid, "Date of Inspection"]
                             deficiency = orig.loc[oid, "Deficiencies Noted"]
                             forwarded_by = orig.loc[oid, "Head"]
-
-                            # 👉 Build alert message
                             alert_msg = (
                                 f"📌 **{head} Department Alert**\n"
                                 f"- Date: {date_str}\n"
@@ -816,15 +813,10 @@ if not editable_filtered.empty:
                                 f"- Forwarded Remark: {user_remark}"
                             )
                             st.session_state.alerts_log.insert(0, alert_msg)
-
-                    # ✅ Replace Feedback with new remark (clear remark column)
                     diffs.at[oid, "Feedback"] = user_remark
                     diffs.at[oid, "User Feedback/Remark"] = ""
-
                     st.session_state.df.at[oid, "Feedback"] = user_remark
                     st.session_state.df.at[oid, "User Feedback/Remark"] = ""
-
-                # Persist to storage
                 update_feedback_column(
                     diffs.reset_index().rename(columns={"index": "_original_sheet_index"})
                 )
@@ -832,8 +824,7 @@ if not editable_filtered.empty:
             else:
                 st.info("ℹ️ No changes detected to save.")
 else:
-    st.info("Deficiencies will be updated soon !")
-
+    st.info("Deficiencies will be updated soon!")
 
 # ---------------- ALERT LOG SECTION ----------------
 st.markdown("## 📋 Alerts Log")
@@ -1166,6 +1157,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
