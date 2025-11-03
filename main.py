@@ -569,6 +569,11 @@ with tabs[0]:
     # ---------- EDITOR ----------
 st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
 if not filtered.empty:
+    # Ensure Date of Inspection is date-only in filtered DataFrame
+    if "Date of Inspection" in filtered.columns:
+        filtered["Date of Inspection"] = pd.to_datetime(
+            filtered["Date of Inspection"], errors="coerce"
+        ).dt.date
     # Validate and select columns to avoid KeyError
     display_cols = [
         "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
@@ -583,11 +588,6 @@ if not filtered.empty:
         st.error("⚠️ 'Deficiencies Noted' column is required for search functionality.")
         st.stop()
     editable_filtered = filtered.copy()
-    # Ensure Date of Inspection is date-only
-    if "Date of Inspection" in editable_filtered.columns:
-        editable_filtered["Date of Inspection"] = pd.to_datetime(
-            editable_filtered["Date of Inspection"], errors="coerce"
-        ).dt.date
     # Ensure stable ID columns
     if "_original_sheet_index" not in editable_filtered.columns:
         editable_filtered["_original_sheet_index"] = editable_filtered.index
@@ -595,11 +595,11 @@ if not filtered.empty:
         editable_filtered["_sheet_row"] = editable_filtered.index + 2
     # Create editable DataFrame
     editable_df = editable_filtered[valid_cols + ["_original_sheet_index", "_sheet_row"]].copy()
-    # Format Date of Inspection for display
+    # Format Date of Inspection for AgGrid display as DD-MM-YYYY
     if "Date of Inspection" in editable_df.columns:
         editable_df["Date of Inspection"] = pd.to_datetime(
             editable_df["Date of Inspection"], errors="coerce"
-        ).dt.date
+        ).dt.strftime('%d-%m-%Y')
     # Add Status column
     if "Feedback" in editable_df.columns and "User Feedback/Remark" in editable_df.columns:
         editable_df.insert(
@@ -628,6 +628,18 @@ if not filtered.empty:
     # AgGrid Configuration
     gb = GridOptionsBuilder.from_dataframe(editable_df)
     gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True)
+    if "Date of Inspection" in editable_df.columns:
+        gb.configure_column(
+            "Date of Inspection",
+            type=["dateColumn"],
+            cellRenderer=JsCode("""
+                function(params) {
+                    return params.value ? params.value : '';
+                }
+            """),
+            wrapText=True,
+            autoHeight=True
+        )
     if "User Feedback/Remark" in editable_df.columns:
         gb.configure_column(
             "User Feedback/Remark",
@@ -669,7 +681,7 @@ if not filtered.empty:
     if "Date of Inspection" in export_edited_df.columns:
         export_edited_df["Date of Inspection"] = pd.to_datetime(
             export_edited_df["Date of Inspection"], errors="coerce"
-        ).dt.date
+        ).dt.strftime('%d-%m-%Y')
     towb_edited = BytesIO()
     with pd.ExcelWriter(towb_edited, engine="openpyxl") as writer:
         export_edited_df.to_excel(writer, index=False, sheet_name="Edited Records")
@@ -1122,4 +1134,5 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
