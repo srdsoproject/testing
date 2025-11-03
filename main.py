@@ -393,7 +393,7 @@ def load_data():
         for col in REQUIRED_COLS:
             if col not in df.columns:
                 df[col] = ""
-        df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
+        df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce").dt.date
         df["Location"] = df["Location"].astype(str).str.strip().str.upper()
         df["_sheet_row"] = df.index + 2
         return df
@@ -417,11 +417,11 @@ with tabs[0]:
                 "Inspection By", "Action By", "Feedback", "User Feedback/Remark"]:
         if col not in df.columns:
             df[col] = ""
-    df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
+    df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce").dt.date
     df["_original_sheet_index"] = df.index
     df["Status"] = df.apply(lambda r: classify_feedback(r["Feedback"], r.get("User Feedback/Remark", "")), axis=1)
-    start_date = df["Date of Inspection"].min() if not df["Date of Inspection"].isna().all() else pd.Timestamp.today()
-    end_date = df["Date of Inspection"].max() if not df["Date of Inspection"].isna().all() else pd.Timestamp.today()
+    start_date = df["Date of Inspection"].min() if not df["Date of Inspection"].isna().all() else pd.Timestamp.today().date()
+    end_date = df["Date of Inspection"].max() if not df["Date of Inspection"].isna().all() else pd.Timestamp.today().date()
     c1, c2 = st.columns(2)
     c1.multiselect("Type of Inspection", VALID_INSPECTIONS, key="view_type_filter")
     c2.multiselect("Location", FOOTPLATE_LIST, key="view_location_filter")
@@ -444,8 +444,8 @@ with tabs[0]:
     filtered = apply_common_filters(filtered, prefix="view_")
     filtered = filtered.apply(lambda x: x.str.replace("\n", " ") if x.dtype == "object" else x)
     filtered = filtered.sort_values("Date of Inspection")
-    st.write(f"🔹 Showing {len(filtered)} record(s) from **{start_date.strftime('%d.%m.%Y')}** "
-             f"to **{end_date.strftime('%d.%m.%Y')}**")
+    st.write(f"🔹 Showing {len(filtered)} record(s) from **{pd.to_datetime(start_date).strftime('%d.%m.%Y')}** "
+             f"to **{pd.to_datetime(end_date).strftime('%d.%m.%Y')}**")
     col_a, col_b, col_c, col_d = st.columns(4)
     pending_count = (filtered["Status"] == "Pending").sum()
     no_response_count = filtered["Feedback"].isna().sum() + (filtered["Feedback"].astype(str).str.strip() == "").sum()
@@ -497,7 +497,248 @@ with tabs[0]:
             tbl.set_fontsize(10)
             tbl.scale(1, 1.5)
             fig.suptitle("📊 Sub Head Breakdown", fontsize=14, fontweight="bold")
-            dr = f"{start_date.strftime('%d-%m-%Y')} to {end_date.strftime('%d-%m-%Y')}"
+            dr = f"{pd.to_datetime(start_date).strftime('%d-%m-%Y')} to {pd.to_datetime(end_date).strftime('%d-%m-%Y')}"
+            heads = ", ".join(st.session_state.view_head_filter)
+            type_display = ", ".join(st.session_state.view_type_filter) if st.session_state.view_type_filter else "All Types"
+            location_display = st.session_state.view_location_filter or "All Locations"
+            fig.text(0.5, 0.02 + 0.015,
+                     f"Date Range: {dr} | Department: {heads} | Type: {type_display} | Location: {location_display}",
+                     ha='center', fontsize=9, color='gray')
+            if st.session_state.view_sub_filter:
+                fig.text(0.5, 0.02, f"Sub Head Filter: {st.session_state.view_sub_filter}",
+                         ha='center', fontsize=9, color='black', fontweight='bold')
+            plt.tight_layout(rect=[0, 0.06, 1, 0.94])
+            buf = BytesIO()
+            plt.savefig(buf, format="png", dpi=200, bbox_inches="tight")
+            buf.seek(0)
+            plt.close()
+            st.image(buf, use_column_width=True)
+            st.download_button("📥 Download Sub Head Distribution (PNG)", data=buf,
+                               file_name="subhead_distribution.png", mime="image/png")
+    export_df = filtered[[
+        "-upper", "lower"], key=f"case_{column}")
+            search_term = st.text_input(f"Filter {column}", key=f"search_{column}")
+            if search_term:
+                if case == "upper":
+                    df_filtered = df_filtered[df_filtered[column].str.upper().str.contains(search_term.upper(), na=False)]
+                elif case == "lower":
+                    df_filtered = df_filtered[df_filtered[column].str.lower().str.contains(search_term.lower(), na=False)]
+                else:
+                    df_filtered = df_filtered[df_filtered[column].str.contains(search_term, case=False, na=False)]
+    return df_filtered
+
+# ---------- GOOGLE SHEET UPDATE ----------
+def update_feedback_column(edited_df):
+    header = sheet.row_values(1)
+    def col_idx(name):
+        try:
+            return header.index(name) + 1
+        except ValueError:
+            st.error(f"⚠️ '{name}' column not found")
+            return None
+    feedback_col = col_idx("Feedback")
+    remark_col = col_idx("User Feedback/Remark")
+    head_col = col_idx("Head")
+    action_col = col_idx("Action By")
+    subhead_col = col_idx("Sub Head")
+    if None in (feedback_col, remark_col, head_col, action_col, subhead_col):
+        return
+    updates = []
+    for _, row in edited_df.iterrows():
+        r = int(row["_sheet_row"])
+        def a1(c): return gspread.utils.rowcol_to_a1(r, c)
+        fv = row.get("Feedback", "") or ""
+        rv = row.get("User Feedback/Remark", "") or ""
+        hv = row.get("Head", "") or ""
+        av = row.get("Action By", "") or ""
+        sv = row.get("Sub Head", "") or ""
+        updates += [
+            {"range": a1(feedback_col), "values": [[fv]]},
+            {"range": a1(remark_col), "values": [[rv]]},
+            {"range": a1(head_col), "values": [[hv]]},
+            {"range": a1(action_col), "values": [[av]]},
+            {"range": a1(subhead_col), "values": [[sv]]},
+        ]
+        s = st.session_state.df
+        s.loc[s["_sheet_row"] == r, ["Feedback", "User Feedback/Remark", "Head", "Action By", "Sub Head"]] = [fv, rv, hv, av, sv]
+    if updates:
+        sheet.spreadsheet.values_batch_update({"valueInputOption": "USER_ENTERED", "data": updates})
+
+# ---------- FILTER WIDGETS ----------
+def apply_common_filters(df, prefix=""):
+    with st.expander("🔍 Apply Additional Filters", expanded=True):
+        c1, c2 = st.columns(2)
+        c1.multiselect("Inspection By", INSPECTION_BY_LIST[1:],
+                       default=st.session_state.get(prefix + "insp", []), key=prefix + "insp")
+        c2.multiselect("Action By", ACTION_BY_LIST[1:],
+                       default=st.session_state.get(prefix + "action", []), key=prefix + "action")
+        d1, d2 = st.columns(2)
+        d1.date_input("📅 From Date", key=prefix + "from_date")
+        d2.date_input("📅 To Date", key=prefix + "to_date")
+    out = df.copy()
+    if st.session_state.get(prefix + "insp"):
+        sel = st.session_state[prefix + "insp"]
+        out = out[out["Inspection By"].apply(
+            lambda x: any(s.strip() in str(x).split(",") for s in sel)
+        )]
+    if st.session_state.get(prefix + "action"):
+        sel = st.session_state[prefix + "action"]
+        out = out[out["Action By"].apply(
+            lambda x: any(s.strip() in str(x).split(",") for s in sel)
+        )]
+    if st.session_state.get(prefix + "from_date") and st.session_state.get(prefix + "to_date"):
+        from_date = st.session_state[prefix + "from_date"]
+        to_date = st.session_state[prefix + "to_date"]
+        out = out[
+            (out["Date of Inspection"] >= pd.to_datetime(from_date)) &
+            (out["Date of Inspection"] <= pd.to_datetime(to_date))
+        ]
+    return out
+
+# ---------- HEADER ----------
+st.markdown(
+    """
+    <div style="display:flex;align-items:center;margin-top:10px;margin-bottom:20px;">
+        <img src="https://raw.githubusercontent.com/srdsoproject/testing/main/Central%20Railway%20Logo.png"
+             height="55" style="margin-right:15px;object-fit:contain;">
+        <div>
+            <h3 style="margin:0;font-weight:bold;color:var(--text-color);">
+                An initiative by <b>Safety Department</b>, Solapur Division
+            </h3>
+        </div>
+    </div>
+    <h1 style="margin-top:0;color:var(--text-color);">📋 S.A.R.A.L</h1>
+    <h3 style="margin-top:-10px;font-weight:normal;color:var(--text-color);">
+        (Safety Abnormality Report & Action List – Version 1.1.8)
+    </h3>
+    """,
+    unsafe_allow_html=True
+)
+
+# ---------- LOAD DATA ----------
+@st.cache_data(ttl=0)
+def load_data():
+    REQUIRED_COLS = [
+        "Date of Inspection", "Type of Inspection", "Location",
+        "Head", "Sub Head", "Deficiencies Noted",
+        "Inspection By", "Action By", "Feedback",
+        "User Feedback/Remark"
+    ]
+    try:
+        data = sheet.get_all_values()
+        if not data or len(data) < 2:
+            st.warning("No data found in Google Sheet. Returning empty DataFrame.")
+            return pd.DataFrame(columns=REQUIRED_COLS)
+        headers = [c.strip() for c in data[0]]
+        df = pd.DataFrame(data[1:], columns=headers)
+        for col in REQUIRED_COLS:
+            if col not in df.columns:
+                df[col] = ""
+        df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce").dt.date
+        df["Location"] = df["Location"].astype(str).str.strip().str.upper()
+        df["_sheet_row"] = df.index + 2
+        return df
+    except Exception as e:
+        st.error(f"❌ Error loading Google Sheet: {str(e)}")
+        st.warning("Returning empty DataFrame to prevent crashes.")
+        return pd.DataFrame(columns=REQUIRED_COLS)
+
+# Initialize df if None
+if st.session_state.df is None:
+    st.session_state.df = load_data()
+
+# ---------- TABS ----------
+tabs = st.tabs(["📊 View Records", "📈 Analytics"])
+with tabs[0]:
+    df = st.session_state.df
+    if df is None or df.empty:
+        st.warning("No data available. Please check Google Sheets connection or refresh.")
+        st.stop()
+    for col in ["Type of Inspection", "Location", "Head", "Sub Head", "Deficiencies Noted",
+                "Inspection By", "Action By", "Feedback", "User Feedback/Remark"]:
+        if col not in df.columns:
+            df[col] = ""
+    df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce").dt.date
+    df["_original_sheet_index"] = df.index
+    df["Status"] = df.apply(lambda r: classify_feedback(r["Feedback"], r.get("User Feedback/Remark", "")), axis=1)
+    start_date = df["Date of Inspection"].min() if not df["Date of Inspection"].isna().all() else pd.Timestamp.today().date()
+    end_date = df["Date of Inspection"].max() if not df["Date of Inspection"].isna().all() else pd.Timestamp.today().date()
+    c1, c2 = st.columns(2)
+    c1.multiselect("Type of Inspection", VALID_INSPECTIONS, key="view_type_filter")
+    c2.multiselect("Location", FOOTPLATE_LIST, key="view_location_filter")
+    c3, c4 = st.columns(2)
+    c3.multiselect("Head", HEAD_LIST[1:], key="view_head_filter")
+    sub_opts = sorted({s for h in st.session_state.view_head_filter for s in SUBHEAD_LIST.get(h, [])})
+    c4.multiselect("Sub Head", sub_opts, key="view_sub_filter")
+    selected_status = st.selectbox("🔘 Status", ["All", "Pending", "Resolved"], key="view_status_filter")
+    filtered = df[(df["Date of Inspection"] >= start_date) & (df["Date of Inspection"] <= end_date)]
+    if st.session_state.view_type_filter:
+        filtered = filtered[filtered["Type of Inspection"].isin(st.session_state.view_type_filter)]
+    if st.session_state.view_location_filter:
+        filtered = filtered[filtered["Location"].isin(st.session_state.view_location_filter)]
+    if st.session_state.view_head_filter:
+        filtered = filtered[filtered["Head"].isin(st.session_state.view_head_filter)]
+    if st.session_state.view_sub_filter:
+        filtered = filtered[filtered["Sub Head"].isin(st.session_state.view_sub_filter)]
+    if selected_status != "All":
+        filtered = filtered[filtered["Status"] == selected_status]
+    filtered = apply_common_filters(filtered, prefix="view_")
+    filtered = filtered.apply(lambda x: x.str.replace("\n", " ") if x.dtype == "object" else x)
+    filtered = filtered.sort_values("Date of Inspection")
+    st.write(f"🔹 Showing {len(filtered)} record(s) from **{pd.to_datetime(start_date).strftime('%d.%m.%Y')}** "
+             f"to **{pd.to_datetime(end_date).strftime('%d.%m.%Y')}**")
+    col_a, col_b, col_c, col_d = st.columns(4)
+    pending_count = (filtered["Status"] == "Pending").sum()
+    no_response_count = filtered["Feedback"].isna().sum() + (filtered["Feedback"].astype(str).str.strip() == "").sum()
+    resolved_count = (filtered["Status"] == "Resolved").sum()
+    col_a.metric("🟨 Pending", pending_count)
+    col_b.metric("⚠️ No Response", no_response_count)
+    col_c.metric("🟩 Resolved", resolved_count)
+    col_d.metric("📊 Total Records", len(filtered))
+    if st.session_state.view_head_filter and not filtered.empty:
+        st.markdown("### 📊 Sub Head Distribution")
+        subhead_summary = (
+            filtered.groupby("Sub Head")["Sub Head"]
+            .count()
+            .reset_index(name="Count")
+            .sort_values(by="Count", ascending=False)
+        )
+        if not subhead_summary.empty:
+            total_subs = subhead_summary["Count"].sum()
+            display_data = subhead_summary.copy()
+            thresh = 0.02
+            display_data["Percent"] = display_data["Count"] / total_subs
+            major = display_data[display_data["Percent"] >= thresh][["Sub Head", "Count"]]
+            minor = display_data[display_data["Percent"] < thresh]
+            if not minor.empty:
+                major = pd.concat([major, pd.DataFrame([{"Sub Head": "Others", "Count": minor["Count"].sum()}])],
+                                  ignore_index=True)
+            fig, axes = plt.subplots(1, 2, figsize=(16, 8))
+            wedges, texts, autotexts = axes[0].pie(
+                major["Count"], startangle=90, autopct='%1.1f%%',
+                textprops=dict(color='black', fontsize=8)
+            )
+            for i, (wedge, (_, row)) in enumerate(zip(wedges, major.iterrows())):
+                ang = (wedge.theta2 + wedge.theta1) / 2.0
+                x = np.cos(np.deg2rad(ang))
+                y = np.sin(np.deg2rad(ang))
+                place_right = (i % 2 == 0)
+                lx = 1.5 if place_right else -1.5
+                ly = 1.2 * y
+                axes[0].text(lx, ly, f"{row['Sub Head']} ({row['Count']})",
+                             ha="left" if place_right else "right",
+                             va="center", fontsize=8,
+                             bbox=dict(facecolor="white", edgecolor="gray", alpha=0.7, pad=1))
+                axes[0].annotate("", xy=(0.9*x, 0.9*y), xytext=(lx, ly),
+                                 arrowprops=dict(arrowstyle="-", lw=0.8, color="black"))
+            table_data = [["Sub Head", "Count"]] + subhead_summary.values.tolist() + [["Total", total_subs]]
+            axes[1].axis('off')
+            tbl = axes[1].table(cellText=table_data, loc='center')
+            tbl.auto_set_font_size(False)
+            tbl.set_fontsize(10)
+            tbl.scale(1, 1.5)
+            fig.suptitle("📊 Sub Head Breakdown", fontsize=14, fontweight="bold")
+            dr = f"{pd.to_datetime(start_date).strftime('%d-%m-%Y')} to {pd.to_datetime(end_date).strftime('%d-%m-%Y')}"
             heads = ", ".join(st.session_state.view_head_filter)
             type_display = ", ".join(st.session_state.view_type_filter) if st.session_state.view_type_filter else "All Types"
             location_display = st.session_state.view_location_filter or "All Locations"
@@ -520,7 +761,6 @@ with tabs[0]:
         "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "User Feedback/Remark",
         "Status"
     ]].copy()
-    export_df["Date of Inspection"] = pd.to_datetime(export_df["Date of Inspection"]).dt.date
     towb = BytesIO()
     with pd.ExcelWriter(towb, engine="openpyxl") as writer:
         export_df.to_excel(writer, index=False, sheet_name="Filtered Records")
@@ -590,11 +830,6 @@ with tabs[0]:
             editable_filtered["_sheet_row"] = editable_filtered.index + 2
         # Create editable DataFrame
         editable_df = editable_filtered[valid_cols + ["_original_sheet_index", "_sheet_row"]].copy()
-        # Format Date of Inspection
-        if "Date of Inspection" in editable_df.columns:
-            editable_df["Date of Inspection"] = pd.to_datetime(
-                editable_df["Date of Inspection"], errors="coerce"
-            ).dt.date  # Changed to .dt.date for Excel compatibility
         # Add Status column
         if "Feedback" in editable_df.columns and "User Feedback/Remark" in editable_df.columns:
             editable_df.insert(
@@ -661,7 +896,6 @@ with tabs[0]:
         # Download button for filtered/edited results as Excel
         export_cols = [col for col in valid_cols if col not in ["_original_sheet_index", "_sheet_row"]] + ["Status"]
         export_edited_df = edited_df[export_cols].copy()
-        export_edited_df["Date of Inspection"] = pd.to_datetime(export_edited_df["Date of Inspection"]).dt.date
         towb_edited = BytesIO()
         with pd.ExcelWriter(towb_edited, engine="openpyxl") as writer:
             export_edited_df.to_excel(writer, index=False, sheet_name="Edited Records")
@@ -1109,6 +1343,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
