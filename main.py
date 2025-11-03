@@ -835,8 +835,8 @@ with tabs[0]:
                     st.success(f"✅ Updated {len(changed_ids)} Feedback row(s) with new remarks.")
                 else:
                     st.info("ℹ️ No changes detected to save.")
-else:
-    st.info("Deficiencies will be updated soon!")
+    else:
+        st.info("Deficiencies will be updated soon!")
 # ---------------- ALERT LOG SECTION ----------------
 st.markdown("## 📋 Alerts Log")
 
@@ -1168,6 +1168,7 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
 
 
 
