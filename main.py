@@ -1040,7 +1040,7 @@ with tabs[1]:
             st.info("No pending deficiencies to summarize.")
 
         # ---- Critical Locations Chart (Top 3) ----
-        st.markdown("### 🚨 Top 3 Critical Locations")
+        st.markdown("### 🚨 Top 3 Stations having more logged deficiencies")
         # Ensure columns exist
         for col in ["Location","Gate","Section"]:
             if col not in pending.columns:
@@ -1111,6 +1111,7 @@ with tabs[1]:
             st.info("No pending deficiencies for selected locations.")
 
 #Tdate format
+
 
 
 
