@@ -294,6 +294,13 @@ def filter_dataframe(df: pd.DataFrame, include_index: bool = False) -> pd.DataFr
 # ---------- GOOGLE SHEET UPDATE ----------
 def update_feedback_column(edited_df):
     # (Preserved as in original code, no changes needed)
+    header = sheet.row_values(1)
+    def col_idx(name):
+        try:
+            return header.index(name) + 1
+        except ValueError:
+            st.error(f"⚠️ '{name}' column not found")
+            return None
 
 # ---------- FILTER WIDGETS ----------
 def apply_common_filters(df, prefix=""):
@@ -906,3 +913,4 @@ with tabs[1]:
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No pending deficiencies for selected locations.")
+
