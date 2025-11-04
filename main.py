@@ -955,12 +955,12 @@ ALL_LOCATIONS = STATION_LIST + GATE_LIST + FOOTPLATE_ROUTES   # combined master 
 
 # ---- STREAMLIT BLOCK ----
 with tabs[1]:
-    st.markdown("### 📊 Pending Deficiencies Trend (Bar + Trend Line)")
+    st.markdown("### Total Deficiencies Trend (Bar + Trend Line)")
     df = st.session_state.df.copy()
 
-    # Ensure Status column exists
+    # Ensure Status column exists (still useful for other parts of the app)
     if "Status" not in df.columns:
-        df["Status"] = df["Feedback"].apply(classify_feedback)
+        df["Status"] = df.apply(lambda r: classify_feedback(r["Feedback"], r.get("User Feedback/Remark", "")), axis=1)
 
     if df.empty:
         st.info("No data available for analytics.")
@@ -977,44 +977,38 @@ with tabs[1]:
             min_value=min_date,
             max_value=max_date
         )
-        df = df[(df["Date of Inspection"] >= pd.to_datetime(start_date)) & 
-                (df["Date of Inspection"] <= pd.to_datetime(end_date))]
+        df = df[
+            (df["Date of Inspection"] >= pd.to_datetime(start_date)) &
+            (df["Date of Inspection"] <= pd.to_datetime(end_date))
+        ]
 
-        # --- Pending Rows ---
-        pending = df[
-            df["Status"].str.upper().eq("PENDING") |
-            df["Feedback"].isna() |
-            (df["Feedback"].astype(str).str.strip() == "")
-        ].copy()
-
-        # Normalize Department names
-        pending["Head"] = pending["Head"].astype(str).str.strip().str.upper()
-
-        # ---- Trend Chart ----
-        trend = pending.groupby(pd.Grouper(key="Date of Inspection", freq="M")).size().reset_index(name="PendingCount")
+        # ---- Trend Chart (TOTAL) ----
+        trend = df.groupby(pd.Grouper(key="Date of Inspection", freq="M")).size().reset_index(name="TotalCount")
         if not trend.empty:
             trend = trend.sort_values("Date of Inspection").reset_index(drop=True)
             trend["MonthIndex"] = trend.index
+
             bars = alt.Chart(trend).mark_bar(color="#1f77b4").encode(
                 x=alt.X("yearmonth(Date of Inspection):T", title="Inspection Month"),
-                y=alt.Y("PendingCount:Q", title="Pending Deficiencies"),
-                tooltip=["yearmonth(Date of Inspection):T", "PendingCount"]
+                y=alt.Y("TotalCount:Q", title="Total Deficiencies Logged"),
+                tooltip=["yearmonth(Date of Inspection):T", "TotalCount"]
             )
-            line = alt.Chart(trend).transform_regression("MonthIndex", "PendingCount").mark_line(
-                color="red", strokeDash=[5,5], strokeWidth=2
+            line = alt.Chart(trend).transform_regression("MonthIndex", "TotalCount").mark_line(
+                color="red", strokeDash=[5, 5], strokeWidth=2
             ).encode(
                 x=alt.X("yearmonth(Date of Inspection):T"),
-                y="PendingCount:Q"
+                y="TotalCount:Q"
             )
             st.altair_chart(bars + line, use_container_width=True)
         else:
-            st.info("No pending deficiencies to display.")
+            st.info("No deficiencies to display.")
 
-        # ---- Department Summary ----
-        st.markdown("### 🏢 Department-wise Pending Counts")
-        if not pending.empty:
-            dept_counts = pending.groupby("Head").size().reset_index(name="PendingCount").sort_values("PendingCount", ascending=False)
-            total_pending = dept_counts["PendingCount"].sum()
+        # ---- Department Summary (TOTAL) ----
+        st.markdown("### Department-wise **Total** Deficiencies Logged")
+        if not df.empty:
+            dept_counts = df.groupby("Head").size().reset_index(name="TotalCount") \
+                           .sort_values("TotalCount", ascending=False)
+            total_deficiencies = dept_counts["TotalCount"].sum()
 
             # Highlight top 3
             dept_counts["color"] = "#ff7f0e"
@@ -1022,95 +1016,101 @@ with tabs[1]:
 
             # Display list
             for _, row in dept_counts.iterrows():
-                st.markdown(f"- **{row['Head']}** : {row['PendingCount']}")
-            st.markdown(f"**Total Pending : {total_pending}**")
+                st.markdown(f"- **{row['Head']}** : **{row['TotalCount']:,}**")
+            st.markdown(f"**Total Deficiencies Logged : {total_deficiencies:,}**")
 
             dept_chart = alt.Chart(dept_counts).mark_bar().encode(
-                x=alt.X("PendingCount:Q", title="Pending Deficiencies"),
+                x=alt.X("TotalCount:Q", title="Total Deficiencies Logged"),
                 y=alt.Y("Head:N", sort='-x', title="Department"),
                 color=alt.Color("color:N", scale=None),
-                tooltip=["Head","PendingCount"]
+                tooltip=["Head", "TotalCount"]
             ).properties(width="container", height=400)
             st.altair_chart(dept_chart, use_container_width=True)
 
             top3 = dept_counts.head(3)
-            critical_text = ", ".join([f"{row['Head']} ({row['PendingCount']})" for _, row in top3.iterrows()])
-            st.markdown(f"**Critical Departments with Pending Compliances:** {critical_text}")
+            critical_text = ", ".join([f"{row['Head']} ({row['TotalCount']:,})" for _, row in top3.iterrows()])
+            st.markdown(f"**Critical Departments (most logged):** {critical_text}")
         else:
-            st.info("No pending deficiencies to summarize.")
+            st.info("No deficiencies to summarize.")
 
-        # ---- Critical Locations Chart (Top 3) ----
-        st.markdown("### 🚨 Top 3 Stations having more logged deficiencies")
-        # Ensure columns exist
-        for col in ["Location","Gate","Section"]:
-            if col not in pending.columns:
-                pending[col] = ""
-        pending["Location"] = pending["Location"].astype(str).str.strip().str.upper()
-        pending["Gate"] = pending["Gate"].astype(str).str.strip().str.upper()
-        pending["Section"] = pending["Section"].astype(str).str.strip().str.upper()
+        # ---- Critical Locations Chart (Top 3 – TOTAL) ----
+        st.markdown("### Top 3 Stations / Gates / Routes with most logged deficiencies")
+        for col in ["Location", "Gate", "Section"]:
+            if col not in df.columns:
+                df[col] = ""
+        df["Location"] = df["Location"].astype(str).str.strip().str.upper()
+        df["Gate"]      = df["Gate"].astype(str).str.strip().str.upper()
+        df["Section"]   = df["Section"].astype(str).str.strip().str.upper()
 
         # Filter only predefined valid entries
-        pending_stations = pending[pending["Location"].isin(STATION_LIST)]
-        pending_gates = pending[pending["Gate"].isin(GATE_LIST)]
-        pending_routes = pending[pending["Section"].isin([s.upper() for s in FOOTPLATE_ROUTES])]
+        df_stations = df[df["Location"].isin(STATION_LIST)]
+        df_gates    = df[df["Gate"].isin(GATE_LIST)]
+        df_routes   = df[df["Section"].isin([s.upper() for s in FOOTPLATE_ROUTES])]
 
         combined_counts = pd.concat([
-            pending_stations.groupby("Location").size().reset_index(name="PendingCount"),
-            pending_gates.groupby("Gate").size().reset_index(name="PendingCount"),
-            pending_routes.groupby("Section").size().reset_index(name="PendingCount")
+            df_stations.groupby("Location").size().reset_index(name="TotalCount"),
+            df_gates.groupby("Gate").size().reset_index(name="TotalCount"),
+            df_routes.groupby("Section").size().reset_index(name="TotalCount")
         ])
-        combined_counts = combined_counts.groupby(combined_counts.columns[0]).sum().reset_index()
-        combined_counts = combined_counts.sort_values("PendingCount", ascending=False)
+        combined_counts = combined_counts.groupby(combined_counts.columns[0]).sum().reset_index() \
+                                         .sort_values("TotalCount", ascending=False)
 
         if not combined_counts.empty:
-            top3_critical = combined_counts.head(3)
+            top3_critical = combined_counts.head(3).copy()
             top3_critical["color"] = "red"
 
             critical_loc_chart = alt.Chart(top3_critical).mark_bar().encode(
-                x=alt.X("PendingCount:Q", title="Pending Deficiencies"),
-                y=alt.Y(top3_critical.columns[0]+":N", sort='-x', title="Location / Gate / Section"),
+                x=alt.X("TotalCount:Q", title="Total Deficiencies Logged"),
+                y=alt.Y(top3_critical.columns[0] + ":N", sort='-x', title="Location / Gate / Section"),
                 color=alt.Color("color:N", scale=None),
-                tooltip=[top3_critical.columns[0],"PendingCount"]
+                tooltip=[top3_critical.columns[0], "TotalCount"]
             ).properties(width="container", height=300)
             st.altair_chart(critical_loc_chart, use_container_width=True)
         else:
             st.info("No critical locations to display.")
 
-        # ---- Unified Location / Gate / Section Chart ----
-        st.markdown("### 📍 Pending Deficiencies by Location / Gate / Section")
-        selected_locations = st.multiselect("Select Locations", pending["Location"].unique(), default=pending["Location"].unique())
-        selected_gates = st.multiselect("Select Gates", pending["Gate"].unique(), default=pending["Gate"].unique())
-        selected_sections = st.multiselect("Select Sections", pending["Section"].unique(), default=pending["Section"].unique())
+        # ---- Unified Location / Gate / Section Chart (TOTAL) ----
+        st.markdown("### Total Deficiencies by Location / Gate / Section")
+        selected_locations = st.multiselect(
+            "Select Locations", df["Location"].unique(), default=df["Location"].unique()
+        )
+        selected_gates = st.multiselect(
+            "Select Gates", df["Gate"].unique(), default=df["Gate"].unique()
+        )
+        selected_sections = st.multiselect(
+            "Select Sections", df["Section"].unique(), default=df["Section"].unique()
+        )
 
-        filtered_pending_final = pending[
-            (pending["Location"].isin(selected_locations)) |
-            (pending["Gate"].isin(selected_gates)) |
-            (pending["Section"].isin(selected_sections))
+        filtered_total = df[
+            (df["Location"].isin(selected_locations)) |
+            (df["Gate"].isin(selected_gates)) |
+            (df["Section"].isin(selected_sections))
         ]
 
-        if not filtered_pending_final.empty:
+        if not filtered_total.empty:
             loc_counts_final = pd.concat([
-                filtered_pending_final.groupby("Location").size().reset_index(name="PendingCount"),
-                filtered_pending_final.groupby("Gate").size().reset_index(name="PendingCount"),
-                filtered_pending_final.groupby("Section").size().reset_index(name="PendingCount")
+                filtered_total.groupby("Location").size().reset_index(name="TotalCount"),
+                filtered_total.groupby("Gate").size().reset_index(name="TotalCount"),
+                filtered_total.groupby("Section").size().reset_index(name="TotalCount")
             ])
-            loc_counts_final = loc_counts_final[loc_counts_final.iloc[:,0] != ""]
-            loc_counts_final = loc_counts_final.groupby(loc_counts_final.columns[0]).sum().reset_index().sort_values("PendingCount", ascending=False)
+            loc_counts_final = loc_counts_final[loc_counts_final.iloc[:, 0] != ""]
+            loc_counts_final = loc_counts_final.groupby(loc_counts_final.columns[0]).sum() \
+                                               .reset_index().sort_values("TotalCount", ascending=False)
 
             loc_counts_final["color"] = "#ff7f0e"
-            loc_counts_final.loc[:2,"color"] = "red"
+            loc_counts_final.loc[:2, "color"] = "red"
 
             loc_chart = alt.Chart(loc_counts_final).mark_bar().encode(
-                x=alt.X("PendingCount:Q", title="Pending Deficiencies"),
-                y=alt.Y(loc_counts_final.columns[0]+":N", sort='-x', title="Location / Gate / Section"),
+                x=alt.X("TotalCount:Q", title="Total Deficiencies Logged"),
+                y=alt.Y(loc_counts_final.columns[0] + ":N", sort='-x', title="Location / Gate / Section"),
                 color=alt.Color("color:N", scale=None),
-                tooltip=[loc_counts_final.columns[0],"PendingCount"]
+                tooltip=[loc_counts_final.columns[0], "TotalCount"]
             ).properties(width="container", height=500)
             st.altair_chart(loc_chart, use_container_width=True)
         else:
-            st.info("No pending deficiencies for selected locations.")
-
+            st.info("No deficiencies for the selected locations.")
 #Tdate format
+
 
 
 
