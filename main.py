@@ -1023,7 +1023,7 @@ with tabs[1]:
             # Display list
             for _, row in dept_counts.iterrows():
                 st.markdown(f"- **{row['Head']}** : {row['PendingCount']}")
-            st.markdown(f"**Total Pending : {len(filtered)}**")
+            st.markdown(f"**Total Pending : {total_pending}**")
 
             dept_chart = alt.Chart(dept_counts).mark_bar().encode(
                 x=alt.X("PendingCount:Q", title="Pending Deficiencies"),
@@ -1111,6 +1111,7 @@ with tabs[1]:
             st.info("No pending deficiencies for selected locations.")
 
 #Tdate format
+
 
 
 
