@@ -958,7 +958,9 @@ with tabs[1]:
     st.markdown("### Total Deficiencies Trend (Bar + Trend Line)")
     df = st.session_state.df.copy()
 
-    # Ensure Status column exists
+    # ------------------------------------------------------------------ #
+    # 1. Status column (kept for other parts of the app)
+    # ------------------------------------------------------------------ #
     if "Status" not in df.columns:
         df["Status"] = df.apply(
             lambda r: classify_feedback(r["Feedback"], r.get("User Feedback/Remark", "")), axis=1
@@ -967,11 +969,15 @@ with tabs[1]:
     if df.empty:
         st.info("No data available for analytics.")
     else:
-        # --- Parse Dates ---
+        # ------------------------------------------------------------------ #
+        # 2. Parse dates
+        # ------------------------------------------------------------------ #
         df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
         df = df.dropna(subset=["Date of Inspection"])
 
-        # --- Date Filter ---
+        # ------------------------------------------------------------------ #
+        # 3. Date filter
+        # ------------------------------------------------------------------ #
         min_date = df["Date of Inspection"].min().date()
         max_date = df["Date of Inspection"].max().date()
         start_date, end_date = st.date_input(
@@ -985,7 +991,9 @@ with tabs[1]:
             (df["Date of Inspection"] <= pd.to_datetime(end_date))
         ].copy()
 
-        # ====================== CLEAN DEPARTMENT NAMES ======================
+        # ------------------------------------------------------------------ #
+        # 4. Clean department names (same as before)
+        # ------------------------------------------------------------------ #
         import re
         def clean_name(text):
             if pd.isna(text):
@@ -1016,32 +1024,22 @@ with tabs[1]:
         }
         df["Head_std"] = df["Head_clean"].map(dept_map).fillna("UNKNOWN")
 
-        # ====================== CLEAN & CLASSIFY LOCATION ======================
-        # Ensure Location exists
+        # ------------------------------------------------------------------ #
+        # 5. Clean Location (only column that exists)
+        # ------------------------------------------------------------------ #
         if "Location" not in df.columns:
             df["Location"] = ""
-
         df["Location_clean"] = df["Location"].astype(str).apply(clean_name)
 
-        # Normalize predefined lists
+        # ------------------------------------------------------------------ #
+        # 6. Identify stations (using your master list)
+        # ------------------------------------------------------------------ #
         STATIONS_NORM = {clean_name(x) for x in STATION_LIST}
-        GATES_NORM = {clean_name(x) for x in GATE_LIST}
-        ROUTES_NORM = {clean_name(x) for x in FOOTPLATE_ROUTES}
+        df["Is_Station"] = df["Location_clean"].isin(STATIONS_NORM)
 
-        def classify_location(loc):
-            if loc in STATIONS_NORM:
-                return "Station", loc
-            if loc in GATES_NORM:
-                return "Gate", loc
-            if loc in ROUTES_NORM:
-                return "Route", loc
-            return "Other", loc
-
-        df[["Loc_Type", "Loc_Key"]] = df["Location_clean"].apply(
-            lambda x: pd.Series(classify_location(x))
-        )
-
-        # ====================== TREND CHART ======================
+        # ------------------------------------------------------------------ #
+        # 7. Trend chart (total deficiencies)
+        # ------------------------------------------------------------------ #
         trend = df.groupby(pd.Grouper(key="Date of Inspection", freq="M")).size().reset_index(name="TotalCount")
         if not trend.empty:
             trend = trend.sort_values("Date of Inspection")
@@ -1059,7 +1057,9 @@ with tabs[1]:
         else:
             st.info("No data in selected range.")
 
-        # ====================== DEPARTMENT SUMMARY ======================
+        # ------------------------------------------------------------------ #
+        # 8. Department summary
+        # ------------------------------------------------------------------ #
         st.markdown("### Department-wise **Total** Deficiencies Logged")
         dept_counts = df.groupby("Head_std").size().reset_index(name="TotalCount") \
                         .sort_values("TotalCount", ascending=False)
@@ -1084,68 +1084,62 @@ with tabs[1]:
         critical_text = ", ".join([f"**{r['Head_std']}** ({r['TotalCount']:,})" for _, r in top3.iterrows()])
         st.markdown(f"**Critical Departments:** {critical_text}")
 
-        # ====================== TOP 3 LOCATIONS (BY TYPE) ======================
-        st.markdown("### Top 3 Locations (Stations / Gates / Routes)")
-        valid_locs = df[df["Loc_Type"] != "Other"]
-        if not valid_locs.empty:
-            loc_summary = valid_locs.groupby(["Loc_Type", "Loc_Key"]).size() \
-                           .reset_index(name="TotalCount") \
-                           .sort_values("TotalCount", ascending=False)
+        # ------------------------------------------------------------------ #
+        # 9. TOP 3 STATIONS ONLY
+        # ------------------------------------------------------------------ #
+        st.markdown("### Top 3 Stations (Most Logged Deficiencies)")
 
-            top3_all = loc_summary.head(3).copy()
-            top3_all["Label"] = top3_all["Loc_Type"] + ": " + top3_all["Loc_Key"]
-            top3_all["color"] = "red"
+        station_df = df[df["Is_Station"]].copy()
+        if not station_df.empty:
+            top3_stations = (
+                station_df.groupby("Location_clean")
+                .size()
+                .reset_index(name="TotalCount")
+                .sort_values("TotalCount", ascending=False)
+                .head(3)
+                .copy()
+            )
+            top3_stations["Label"] = top3_stations["Location_clean"]
+            top3_stations["color"] = "red"
 
-            chart = alt.Chart(top3_all).mark_bar().encode(
+            chart = alt.Chart(top3_stations).mark_bar().encode(
                 x=alt.X("TotalCount:Q", title="Total Deficiencies"),
-                y=alt.Y("Label:N", sort="-x"),
+                y=alt.Y("Label:N", sort="-x", title="Station"),
                 color=alt.Color("color:N", scale=None),
                 tooltip=["Label", alt.Tooltip("TotalCount", format=",")]
-            ).properties(height=280)
+            ).properties(height=260)
             st.altair_chart(chart, use_container_width=True)
         else:
-            st.info("No valid stations, gates, or routes found.")
+            st.info("No station data found in the selected period.")
 
-        # ====================== UNIFIED LOCATION FILTER ======================
+        # ------------------------------------------------------------------ #
+        # 10. Unified location filter (still includes all, but top-3 is only stations)
+        # ------------------------------------------------------------------ #
         st.markdown("### Filter by Location (Station / Gate / Route)")
 
-        # Get unique clean names by type
-        stations = sorted(df[df["Loc_Type"] == "Station"]["Loc_Key"].unique())
-        gates = sorted(df[df["Loc_Type"] == "Gate"]["Loc_Key"].unique())
-        routes = sorted(df[df["Loc_Type"] == "Route"]["Loc_Key"].unique())
+        stations = sorted(df[df["Is_Station"]]["Location_clean"].unique())
+        # (gates / routes kept for completeness, but not used in top-3)
+        gates   = sorted(df[~df["Is_Station"]]["Location_clean"].unique())
 
         sel_stations = st.multiselect("Stations", options=stations, default=stations[:10] if len(stations) > 10 else stations)
-        sel_gates = st.multiselect("Gates", options=gates, default=gates[:10] if len(gates) > 10 else gates)
-        sel_routes = st.multiselect("Routes", options=routes, default=routes)
+        sel_others   = st.multiselect("Other Locations (Gates / Routes)", options=gates, default=[])
 
         filtered = df[
-            df["Loc_Key"].isin(sel_stations + sel_gates + sel_routes)
+            df["Location_clean"].isin(sel_stations + sel_others)
         ]
 
         if not filtered.empty:
-            combined = filtered.groupby(["Loc_Type", "Loc_Key"]).size().reset_index(name="TotalCount")
-            combined["Label"] = combined["Loc_Type"] + ": " + combined["Loc_Key"]
+            combined = filtered.groupby("Location_clean").size().reset_index(name="TotalCount")
             combined = combined.sort_values("TotalCount", ascending=False)
-
             combined["color"] = "#ff7f0e"
             combined.loc[:2, "color"] = "red"
 
             loc_chart = alt.Chart(combined).mark_bar().encode(
                 x=alt.X("TotalCount:Q", title="Total Deficiencies"),
-                y=alt.Y("Label:N", sort="-x"),
+                y=alt.Y("Location_clean:N", sort="-x", title="Location"),
                 color=alt.Color("color:N", scale=None),
-                tooltip=["Label", alt.Tooltip("TotalCount", format=",")]
+                tooltip=["Location_clean", alt.Tooltip("TotalCount", format=",")]
             ).properties(height=500)
             st.altair_chart(loc_chart, use_container_width=True)
         else:
             st.info("No data for selected locations.")
-
-
-
-
-
-
-
-
-
-
