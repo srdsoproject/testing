@@ -1109,7 +1109,7 @@ with tabs[1]:
             st.info("No station data found in the selected period.")
 
         # ------------------------------------------------------------------ #
-        # 9. LOCATION FILTER → TOTAL PER DEPARTMENT (CLEAN BAR + SUMMARY)
+        # 9. LOCATION FILTER → TOTAL PER DEPARTMENT + DETAILED BREAKDOWN
         # ------------------------------------------------------------------ #
         st.markdown("### Total Deficiencies Logged per Department (Selected Locations)")
 
@@ -1131,7 +1131,7 @@ with tabs[1]:
                 .sort_values("TotalCount", ascending=False)
             )
 
-            # Pending & Resolved counts
+            # Pending & Resolved per department
             status_breakdown = (
                 filtered.groupby(["Head_std", "Status"])
                 .size()
@@ -1187,5 +1187,15 @@ with tabs[1]:
                 f"**Pending:** {pending:,} | "
                 f"**Resolved:** {resolved:,}"
             )
+
+            # Department-wise breakdown
+            st.markdown("**Department-wise Breakdown:**")
+            for _, row in summary_df.iterrows():
+                st.markdown(
+                    f"- **{row['Head_std']}**: {row['TotalCount']:,} | "
+                    f"Pending: {row['PendingCount']:,} | "
+                    f"Resolved: {row['ResolvedCount']:,}"
+                )
+
         else:
             st.info("Please select at least one location to view the breakdown.")
