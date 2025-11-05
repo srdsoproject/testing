@@ -1111,7 +1111,7 @@ with tabs[1]:
         # ------------------------------------------------------------------ #
         # 9. LOCATION FILTER → TOTAL PER DEPARTMENT + DETAILED BREAKDOWN
         # ------------------------------------------------------------------ #
-        st.markdown("### Total Deficiencies Logged per Department (Selected Locations)")
+        st.markdown("### Department wise deficiencies logged")
 
         all_locations = sorted(df["Location_clean"].dropna().unique())
         selected_locations = st.multiselect(
@@ -1199,5 +1199,6 @@ with tabs[1]:
 
         else:
             st.info("Please select at least one location to view the breakdown.")
+
 
 
