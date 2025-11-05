@@ -1109,9 +1109,9 @@ with tabs[1]:
             st.info("No station data found in the selected period.")
 
         # ------------------------------------------------------------------ #
-        # 9. LOCATION FILTER → DEPARTMENT-WISE STACKED CHART
+        # 9. LOCATION FILTER → TOTAL PER DEPARTMENT (CLEAN BAR + SUMMARY)
         # ------------------------------------------------------------------ #
-        st.markdown("### Department-wise Breakdown for Selected Locations")
+        st.markdown("### Total Deficiencies Logged per Department (Selected Locations)")
 
         all_locations = sorted(df["Location_clean"].dropna().unique())
         selected_locations = st.multiselect(
@@ -1123,81 +1123,69 @@ with tabs[1]:
         if selected_locations:
             filtered = df[df["Location_clean"].isin(selected_locations)].copy()
 
-            # Group by Department + Status
-            breakdown = (
+            # Total per department
+            dept_breakdown = (
+                filtered.groupby("Head_std")
+                .size()
+                .reset_index(name="TotalCount")
+                .sort_values("TotalCount", ascending=False)
+            )
+
+            # Pending & Resolved counts
+            status_breakdown = (
                 filtered.groupby(["Head_std", "Status"])
                 .size()
-                .reset_index(name="Count")
+                .unstack(fill_value=0)
             )
+            status_breakdown.columns = [f"{col}Count" for col in status_breakdown.columns]
+            status_breakdown = status_breakdown.reset_index()
 
-            # Ensure both statuses exist for each department
-            all_depts = filtered["Head_std"].unique()
-            required = pd.DataFrame([
-                {"Head_std": dept, "Status": status}
-                for dept in all_depts
-                for status in ["Pending", "Resolved"]
-            ])
-            breakdown = required.merge(breakdown, on=["Head_std", "Status"], how="left").fillna(0)
-            breakdown["Count"] = breakdown["Count"].astype(int)
+            # Merge
+            summary_df = dept_breakdown.merge(status_breakdown, on="Head_std", how="left")
+            summary_df["PendingCount"] = summary_df.get("PendingCount", 0)
+            summary_df["ResolvedCount"] = summary_df.get("ResolvedCount", 0)
 
-            # Sort departments by total count
-            dept_order = breakdown.groupby("Head_std")["Count"].sum().sort_values(ascending=False).index
-            breakdown["Head_std"] = pd.Categorical(breakdown["Head_std"], categories=dept_order, ordered=True)
-
-            # Stacked bar chart
-            stack_chart = alt.Chart(breakdown).mark_bar(size=30).encode(
-                x=alt.X("sum(Count):Q", title="Number of Deficiencies"),
-                y=alt.Y("Head_std:N", title="Department", sort=dept_order.tolist()),
-                color=alt.Color(
-                    "Status:N",
-                    scale=alt.Scale(domain=["Pending", "Resolved"], range=["#e74c3c", "#27ae60"]),
-                    title="Status",
-                    legend=alt.Legend(orient="top")
-                ),
-                order=alt.Order("Status:N", sort="ascending"),
+            # Bar chart (total only)
+            bar_chart = alt.Chart(summary_df).mark_bar(color="#1f77b4").encode(
+                x=alt.X("TotalCount:Q", title="Total Deficiencies Logged"),
+                y=alt.Y("Head_std:N", title="Department", sort="-x"),
                 tooltip=[
                     "Head_std",
-                    "Status",
-                    alt.Tooltip("sum(Count)", title="Count", format=",")
+                    alt.Tooltip("TotalCount", title="Total", format=","),
+                    alt.Tooltip("PendingCount", title="Pending", format=","),
+                    alt.Tooltip("ResolvedCount", title="Resolved", format=",")
                 ]
             ).properties(
-                height=max(300, len(dept_order) * 35),
-                title=f"Department Breakdown ({len(selected_locations)} location(s) selected)"
+                height=max(300, len(summary_df) * 40)
             )
 
-            # Add value labels on bars
-            text = stack_chart.mark_text(
-                align="center",
+            # Add total count as text label
+            text = bar_chart.mark_text(
+                align="left",
                 baseline="middle",
+                dx=3,
                 fontWeight="bold",
-                color="white",
-                dx=18
+                color="black"
             ).encode(
-                text=alt.Text("sum(Count):Q", format=","),
-                color=alt.condition(
-                    alt.datum["sum(Count)"] > 15,
-                    alt.value("white"),
-                    alt.value("black")
-                )
+                text=alt.Text("TotalCount:Q", format=",")
             )
 
-            final_chart = (stack_chart + text).configure_axis(
+            final_chart = (bar_chart + text).configure_axis(
                 labelFontSize=12,
                 titleFontSize=14
             ).configure_title(fontSize=16)
 
             st.altair_chart(final_chart, use_container_width=True)
 
-            # Summary
-            total = breakdown["Count"].sum()
-            pending = breakdown[breakdown["Status"] == "Pending"]["Count"].sum()
-            resolved = breakdown[breakdown["Status"] == "Resolved"]["Count"].sum()
+            # Summary line
+            total = summary_df["TotalCount"].sum()
+            pending = summary_df["PendingCount"].sum()
+            resolved = summary_df["ResolvedCount"].sum()
+
             st.markdown(
-                f"**Selected Locations:** {len(selected_locations)} | "
-                f"**Total:** {total:,} | "
+                f"**Total Deficiencies Logged:** {total:,} | "
                 f"**Pending:** {pending:,} | "
-                f"**Resolved:** {resolved:,} "
-                f"({(resolved/total*100):.1f}% resolved)" if total > 0 else ""
+                f"**Resolved:** {resolved:,}"
             )
         else:
-            st.info("Please select at least one location to view the department breakdown.")
+            st.info("Please select at least one location to view the breakdown.")
