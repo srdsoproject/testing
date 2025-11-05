@@ -959,12 +959,16 @@ with tabs[1]:
     df = st.session_state.df.copy()
 
     # ------------------------------------------------------------------ #
-    # 1. Status column (kept for other parts of the app)
+    # 1. Ensure Status column (Pending / Resolved)
     # ------------------------------------------------------------------ #
     if "Status" not in df.columns:
         df["Status"] = df.apply(
             lambda r: classify_feedback(r["Feedback"], r.get("User Feedback/Remark", "")), axis=1
         )
+    df["Status"] = df["Status"].fillna("Pending").replace({"": "Pending", "NA": "Pending"})
+    df["Status"] = df["Status"].str.strip().str.upper().map({
+        "PENDING": "Pending", "RESOLVED": "Resolved", "CLOSED": "Resolved"
+    }).fillna("Pending")
 
     if df.empty:
         st.info("No data available for analytics.")
@@ -992,7 +996,7 @@ with tabs[1]:
         ].copy()
 
         # ------------------------------------------------------------------ #
-        # 4. Clean department names (same as before)
+        # 4. Clean department names
         # ------------------------------------------------------------------ #
         import re
         def clean_name(text):
@@ -1004,7 +1008,6 @@ with tabs[1]:
             return s.upper()
 
         df["Head_clean"] = df["Head"].apply(clean_name)
-
         dept_map = {
             "ENGINEERING": "ENGINEERING",
             "ELECT/G": "ELECT/G", "ELECTG": "ELECT/G",
@@ -1025,26 +1028,21 @@ with tabs[1]:
         df["Head_std"] = df["Head_clean"].map(dept_map).fillna("UNKNOWN")
 
         # ------------------------------------------------------------------ #
-        # 5. Clean Location (only column that exists)
+        # 5. Clean Location & identify stations
         # ------------------------------------------------------------------ #
         if "Location" not in df.columns:
             df["Location"] = ""
         df["Location_clean"] = df["Location"].astype(str).apply(clean_name)
-
-        # ------------------------------------------------------------------ #
-        # 6. Identify stations (using your master list)
-        # ------------------------------------------------------------------ #
         STATIONS_NORM = {clean_name(x) for x in STATION_LIST}
         df["Is_Station"] = df["Location_clean"].isin(STATIONS_NORM)
 
         # ------------------------------------------------------------------ #
-        # 7. Trend chart (total deficiencies)
+        # 6. Trend chart (total deficiencies)
         # ------------------------------------------------------------------ #
         trend = df.groupby(pd.Grouper(key="Date of Inspection", freq="M")).size().reset_index(name="TotalCount")
         if not trend.empty:
             trend = trend.sort_values("Date of Inspection")
             trend["Month"] = trend["Date of Inspection"].dt.strftime("%b-%Y")
-
             bars = alt.Chart(trend).mark_bar(color="#1f77b4", cornerRadius=3).encode(
                 x=alt.X("Month:O", title="Month", sort=trend["Month"].tolist()),
                 y=alt.Y("TotalCount:Q", title="Total Deficiencies"),
@@ -1058,13 +1056,12 @@ with tabs[1]:
             st.info("No data in selected range.")
 
         # ------------------------------------------------------------------ #
-        # 8. Department summary
+        # 7. Department summary (overall)
         # ------------------------------------------------------------------ #
         st.markdown("### Department-wise **Total** Deficiencies Logged")
         dept_counts = df.groupby("Head_std").size().reset_index(name="TotalCount") \
                         .sort_values("TotalCount", ascending=False)
         total_deficiencies = dept_counts["TotalCount"].sum()
-
         dept_counts["color"] = "#ff7f0e"
         dept_counts.loc[:2, "color"] = "red"
 
@@ -1085,10 +1082,9 @@ with tabs[1]:
         st.markdown(f"**Critical Departments:** {critical_text}")
 
         # ------------------------------------------------------------------ #
-        # 9. TOP 3 STATIONS ONLY
+        # 8. TOP 3 STATIONS ONLY
         # ------------------------------------------------------------------ #
         st.markdown("### Top 3 Stations (Most Logged Deficiencies)")
-
         station_df = df[df["Is_Station"]].copy()
         if not station_df.empty:
             top3_stations = (
@@ -1113,33 +1109,95 @@ with tabs[1]:
             st.info("No station data found in the selected period.")
 
         # ------------------------------------------------------------------ #
-        # 10. Unified location filter (still includes all, but top-3 is only stations)
+        # 9. LOCATION FILTER → DEPARTMENT-WISE STACKED CHART
         # ------------------------------------------------------------------ #
-        st.markdown("### Filter by Location (Station / Gate / Route)")
+        st.markdown("### Department-wise Breakdown for Selected Locations")
 
-        stations = sorted(df[df["Is_Station"]]["Location_clean"].unique())
-        # (gates / routes kept for completeness, but not used in top-3)
-        gates   = sorted(df[~df["Is_Station"]]["Location_clean"].unique())
+        all_locations = sorted(df["Location_clean"].dropna().unique())
+        selected_locations = st.multiselect(
+            "Select Locations (Stations / Gates / Routes)",
+            options=all_locations,
+            default=all_locations[:10] if len(all_locations) > 10 else all_locations
+        )
 
-        sel_stations = st.multiselect("Stations", options=stations, default=stations[:10] if len(stations) > 10 else stations)
-        sel_others   = st.multiselect("Other Locations (Gates / Routes)", options=gates, default=[])
+        if selected_locations:
+            filtered = df[df["Location_clean"].isin(selected_locations)].copy()
 
-        filtered = df[
-            df["Location_clean"].isin(sel_stations + sel_others)
-        ]
+            # Group by Department + Status
+            breakdown = (
+                filtered.groupby(["Head_std", "Status"])
+                .size()
+                .reset_index(name="Count")
+            )
 
-        if not filtered.empty:
-            combined = filtered.groupby("Location_clean").size().reset_index(name="TotalCount")
-            combined = combined.sort_values("TotalCount", ascending=False)
-            combined["color"] = "#ff7f0e"
-            combined.loc[:2, "color"] = "red"
+            # Ensure both statuses exist for each department
+            all_depts = filtered["Head_std"].unique()
+            required = pd.DataFrame([
+                {"Head_std": dept, "Status": status}
+                for dept in all_depts
+                for status in ["Pending", "Resolved"]
+            ])
+            breakdown = required.merge(breakdown, on=["Head_std", "Status"], how="left").fillna(0)
+            breakdown["Count"] = breakdown["Count"].astype(int)
 
-            loc_chart = alt.Chart(combined).mark_bar().encode(
-                x=alt.X("TotalCount:Q", title="Total Deficiencies"),
-                y=alt.Y("Location_clean:N", sort="-x", title="Location"),
-                color=alt.Color("color:N", scale=None),
-                tooltip=["Location_clean", alt.Tooltip("TotalCount", format=",")]
-            ).properties(height=500)
-            st.altair_chart(loc_chart, use_container_width=True)
+            # Sort departments by total count
+            dept_order = breakdown.groupby("Head_std")["Count"].sum().sort_values(ascending=False).index
+            breakdown["Head_std"] = pd.Categorical(breakdown["Head_std"], categories=dept_order, ordered=True)
+
+            # Stacked bar chart
+            stack_chart = alt.Chart(breakdown).mark_bar(size=30).encode(
+                x=alt.X("sum(Count):Q", title="Number of Deficiencies"),
+                y=alt.Y("Head_std:N", title="Department", sort=dept_order.tolist()),
+                color=alt.Color(
+                    "Status:N",
+                    scale=alt.Scale(domain=["Pending", "Resolved"], range=["#e74c3c", "#27ae60"]),
+                    title="Status",
+                    legend=alt.Legend(orient="top")
+                ),
+                order=alt.Order("Status:N", sort="ascending"),
+                tooltip=[
+                    "Head_std",
+                    "Status",
+                    alt.Tooltip("sum(Count)", title="Count", format=",")
+                ]
+            ).properties(
+                height=max(300, len(dept_order) * 35),
+                title=f"Department Breakdown ({len(selected_locations)} location(s) selected)"
+            )
+
+            # Add value labels on bars
+            text = stack_chart.mark_text(
+                align="center",
+                baseline="middle",
+                fontWeight="bold",
+                color="white",
+                dx=18
+            ).encode(
+                text=alt.Text("sum(Count):Q", format=","),
+                color=alt.condition(
+                    alt.datum["sum(Count)"] > 15,
+                    alt.value("white"),
+                    alt.value("black")
+                )
+            )
+
+            final_chart = (stack_chart + text).configure_axis(
+                labelFontSize=12,
+                titleFontSize=14
+            ).configure_title(fontSize=16)
+
+            st.altair_chart(final_chart, use_container_width=True)
+
+            # Summary
+            total = breakdown["Count"].sum()
+            pending = breakdown[breakdown["Status"] == "Pending"]["Count"].sum()
+            resolved = breakdown[breakdown["Status"] == "Resolved"]["Count"].sum()
+            st.markdown(
+                f"**Selected Locations:** {len(selected_locations)} | "
+                f"**Total:** {total:,} | "
+                f"**Pending:** {pending:,} | "
+                f"**Resolved:** {resolved:,} "
+                f"({(resolved/total*100):.1f}% resolved)" if total > 0 else ""
+            )
         else:
-            st.info("No data for selected locations.")
+            st.info("Please select at least one location to view the department breakdown.")
