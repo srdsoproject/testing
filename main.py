@@ -1084,7 +1084,7 @@ with tabs[1]:
         # ------------------------------------------------------------------ #
         # 8. TOP 3 STATIONS ONLY
         # ------------------------------------------------------------------ #
-        st.markdown("### Top 3 Stations (Most Logged Deficiencies)")
+        st.markdown("### Top 3 Stations having most logged deficiencies")
         station_df = df[df["Is_Station"]].copy()
         if not station_df.empty:
             top3_stations = (
@@ -1199,4 +1199,5 @@ with tabs[1]:
 
         else:
             st.info("Please select at least one location to view the breakdown.")
+
 
