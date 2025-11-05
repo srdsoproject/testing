@@ -1188,14 +1188,15 @@ with tabs[1]:
                 f"**Resolved:** {resolved:,}"
             )
 
-            # Department-wise breakdown
+                        # Department-wise breakdown
             st.markdown("**Department-wise Breakdown:**")
             for _, row in summary_df.iterrows():
                 st.markdown(
-                    f"- **{row['Head_std']}**: {row['TotalCount']:,} | "
-                    f"Pending: {row['PendingCount']:,} | "
-                    f"Resolved: {row['ResolvedCount']:,}"
+                    f"- **{row['Head_std']}**: **Total Deficiencies:** {row['TotalCount']:,} | "
+                    f"**Pending:** {row['PendingCount']:,} | "
+                    f"**Resolved:** {row['ResolvedCount']:,}"
                 )
 
         else:
             st.info("Please select at least one location to view the breakdown.")
+
