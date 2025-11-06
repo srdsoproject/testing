@@ -74,21 +74,19 @@ body {
         font-size: 0.8rem;
     }
     .stDataFrame, .stTable {
-        font-size: 0.8rem;
+        font-size: 0.9rem; /* Slightly larger for readability */
     }
     .adaptive-credit {
         padding: 10px 20px;
         font-size: 0.9rem;
     }
     marquee {
-        display: none; /* Hide marquee on mobile */
+        display: none;
     }
-    /* Adjust chart container */
     .vega-embed, canvas {
         width: 100% !important;
         max-width: 100%;
     }
-    /* Stack columns vertically */
     .stHorizontal > div {
         flex-direction: column;
     }
@@ -96,36 +94,68 @@ body {
         width: 100% !important;
         margin-bottom: 10px;
     }
+    /* Card layout for mobile */
+    .card {
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        padding: 10px;
+        margin-bottom: 10px;
+        background-color: #f9f9f9;
+    }
+    .card-header {
+        font-weight: bold;
+        font-size: 0.95rem;
+        margin-bottom: 8px;
+    }
+    .card-field {
+        margin-bottom: 8px;
+    }
+    .card-field label {
+        font-size: 0.9rem;
+        color: #555;
+    }
+    .card-field p {
+        font-size: 0.9rem;
+        margin: 4px 0;
+    }
 }
 /* AgGrid adjustments */
 .ag-root-wrapper {
     font-size: 0.9rem;
+    overflow-x: auto;
 }
 .ag-cell {
     padding: 8px !important;
     line-height: 1.4 !important;
+    white-space: normal !important;
 }
 .ag-header-cell-text {
     font-size: 0.9rem;
+    white-space: normal !important;
 }
 @media (max-width: 600px) {
     .ag-root-wrapper {
-        font-size: 0.8rem;
+        font-size: 0.9rem; /* Increased for readability */
+        max-width: 100%;
+        overflow-x: auto;
     }
     .ag-cell {
-        padding: 6px !important;
+        padding: 8px !important; /* Slightly larger padding */
+        min-height: 40px; /* Ensure touchable height */
     }
     .ag-header-cell-text {
-        font-size: 0.8rem;
+        font-size: 0.9rem;
+    }
+    .ag-header-cell {
+        padding: 6px !important;
     }
 }
-/* Chart text adjustments */
 .vega-embed text {
     font-size: 10px;
 }
 @media (max-width: 600px) {
     .vega-embed text {
-        font-size: 8px;
+        font-size: 9px;
     }
 }
 </style>
@@ -520,7 +550,6 @@ def load_data():
         df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
         df["Location"] = df["Location"].astype(str).str.strip().str.upper()
         df["_sheet_row"] = df.index + 2
-        # Clean string columns
         for col in ["Location", "Head", "Sub Head", "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "User Feedback/Remark"]:
             if col in df.columns:
                 df[col] = df[col].fillna("").astype(str).str.strip()
@@ -610,7 +639,6 @@ with tabs[0]:
                 major = pd.concat([major, pd.DataFrame([{"Sub Head": "Others", "Count": minor["Count"].sum()}])],
                                   ignore_index=True)
             
-            # Simplified pie chart for mobile
             fig, ax = plt.subplots(figsize=(8, 4))
             wedges, texts, autotexts = ax.pie(
                 major["Count"], startangle=90, autopct='%1.1f%%',
@@ -681,10 +709,15 @@ with tabs[0]:
     # ---------- EDITOR ----------
     st.markdown("### ✍️ Edit User Feedback/Remarks")
     if not filtered.empty:
+        # Detect mobile device (simplified heuristic based on screen width)
+        is_mobile = st.get_option("browser.screen_width") <= 600 if hasattr(st, "get_option") else False
+        
         display_cols = [
+            "Date of Inspection", "Location", "Head", "Deficiencies Noted",
+            "User Feedback/Remark", "Status"
+        ] if is_mobile else [
             "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
-            "Deficiencies Noted", "Inspection By", "Action By", "Feedback",
-            "User Feedback/Remark"
+            "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "User Feedback/Remark"
         ]
         valid_cols = [col for col in display_cols if col in filtered.columns]
         if not valid_cols:
@@ -727,46 +760,73 @@ with tabs[0]:
             editable_df = filter_dataframe(editable_df)
             st.info(f"Applied filters to {len(editable_df)} rows.")
         
-        # AgGrid Configuration
-        gb = GridOptionsBuilder.from_dataframe(editable_df)
-        gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True)
-        if "User Feedback/Remark" in editable_df.columns:
-            gb.configure_column(
-                "User Feedback/Remark",
-                editable=True,
-                wrapText=True,
-                autoHeight=True,
-                cellEditor="agTextCellEditor",
-                cellEditorPopup=False,
-                cellEditorParams={"maxLength": 4000}
+        if is_mobile:
+            # Card-based layout for mobile
+            st.markdown("#### 📋 Edit Records")
+            st.caption("Tap to expand and edit each record.")
+            for idx, row in editable_df.iterrows():
+                with st.expander(f"Record {idx + 1}: {row['Location']} - {row['Status']}"):
+                    st.markdown(f"<div class='card'>", unsafe_allow_html=True)
+                    for col in valid_cols:
+                        if col != "User Feedback/Remark":
+                            st.markdown(f"<div class='card-field'><label>{col}:</label><p>{row[col]}</p></div>", unsafe_allow_html=True)
+                    # Editable field
+                    new_remark = st.text_area(
+                        "User Feedback/Remark",
+                        value=row["User Feedback/Remark"],
+                        key=f"remark_{idx}",
+                        height=100
+                    )
+                    editable_df.at[idx, "User Feedback/Remark"] = new_remark
+                    st.markdown("</div>", unsafe_allow_html=True)
+        else:
+            # AgGrid Configuration for desktop
+            gb = GridOptionsBuilder.from_dataframe(editable_df)
+            gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True)
+            if "User Feedback/Remark" in editable_df.columns:
+                gb.configure_column(
+                    "User Feedback/Remark",
+                    editable=True,
+                    wrapText=True,
+                    autoHeight=True,
+                    cellEditor="agTextCellEditor",
+                    cellEditorPopup=False,
+                    cellEditorParams={"maxLength": 4000}
+                )
+                gb.configure_column("User Feedback/Remark", pinned="left")
+                gb.configure_column("Status", pinned="left")
+            gb.configure_column("_original_sheet_index", hide=True)
+            gb.configure_column("_sheet_row", hide=True)
+            gb.configure_grid_options(singleClickEdit=False, enterMovesDown=True)
+            auto_size_js = JsCode("""
+            function(params) {
+                let allColumnIds = [];
+                params.columnApi.getAllColumns().forEach(function(column) {
+                    if (!column.getColDef().pinned) {
+                        allColumnIds.push(column.getColId());
+                    }
+                });
+                params.columnApi.autoSizeColumns(allColumnIds);
+                params.columnApi.setColumnWidths([
+                    {key: 'User Feedback/Remark', newWidth: 200},
+                    {key: 'Status', newWidth: 100}
+                ]);
+            }
+            """)
+            gb.configure_grid_options(onFirstDataRendered=auto_size_js)
+            grid_options = gb.build()
+            
+            st.markdown("#### 📋 Editable Table")
+            st.caption("Double-click 'User Feedback/Remark' to edit. Click headers to sort.")
+            grid_response = AgGrid(
+                editable_df,
+                gridOptions=grid_options,
+                update_mode=GridUpdateMode.VALUE_CHANGED,
+                height=400,
+                allow_unsafe_jscode=True,
+                fit_columns_on_grid_load=True
             )
-        gb.configure_column("_original_sheet_index", hide=True)
-        gb.configure_column("_sheet_row", hide=True)
-        gb.configure_grid_options(singleClickEdit=True)
-        auto_size_js = JsCode("""
-        function(params) {
-            let allColumnIds = [];
-            params.columnApi.getAllColumns().forEach(function(column) {
-                allColumnIds.push(column.getColId());
-            });
-            params.columnApi.autoSizeColumns(allColumnIds);
-        }
-        """)
-        gb.configure_grid_options(onFirstDataRendered=auto_size_js)
-        grid_options = gb.build()
-        
-        # Render AgGrid
-        st.markdown("#### 📋 Editable Table")
-        st.caption("Edit 'User Feedback/Remark' column. Tap headers to sort.")
-        grid_response = AgGrid(
-            editable_df,
-            gridOptions=grid_options,
-            update_mode=GridUpdateMode.VALUE_CHANGED,
-            height=400,
-            allow_unsafe_jscode=True,
-            fit_columns_on_grid_load=True
-        )
-        edited_df = pd.DataFrame(grid_response["data"])
+            edited_df = pd.DataFrame(grid_response["data"])
         
         # Export Edited Records
         export_cols = [col for col in valid_cols if col not in ["_original_sheet_index", "_sheet_row"]] + ["Status"]
@@ -889,7 +949,6 @@ with tabs[0]:
                     st.success(f"✅ Updated {len(changed_ids)} Feedback row(s).")
                 else:
                     st.info("ℹ️ No changes detected.")
-
     else:
         st.info("Deficiencies will be updated soon!")
 
