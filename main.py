@@ -1169,17 +1169,17 @@ with tabs[1]:
             summary_df["PendingCount"] = summary_df.get("PendingCount", 0)
             summary_df["ResolvedCount"] = summary_df.get("ResolvedCount", 0)
             bar_chart = alt.Chart(summary_df).mark_bar(color="#1f77b4").encode(
-                x=alt.X("TotalCount:Q", title="Total Deficiencies"),
-                y=alt.Y("Head_std:N", title="Department", sort="-x"),
-                tooltip=[
-                    "Head_std",
-                    alt.Tooltip("TotalCount", title="Total", format=","),
-                    alt.Tooltip("Point", title="Pending", format=","),
-                    alt.Tooltip("ResolvedCount", title="Resolved", format=",")
-                ]
+            x=alt.X("TotalCount:Q", title="Total Deficiencies"),
+            y=alt.Y("Head_std:N", title="Department", sort="-x"),
+            tooltip=[
+            "Head_std",
+            alt.Tooltip("TotalCount", title="Total", format=","),
+            alt.Tooltip("Point", title="Pending", format=","),  # Error here
+            alt.Tooltip("ResolvedCount", title="Resolved", format=",")
+                    ]
             ).properties(
-                height=max(200, len(summary_df) * 30)
-            )
+                            height=max(200, len(summary_df) * 30)
+                        )
             text = bar_chart.mark_text(
                 align="left",
                 baseline="middle",
@@ -1207,3 +1207,4 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location.")
+
