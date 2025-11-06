@@ -74,7 +74,7 @@ body {
         font-size: 0.8rem;
     }
     .stDataFrame, .stTable {
-        font-size: 0.9rem; /* Slightly larger for readability */
+        font-size: 0.9rem;
     }
     .adaptive-credit {
         padding: 10px 20px;
@@ -135,13 +135,13 @@ body {
 }
 @media (max-width: 600px) {
     .ag-root-wrapper {
-        font-size: 0.9rem; /* Increased for readability */
+        font-size: 0.9rem;
         max-width: 100%;
         overflow-x: auto;
     }
     .ag-cell {
-        padding: 8px !important; /* Slightly larger padding */
-        min-height: 40px; /* Ensure touchable height */
+        padding: 8px !important;
+        min-height: 40px;
     }
     .ag-header-cell-text {
         font-size: 0.9rem;
@@ -161,6 +161,17 @@ body {
 </style>
 """, unsafe_allow_html=True)
 
+# Inject JavaScript to detect screen width
+st.markdown("""
+<script>
+    if (window.innerWidth <= 600) {
+        window.sessionStorage.setItem('is_mobile', 'true');
+    } else {
+        window.sessionStorage.setItem('is_mobile', 'false');
+    }
+</script>
+""", unsafe_allow_html=True)
+
 # ---------- SESSION STATE INITIALIZATION ----------
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -172,6 +183,8 @@ if "alerts_log" not in st.session_state:
     st.session_state.alerts_log = []
 if "df" not in st.session_state:
     st.session_state.df = None
+if "is_mobile" not in st.session_state:
+    st.session_state.is_mobile = False  # Default until JS updates it
 
 # ---------- LOGIN ----------
 def login(email, password):
@@ -709,8 +722,8 @@ with tabs[0]:
     # ---------- EDITOR ----------
     st.markdown("### ✍️ Edit User Feedback/Remarks")
     if not filtered.empty:
-        # Detect mobile device (simplified heuristic based on screen width)
-        is_mobile = st.get_option("browser.screen_width") <= 600 if hasattr(st, "get_option") else False
+        # Use JavaScript-detected mobile status
+        is_mobile = st.session_state.get('is_mobile', 'false') == 'true'
         
         display_cols = [
             "Date of Inspection", "Location", "Head", "Deficiencies Noted",
@@ -1161,7 +1174,7 @@ with tabs[1]:
                 tooltip=[
                     "Head_std",
                     alt.Tooltip("TotalCount", title="Total", format=","),
-                    alt.Tooltip("PendingCount", title="Pending", format=","),
+                    alt.Tooltip("Point", title="Pending", format=","),
                     alt.Tooltip("ResolvedCount", title="Resolved", format=",")
                 ]
             ).properties(
