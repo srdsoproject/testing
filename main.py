@@ -13,7 +13,6 @@ from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from st_aggrid.shared import JsCode
 
 # ---------- CONFIG ----------
-# Conditionally set layout based on screen size
 st.set_page_config(page_title="Inspection App", layout="wide")
 
 # Inject custom CSS for mobile responsiveness
@@ -45,7 +44,6 @@ body {
     width: 100% !important;
     overflow-x: auto;
 }
-
 /* Mobile-specific styles */
 @media (max-width: 600px) {
     .stApp {
@@ -99,7 +97,6 @@ body {
         margin-bottom: 10px;
     }
 }
-
 /* AgGrid adjustments */
 .ag-root-wrapper {
     font-size: 0.9rem;
@@ -122,7 +119,6 @@ body {
         font-size: 0.8rem;
     }
 }
-
 /* Chart text adjustments */
 .vega-embed text {
     font-size: 10px;
@@ -245,7 +241,6 @@ if st.sidebar.button("🚪 Logout"):
     st.rerun()
 
 # ---------- CONSTANT LISTS ----------
-# (Keeping the lists as they are for brevity, but they are already defined correctly)
 STATION_LIST = list(dict.fromkeys([
     'BRB', 'MLM', 'BGVN', 'JNTR', 'PRWD', 'WSB', 'PPJ', 'JEUR', 'KEM', 'BLNI', 'DHS', 'KWV', 'WDS', 'MA', 'AAG',
     'MKPT', 'MO', 'MVE', 'PK', 'BALE', "SUR", 'TKWD', 'HG', 'TLT', 'AKOR', 'NGS', 'BOT', 'DUD', 'KUI', 'GDGN', 'GUR',
@@ -295,11 +290,15 @@ VALID_INSPECTIONS = [
 FOOTPLATE_LIST = STATION_LIST + GATE_LIST + FOOTPLATE_ROUTES
 
 # ---------- HELPERS ----------
-import pandas as pd
-import re
-import streamlit as st
+def clean_name(text):
+    if pd.isna(text) or text is None:
+        return ""
+    try:
+        return re.sub(r'\s+', ' ', str(text).upper()).strip()
+    except Exception as e:
+        st.warning(f"Error cleaning text: {text} ({type(text)}). Error: {e}")
+        return ""
 
-# Modified normalize_str to handle edge cases
 def normalize_str(text):
     if pd.isna(text) or text is None:
         return ""
@@ -309,7 +308,6 @@ def normalize_str(text):
         st.warning(f"Error normalizing text: {text} ({type(text)}). Error: {e}")
         return ""
 
-# Modified classify_feedback with logging
 def classify_feedback(feedback, user_remark=""):
     try:
         if isinstance(feedback, str) and feedback.strip() == "`":
@@ -345,7 +343,6 @@ def classify_feedback(feedback, user_remark=""):
                 "planned for", "will arrange", "proposed date", "to complete", "to be completed",
                 "likely completion", "expected completion", "not received", "awaiting response"
             ]
-            # Ensure all keywords are strings
             resolved_kw = [str(kw) for kw in resolved_kw]
             pending_kw = [str(kw) for kw in pending_kw]
             
@@ -373,7 +370,7 @@ def classify_feedback(feedback, user_remark=""):
         return "Pending"
     except Exception as e:
         st.error(f"Error in classify_feedback: {e}. Feedback: {feedback}, Remark: {user_remark}")
-        return "Pending"  # Fallback to avoid breaking the app
+        return "Pending"
 
 def get_status(feedback, remark):
     return classify_feedback(feedback, remark)
@@ -452,7 +449,7 @@ def update_feedback_column(edited_df):
 
 # ---------- FILTER WIDGETS ----------
 def apply_common_filters(df, prefix=""):
-    with st.expander("🔍 Apply Additional Filters", expanded=False):  # Collapsed by default on mobile
+    with st.expander("🔍 Apply Additional Filters", expanded=False):
         c1, c2 = st.columns([1, 1])
         c1.multiselect("Inspection By", INSPECTION_BY_LIST[1:],
                        default=st.session_state.get(prefix + "insp", []), key=prefix + "insp")
@@ -502,7 +499,7 @@ st.markdown(
 )
 
 # ---------- LOAD DATA ----------
-@st.cache_data(ttl=300)  # Reduced TTL for mobile performance
+@st.cache_data(ttl=300)
 def load_data():
     REQUIRED_COLS = [
         "Date of Inspection", "Type of Inspection", "Location",
@@ -523,6 +520,10 @@ def load_data():
         df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
         df["Location"] = df["Location"].astype(str).str.strip().str.upper()
         df["_sheet_row"] = df.index + 2
+        # Clean string columns
+        for col in ["Location", "Head", "Sub Head", "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "User Feedback/Remark"]:
+            if col in df.columns:
+                df[col] = df[col].fillna("").astype(str).str.strip()
         return df
     except Exception as e:
         st.error(f"❌ Error loading Google Sheet: {str(e)}")
@@ -618,7 +619,7 @@ with tabs[0]:
             ax.set_title("Sub Head Breakdown", fontsize=12)
             plt.tight_layout()
             buf = BytesIO()
-            plt.savefig(buf, format="png", dpi=150)  # Reduced DPI for mobile
+            plt.savefig(buf, format="png", dpi=150)
             buf.seek(0)
             plt.close()
             st.image(buf, use_column_width=True)
@@ -653,7 +654,7 @@ with tabs[0]:
                         max_length = max(max_length, len(str(cell.value)))
                 except:
                     pass
-            adjusted_width = (max_length + 2) if max_length < 30 else 30  # Reduced max width
+            adjusted_width = (max_length + 2) if max_length < 30 else 30
             ws.column_dimensions[col_letter].width = adjusted_width
         thin_border = Border(left=Side(style='thin'),
                              right=Side(style='thin'),
@@ -761,7 +762,7 @@ with tabs[0]:
             editable_df,
             gridOptions=grid_options,
             update_mode=GridUpdateMode.VALUE_CHANGED,
-            height=400,  # Reduced height for mobile
+            height=400,
             allow_unsafe_jscode=True,
             fit_columns_on_grid_load=True
         )
@@ -840,7 +841,21 @@ with tabs[0]:
                 if changed_ids:
                     diffs = new.loc[changed_ids].copy()
                     diffs["_sheet_row"] = orig.loc[changed_ids, "_sheet_row"].values
-                    routing = {...}  # As provided
+                    routing = {
+                        "OPTG": ("OPTG", "Sr.DOM"),
+                        "S&T": ("SIGNAL & TELECOM", "Sr.DSTE"),
+                        "COMMERCIAL": ("COMMERCIAL", "Sr.DCM"),
+                        "ELECT/G": ("ELECT/G", "Sr.DEE/G"),
+                        "MECHANICAL": ("MECHANICAL", "Sr.DME"),
+                        "ELECT/TRD": ("ELECT/TRD", "Sr.DEE/TRD"),
+                        "ELECT/TRO": ("ELECT/TRO", "Sr.DEE/TRO"),
+                        "Sr.DEN/S": ("ENGINEERING", "Sr.DEN/S"),
+                        "Sr.DEN/C": ("ENGINEERING", "Sr.DEN/C"),
+                        "FINAINCE": ("FINANCE", "Sr.DFM"),
+                        "STORE": ("STORE", "Sr.DMM"),
+                        "MEDICAL": ("MEDICAL", "CMS"),
+                        "SECURITY": ("SECURITY", "DSC")
+                    }
                     for oid in changed_ids:
                         user_remark = new.loc[oid, "User Feedback/Remark"].strip()
                         if not user_remark:
@@ -882,7 +897,7 @@ with tabs[0]:
 st.markdown("## 📋 Alerts Log")
 if st.session_state.alerts_log:
     for i, log in enumerate(st.session_state.alerts_log):
-        with st.expander(f"🔔 Alert {i+1}", expanded=False):  # Collapsed by default on mobile
+        with st.expander(f"🔔 Alert {i+1}", expanded=False):
             st.markdown(log, unsafe_allow_html=True)
             if st.button("Mark as Read", key=f"mark_{i}"):
                 st.session_state.alerts_log.pop(i)
@@ -974,7 +989,23 @@ with tabs[1]:
             (df["Date of Inspection"] <= pd.to_datetime(end_date))
         ].copy()
         df["Head_clean"] = df["Head"].apply(clean_name)
-        dept_map = {...}  # As provided
+        dept_map = {
+            "ELECT/TRD": "ELECT/TRD",
+            "ELECT/G": "ELECT/G",
+            "ELECT/TRO": "ELECT/TRO",
+            "SIGNAL & TELECOM": "SIGNAL & TELECOM",
+            "OPTG": "OPERATING",
+            "MECHANICAL": "MECHANICAL",
+            "ENGINEERING": "ENGINEERING",
+            "COMMERCIAL": "COMMERCIAL",
+            "C&W": "CARRIAGE & WAGON",
+            "PERSONNEL": "PERSONNEL",
+            "SECURITY": "SECURITY",
+            "FINANCE": "FINANCE",
+            "MEDICAL": "MEDICAL",
+            "STORE": "STORE",
+            "": "UNKNOWN"
+        }
         df["Head_std"] = df["Head_clean"].map(dept_map).fillna("UNKNOWN")
         df["Location_clean"] = df["Location"].astype(str).apply(clean_name)
         STATIONS_NORM = {clean_name(x) for x in STATION_LIST}
@@ -1104,4 +1135,3 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location.")
-
