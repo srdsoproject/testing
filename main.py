@@ -1143,6 +1143,7 @@ with tabs[1]:
             st.info("No station data found.")
         
         # Location filter
+        # Department-wise Breakdown
         st.markdown("### Department-wise Breakdown")
         all_locations = sorted(df["Location_clean"].dropna().unique())
         selected_locations = st.multiselect(
@@ -1166,45 +1167,49 @@ with tabs[1]:
             status_breakdown.columns = [f"{col}Count" for col in status_breakdown.columns]
             status_breakdown = status_breakdown.reset_index()
             summary_df = dept_breakdown.merge(status_breakdown, on="Head_std", how="left")
-            summary_df["PendingCount"] = summary_df.get("PendingCount", 0)
-            summary_df["ResolvedCount"] = summary_df.get("ResolvedCount", 0)
-            bar_chart = alt.Chart(summary_df).mark_bar(color="#1f77b4").encode(
-            x=alt.X("TotalCount:Q", title="Total Deficiencies"),
-            y=alt.Y("Head_std:N", title="Department", sort="-x"),
-            tooltip=[
-            "Head_std",
-            alt.Tooltip("TotalCount", title="Total", format=","),
-            alt.Tooltip("Point", title="Pending", format=","),  # Error here
-            alt.Tooltip("ResolvedCount", title="Resolved", format=",")
+            summary_df["PendingCount"] = summary_df.get("PendingCount", 0).fillna(0).astype(int)
+            summary_df["ResolvedCount"] = summary_df.get("ResolvedCount", 0).fillna(0).astype(int)
+        
+            if summary_df.empty or not all(col in summary_df.columns for col in ["Head_std", "TotalCount", "PendingCount", "ResolvedCount"]):
+                st.warning("⚠️ No data available for the selected locations or required columns are missing.")
+            else:
+                bar_chart = alt.Chart(summary_df).mark_bar(color="#1f77b4").encode(
+                    x=alt.X("TotalCount:Q", title="Total Deficiencies"),
+                    y=alt.Y("Head_std:N", title="Department", sort="-x"),
+                    tooltip=[
+                        "Head_std",
+                        alt.Tooltip("TotalCount", title="Total", format=","),
+                        alt.Tooltip("PendingCount", title="Pending", format=","),  # Fixed typo
+                        alt.Tooltip("ResolvedCount", title="Resolved", format=",")
                     ]
-            ).properties(
-                            height=max(200, len(summary_df) * 30)
-                        )
-            text = bar_chart.mark_text(
-                align="left",
-                baseline="middle",
-                dx=3,
-                fontWeight="bold",
-                color="black"
-            ).encode(
-                text=alt.Text("TotalCount:Q", format=",")
-            )
-            st.altair_chart((bar_chart + text), use_container_width=True)
-            total = summary_df["TotalCount"].sum()
-            pending = summary_df["PendingCount"].sum()
-            resolved = summary_df["ResolvedCount"].sum()
-            st.markdown(
-                f"**Total Deficiencies:** {total:,} | "
-                f"**Pending:** {pending:,} | "
-                f"**Resolved:** {resolved:,}"
-            )
-            st.markdown("**Department-wise Breakdown:**")
-            for _, row in summary_df.iterrows():
-                st.markdown(
-                    f"- **{row['Head_std']}**: **Total:** {row['TotalCount']:,} | "
-                    f"**Pending:** {row['PendingCount']:,} | "
-                    f"**Resolved:** {row['ResolvedCount']:,}"
+                ).properties(
+                    height=max(200, len(summary_df) * 30)
                 )
+                text = bar_chart.mark_text(
+                    align="left",
+                    baseline="middle",
+                    dx=3,
+                    fontWeight="bold",
+                    color="black"
+                ).encode(
+                    text=alt.Text("TotalCount:Q", format=",")
+                )
+                st.altair_chart((bar_chart + text), use_container_width=True)
+                total = summary_df["TotalCount"].sum()
+                pending = summary_df["PendingCount"].sum()
+                resolved = summary_df["ResolvedCount"].sum()
+                st.markdown(
+                    f"**Total Deficiencies:** {total:,} | "
+                    f"**Pending:** {pending:,} | "
+                    f"**Resolved:** {resolved:,}"
+                )
+                st.markdown("**Department-wise Breakdown:**")
+                for _, row in summary_df.iterrows():
+                    st.markdown(
+                        f"- **{row['Head_std']}**: **Total:** {row['TotalCount']:,} | "
+                        f"**Pending:** {row['PendingCount']:,} | "
+                        f"**Resolved:** {row['ResolvedCount']:,}"
+                    )
         else:
             st.info("Please select at least one location.")
-
+        
