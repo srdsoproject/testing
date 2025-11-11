@@ -156,7 +156,6 @@ FOOTPLATE_ROUTE_HIERARCHY = {
 FOOTPLATE_ROUTES = list(FOOTPLATE_ROUTE_HIERARCHY.keys())
 ALL_FOOTPLATE_LOCATIONS = FOOTPLATE_ROUTES + [sub for subs in FOOTPLATE_ROUTE_HIERARCHY.values() for sub in subs]
 ALL_LOCATIONS = STATION_LIST + GATE_LIST + ALL_FOOTPLATE_LOCATIONS
-
 HEAD_LIST = ["", "ELECT/TRD", "ELECT/G", "ELECT/TRO", "SIGNAL & TELECOM", "OPTG", "MECHANICAL",
              "ENGINEERING", "COMMERCIAL", "C&W", 'PERSONNEL', 'SECURITY', "FINANCE", "MEDICAL", "STORE"]
 SUBHEAD_LIST = {
@@ -440,7 +439,7 @@ with tabs[0]:
     c1.multiselect("Type of Inspection", VALID_INSPECTIONS, key="view_type_filter")
     c2.multiselect("Location", ALL_LOCATIONS, key="view_location_filter")
     c3, c4 = st.columns(2)
-    c3 = c3.multiselect("Head", HEAD_LIST[1:], key="view_head_filter")
+    c3.multiselect("Head", HEAD_LIST[1:], key="view_head_filter")  # Fixed typo: removed erroneous c3 = c3.multiselect
     sub_opts = sorted({s for h in st.session_state.view_head_filter for s in SUBHEAD_LIST.get(h, [])})
     c4.multiselect("Sub Head", sub_opts, key="view_sub_filter")
     selected_status = st.selectbox("🔘 Status", ["All", "Pending", "Resolved"], key="view_status_filter")
@@ -474,6 +473,58 @@ with tabs[0]:
     col_b.metric("⚠️ No Response", no_response_count)
     col_c.metric("🟩 Resolved", resolved_count)
     col_d.metric("📊 Total Records", len(filtered))
+    # Department-wise (Head) Breakdown when Location is selected
+    if st.session_state.view_location_filter and not filtered.empty:
+        st.markdown("### 📊 Department-wise Distribution")
+        head_summary = (
+            filtered.groupby("Head")["Head"]
+            .count()
+            .reset_index(name="Count")
+            .sort_values(by="Count", ascending=False)
+        )
+        if not head_summary.empty:
+            total_heads = head_summary["Count"].sum()
+            display_data = head_summary.copy()
+            thresh = 0.02  # 2% threshold for "Others" category
+            display_data["Percent"] = display_data["Count"] / total_heads
+            major = display_data[display_data["Percent"] >= thresh][["Head", "Count"]]
+            minor = display_data[display_data["Percent"] < thresh]
+            if not minor.empty:
+                major = pd.concat([major, pd.DataFrame([{"Head": "Others", "Count": minor["Count"].sum()}])],
+                                  ignore_index=True)
+            fig, ax = plt.subplots(figsize=(10, 6))
+            wedges, texts, autotexts = ax.pie(
+                major["Count"], startangle=90, autopct='%1.1f%%',
+                textprops=dict(color='black', fontsize=10)
+            )
+            for i, (wedge, (_, row)) in enumerate(zip(wedges, major.iterrows())):
+                ang = (wedge.theta2 + wedge.theta1) / 2.0
+                x = np.cos(np.deg2rad(ang))
+                y = np.sin(np.deg2rad(ang))
+                place_right = (i % 2 == 0)
+                lx = 1.5 if place_right else -1.5
+                ly = 1.2 * y
+                ax.text(lx, ly, f"{row['Head']} ({row['Count']})",
+                        ha="left" if place_right else "right",
+                        va="center", fontsize=10,
+                        bbox=dict(facecolor="white", edgecolor="gray", alpha=0.7, pad=1))
+                ax.annotate("", xy=(0.9*x, 0.9*y), xytext=(lx, ly),
+                            arrowprops=dict(arrowstyle="-", lw=0.8, color="black"))
+            fig.suptitle("📊 Department-wise Breakdown", fontsize=14, fontweight="bold")
+            dr = f"{start_date.strftime('%d-%m-%Y')} to {end_date.strftime('%d-%m-%Y')}"
+            locations = ", ".join(st.session_state.view_location_filter)
+            type_display = ", ".join(st.session_state.view_type_filter) if st.session_state.view_type_filter else "All Types"
+            fig.text(0.5, 0.02, f"Date Range: {dr} | Locations: {locations} | Type: {type_display}",
+                     ha='center', fontsize=9, color='gray')
+            plt.tight_layout(rect=[0, 0.06, 1, 0.94])
+            buf = BytesIO()
+            plt.savefig(buf, format="png", dpi=200, bbox_inches="tight")
+            buf.seek(0)
+            plt.close()
+            st.image(buf, use_column_width=True)
+            st.download_button("📥 Download Department-wise Distribution (PNG)", data=buf,
+                               file_name="head_distribution.png", mime="image/png")
+    # Sub Head Breakdown when Head is selected
     if st.session_state.view_head_filter and not filtered.empty:
         st.markdown("### 📊 Sub Head Distribution")
         subhead_summary = (
@@ -1166,4 +1217,3 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
-
