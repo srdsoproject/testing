@@ -93,6 +93,7 @@ try:
         st.write("No responses submitted yet.")
 except FileNotFoundError:
     st.write("No responses submitted yet.")
+
 if st.button("🗑️ Clear All Responses", key="clear_responses_btn"):
     df = pd.DataFrame(columns=["UserID", "Name"])
     df.to_excel("responses.xlsx", index=False)
@@ -141,7 +142,21 @@ GATE_LIST = list(dict.fromkeys([
     'LC-04', 'LC-67', 'LC-77', 'LC-75', 'LC-64', 'LC-65', 'LC-5', 'LC-6', 'LC-57', 'LC-62', 'LC-39', 'LC-2/C',
     'LC-6/C', 'LC-11', 'LC-03', 'LC-15/C', 'LC-21', 'LC-26-A', 'LC-60'
 ]))
-FOOTPLATE_ROUTES = ["SUR-DD", "SUR-WADI", "LUR-KWV", 'KWV-MRJ', 'DD-SUR', 'WADI-SUR', 'KWV-LUR', 'MRJ-KWV']
+# Updated Footplate Route Hierarchy
+FOOTPLATE_ROUTE_HIERARCHY = {
+    "SUR-DD": ["SUR-KWV"],
+    "SUR-WADI": ["SUR-KLBG", "SDB-WADI"],
+    "LUR-KWV": ["BTW-KWV"],
+    "KWV-MRJ": ["KWV-PVR"],
+    "DD-SUR": [],
+    "WADI-SUR": [],
+    "KWV-LUR": ["KWV-BTW"],
+    "MRJ-KWV": ["PVR-KWV"],
+}
+FOOTPLATE_ROUTES = list(FOOTPLATE_ROUTE_HIERARCHY.keys())
+ALL_FOOTPLATE_LOCATIONS = FOOTPLATE_ROUTES + [sub for subs in FOOTPLATE_ROUTE_HIERARCHY.values() for sub in subs]
+ALL_LOCATIONS = STATION_LIST + GATE_LIST + ALL_FOOTPLATE_LOCATIONS
+
 HEAD_LIST = ["", "ELECT/TRD", "ELECT/G", "ELECT/TRO", "SIGNAL & TELECOM", "OPTG", "MECHANICAL",
              "ENGINEERING", "COMMERCIAL", "C&W", 'PERSONNEL', 'SECURITY', "FINANCE", "MEDICAL", "STORE"]
 SUBHEAD_LIST = {
@@ -172,7 +187,6 @@ VALID_INSPECTIONS = [
     "FOOTPLATE INSPECTION", "STATION INSPECTION", "LC GATE INSPECTION",
     "MISC", "COACHING DEPOT", "ON TRAIN", "SURPRISE/AMBUSH INSPECTION", "WORKSITE INSPECTION", "OTHER (UNUSUAL)",
 ]
-FOOTPLATE_LIST = STATION_LIST + GATE_LIST + FOOTPLATE_ROUTES
 
 # ---------- HELPERS ----------
 def normalize_str(text):
@@ -424,9 +438,9 @@ with tabs[0]:
     end_date = df["Date of Inspection"].max() if not df["Date of Inspection"].isna().all() else pd.Timestamp.today()
     c1, c2 = st.columns(2)
     c1.multiselect("Type of Inspection", VALID_INSPECTIONS, key="view_type_filter")
-    c2.multiselect("Location", FOOTPLATE_LIST, key="view_location_filter")
+    c2.multiselect("Location", ALL_LOCATIONS, key="view_location_filter")
     c3, c4 = st.columns(2)
-    c3.multiselect("Head", HEAD_LIST[1:], key="view_head_filter")
+    c3 = c3.multiselect("Head", HEAD_LIST[1:], key="view_head_filter")
     sub_opts = sorted({s for h in st.session_state.view_head_filter for s in SUBHEAD_LIST.get(h, [])})
     c4.multiselect("Sub Head", sub_opts, key="view_sub_filter")
     selected_status = st.selectbox("🔘 Status", ["All", "Pending", "Resolved"], key="view_status_filter")
@@ -434,7 +448,13 @@ with tabs[0]:
     if st.session_state.view_type_filter:
         filtered = filtered[filtered["Type of Inspection"].isin(st.session_state.view_type_filter)]
     if st.session_state.view_location_filter:
-        filtered = filtered[filtered["Location"].isin(st.session_state.view_location_filter)]
+        # Include main routes and their subsections
+        selected_locations = st.session_state.view_location_filter
+        all_selected_locations = set(selected_locations)
+        for loc in selected_locations:
+            if loc in FOOTPLATE_ROUTE_HIERARCHY:
+                all_selected_locations.update(FOOTPLATE_ROUTE_HIERARCHY[loc])
+        filtered = filtered[filtered["Location"].isin(all_selected_locations)]
     if st.session_state.view_head_filter:
         filtered = filtered[filtered["Head"].isin(st.session_state.view_head_filter)]
     if st.session_state.view_sub_filter:
@@ -565,7 +585,6 @@ with tabs[0]:
         file_name="filtered_records.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-
     # ---------- EDITOR ----------
     st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
     if not filtered.empty:
@@ -730,21 +749,21 @@ with tabs[0]:
                     diffs = new.loc[changed_ids].copy()
                     diffs["_sheet_row"] = orig.loc[changed_ids, "_sheet_row"].values
                     routing = {
-                    "Pertains to S&T":        ("SIGNAL & TELECOM", "Sr.DSTE"),
-                    "Pertains to SECURITY": ("SECURITY","DSC"),
-                    "Pertains to OPTG":       ("OPTG", "Sr.DOM"),
-                    "Pertains to COMMERCIAL": ("COMMERCIAL", "Sr.DCM"),
-                    "Pertains to ELECT/G":    ("ELECT/G", "Sr.DEE/G"),
-                    "Pertains to ELECT/TRD":  ("ELECT/TRD", "Sr.DEE/TRD"),
-                    "Pertains to MECHANICAL":  ("MECHANICAL", "Sr.DME"),
-                    "Pertains to ELECT/TRO":  ("ELECT/TRO", "Sr.DEE/TRO"),
-                    "Pertains to Sr.DEN/S":   ("ENGINEERING", "Sr.DEN/S"),
-                    "Pertains to Sr.DEN/C":   ("ENGINEERING", "Sr.DEN/C"),
-                    "Pertains to Sr.DEN/Co":  ("ENGINEERING", "Sr.DEN/Co"),
-                    "Pertains to FINAINCE": ("FINANCE","Sr.DFM"),
-                    "Pertains to STORE" : ("STORE","Sr.DMM"),
-                    "Pertains to MEDICAL" : ("MEDICAL", "CMS"),
-                }
+                        "Pertains to S&T": ("SIGNAL & TELECOM", "Sr.DSTE"),
+                        "Pertains to SECURITY": ("SECURITY", "DSC"),
+                        "Pertains to OPTG": ("OPTG", "Sr.DOM"),
+                        "Pertains to COMMERCIAL": ("COMMERCIAL", "Sr.DCM"),
+                        "Pertains to ELECT/G": ("ELECT/G", "Sr.DEE/G"),
+                        "Pertains to ELECT/TRD": ("ELECT/TRD", "Sr.DEE/TRD"),
+                        "Pertains to MECHANICAL": ("MECHANICAL", "Sr.DME"),
+                        "Pertains to ELECT/TRO": ("ELECT/TRO", "Sr.DEE/TRO"),
+                        "Pertains to Sr.DEN/S": ("ENGINEERING", "Sr.DEN/S"),
+                        "Pertains to Sr.DEN/C": ("ENGINEERING", "Sr.DEN/C"),
+                        "Pertains to Sr.DEN/Co": ("ENGINEERING", "Sr.DEN/Co"),
+                        "Pertains to FINAINCE": ("FINANCE", "Sr.DFM"),
+                        "Pertains to STORE": ("STORE", "Sr.DMM"),
+                        "Pertains to MEDICAL": ("MEDICAL", "CMS"),
+                    }
                     for oid in changed_ids:
                         user_remark = new.loc[oid, "User Feedback/Remark"].strip()
                         if not user_remark:
@@ -780,9 +799,9 @@ with tabs[0]:
                     st.info("ℹ️ No changes detected to save.")
     else:
         st.info("Deficiencies will be updated soon!")
+
 # ---------------- ALERT LOG SECTION ----------------
 st.markdown("## 📋 Alerts Log")
-
 if st.session_state.alerts_log:
     for i, log in enumerate(st.session_state.alerts_log):
         with st.expander(f"🔔 Alert {i+1}", expanded=True):
@@ -791,7 +810,6 @@ if st.session_state.alerts_log:
                 st.session_state.alerts_log.pop(i)
                 st.session_state.last_alert_clicked = i  # save position
                 st.rerun()
-
 # After rerun, if we just clicked
 if "last_alert_clicked" in st.session_state:
     st.markdown(
@@ -806,10 +824,8 @@ if "last_alert_clicked" in st.session_state:
         unsafe_allow_html=True
     )
     del st.session_state.last_alert_clicked
-
 else:
     st.info("✅ No pending alerts.")
-
 
 # -------------------- FOOTER --------------------
 st.markdown(
@@ -820,12 +836,10 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
 st.markdown("""
-**Use the following syntax or copy to forward attention to other department:**  
-
-- For Operating: Pertains to **OPTG**  
-- For Signal & Telecom: Pertains to **S&T** 
+**Use the following syntax or copy to forward attention to other department:**
+- For Operating: Pertains to **OPTG**
+- For Signal & Telecom: Pertains to **S&T**
 - For Commercial: Pertains to **COMMERCIAL**
 - For ELECT/G: Pertains to **ELECT/G**
 - For MECHANICAL: Pertains to **MECHANICAL**
@@ -838,20 +852,16 @@ st.markdown("""
 - For Medical Department: Pertains to **MEDICAL**
 - For Security Department: Pertains to **SECURITY**
 """)
-
-
-
 st.markdown("""
 <div style="text-align: center; margin: 35px 0;">
   <div class="adaptive-credit">
     <p>
-      <strong>Designed & Developed by</strong> 
-      <span class="highlight">Safety Department</span>, 
+      <strong>Designed & Developed by</strong>
+      <span class="highlight">Safety Department</span>,
       <em>Solapur Division</em>
     </p>
   </div>
 </div>
-
 <style>
 /* Adaptive Colors for Light & Dark Mode */
 @media (prefers-color-scheme: light) {
@@ -866,7 +876,6 @@ st.markdown("""
     --glow-color: rgba(179, 229, 252, 0.9);
   }
 }
-
 @media (prefers-color-scheme: dark) {
   :root {
     --text-color: #ffffff;
@@ -879,7 +888,6 @@ st.markdown("""
     --glow-color: rgba(179, 229, 252, 0.95);
   }
 }
-
 /* Credit Card Style */
 .adaptive-credit {
   display: inline-block;
@@ -895,7 +903,6 @@ st.markdown("""
   font-size: 15px;
   line-height: 1.5;
 }
-
 .adaptive-credit p {
   margin: 0;
   color: var(--text-color);
@@ -904,28 +911,24 @@ st.markdown("""
   text-shadow: none;
   transition: text-shadow 0.4s ease;
 }
-
 .adaptive-credit p span.highlight {
   color: var(--text-highlight);
   font-weight: 700;
 }
-
 .adaptive-credit p em {
   font-style: normal;
   color: var(--text-sub);
 }
-
 /* Hover: Glow + Lift */
 .adaptive-credit:hover {
   transform: translateY(-4px);
-  box-shadow: 
+  box-shadow:
     0 14px 35px var(--shadow-hover),
     0 0 40px var(--glow-color),
     0 0 0 1px var(--border-color);
 }
-
 .adaptive-credit:hover p {
-  text-shadow: 
+  text-shadow:
     0 0 10px var(--glow-color),
     0 0 20px var(--glow-color),
     0 0 30px var(--glow-color),
@@ -934,34 +937,10 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ---- PREDEFINED LISTS ----
-STATION_LIST = list(dict.fromkeys([
-    'BRB','MLM','BGVN','JNTR','PRWD','WSB','PPJ','JEUR','KEM','BLNI','DHS','KWV','WDS','MA','AAG',
-    'MKPT','MO','MVE','PK','BALE',"SUR",'TKWD','HG','TLT','AKOR','NGS','BOT','DUD','KUI','GDGN','GUR',
-    'HHD','SVG','BBD','TJSP','KLBG','HQR','MR','SDB','WADI','ARAG','BLNK','SGRE','KVK','LNP','DLGN',
-    'JTRD','MSDG','JVA','WSD','SGLA','PVR','MLB','SEI','BTW','PJR','DRSV','YSI','KMRD','DKY','MRX',
-    'OSA','HGL','LUR','NTPC','MRJ','BHLI'
-]))
-
-GATE_LIST = list(dict.fromkeys([
-    'LC-19','LC-22A','LC-25','LC-26','LC-27C','LC-28','LC-30','LC-31','LC-35','LC-37','LC-40','LC-41',
-    'LC-43','LC-44','LC-45','LC-46C','LC-54','LC-61','LC-66','LC-74','LC-76','LC-78','LC-82','LC-1',
-    'LC-60A','LC-1 TLT ZCL','LC-1 ACC','LC-2 ACC','LC-91','LC-22','LC-24','LC-32','LC-49','LC-70',
-    'LC-10','LC-34','LC-36','LC-47','LC-55','LC-59','LC-2','LC-4','LC-42','LC-02','LC-128','LC-63',
-    'LC-04','LC-67','LC-77','LC-75','LC-64','LC-65','LC-5','LC-6','LC-57','LC-62','LC-39','LC-2/C',
-    'LC-6/C','LC-11','LC-03','LC-15/C','LC-21','LC-26-A','LC-60'
-]))
-
-FOOTPLATE_ROUTES = ["SUR-DD","SUR-WADI","LUR-KWV",'KWV-MRJ','DD-SUR','WADI-SUR','KWV-LUR','MRJ-KWV']
-
-
-ALL_LOCATIONS = STATION_LIST + GATE_LIST + FOOTPLATE_ROUTES   # combined master list
-
 # ---- STREAMLIT BLOCK ----
 with tabs[1]:
     st.markdown("### Total Deficiencies Trend (Bar + Trend Line)")
     df = st.session_state.df.copy()
-
     # ------------------------------------------------------------------ #
     # 1. Ensure Status column (Pending / Resolved)
     # ------------------------------------------------------------------ #
@@ -973,7 +952,6 @@ with tabs[1]:
     df["Status"] = df["Status"].str.strip().str.upper().map({
         "PENDING": "Pending", "RESOLVED": "Resolved", "CLOSED": "Resolved"
     }).fillna("Pending")
-
     if df.empty:
         st.info("No data available for analytics.")
     else:
@@ -982,7 +960,6 @@ with tabs[1]:
         # ------------------------------------------------------------------ #
         df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
         df = df.dropna(subset=["Date of Inspection"])
-
         # ------------------------------------------------------------------ #
         # 3. Date filter
         # ------------------------------------------------------------------ #
@@ -998,11 +975,9 @@ with tabs[1]:
             (df["Date of Inspection"] >= pd.to_datetime(start_date)) &
             (df["Date of Inspection"] <= pd.to_datetime(end_date))
         ].copy()
-
         # ------------------------------------------------------------------ #
         # 4. Clean department names
         # ------------------------------------------------------------------ #
-        import re
         def clean_name(text):
             if pd.isna(text):
                 return "UNKNOWN"
@@ -1010,7 +985,6 @@ with tabs[1]:
             s = re.sub(r"[\*\-\_\'\"]", "", s)
             s = re.sub(r"\s+", " ", s).strip()
             return s.upper()
-
         df["Head_clean"] = df["Head"].apply(clean_name)
         dept_map = {
             "ENGINEERING": "ENGINEERING",
@@ -1030,7 +1004,6 @@ with tabs[1]:
             "": "UNKNOWN", "UNKNOWN": "UNKNOWN", "--": "UNKNOWN", "---": "UNKNOWN"
         }
         df["Head_std"] = df["Head_clean"].map(dept_map).fillna("UNKNOWN")
-
         # ------------------------------------------------------------------ #
         # 5. Clean Location & identify stations
         # ------------------------------------------------------------------ #
@@ -1039,7 +1012,12 @@ with tabs[1]:
         df["Location_clean"] = df["Location"].astype(str).apply(clean_name)
         STATIONS_NORM = {clean_name(x) for x in STATION_LIST}
         df["Is_Station"] = df["Location_clean"].isin(STATIONS_NORM)
-
+        # Expand footplate routes to include subsections
+        all_locations = set(df["Location_clean"].dropna().unique())
+        for main_route, subsections in FOOTPLATE_ROUTE_HIERARCHY.items():
+            if main_route in all_locations:
+                all_locations.update(subsections)
+        df = df[df["Location_clean"].isin(all_locations)]
         # ------------------------------------------------------------------ #
         # 6. Trend chart (total deficiencies)
         # ------------------------------------------------------------------ #
@@ -1058,7 +1036,6 @@ with tabs[1]:
             st.altair_chart(bars + line, use_container_width=True)
         else:
             st.info("No data in selected range.")
-
         # ------------------------------------------------------------------ #
         # 7. Department summary (overall)
         # ------------------------------------------------------------------ #
@@ -1068,11 +1045,9 @@ with tabs[1]:
         total_deficiencies = dept_counts["TotalCount"].sum()
         dept_counts["color"] = "#ff7f0e"
         dept_counts.loc[:2, "color"] = "red"
-
         for _, row in dept_counts.iterrows():
             st.markdown(f"- **{row['Head_std']}** : **{row['TotalCount']:,}**")
         st.markdown(f"**Grand Total: {total_deficiencies:,}**")
-
         dept_chart = alt.Chart(dept_counts).mark_bar().encode(
             x=alt.X("TotalCount:Q", title="Total Deficiencies"),
             y=alt.Y("Head_std:N", sort="-x", title="Department"),
@@ -1080,11 +1055,9 @@ with tabs[1]:
             tooltip=["Head_std", alt.Tooltip("TotalCount", format=",")]
         ).properties(height=400)
         st.altair_chart(dept_chart, use_container_width=True)
-
         top3 = dept_counts.head(3)
         critical_text = ", ".join([f"**{r['Head_std']}** ({r['TotalCount']:,})" for _, r in top3.iterrows()])
         st.markdown(f"**Critical Departments:** {critical_text}")
-
         # ------------------------------------------------------------------ #
         # 8. TOP 3 STATIONS ONLY
         # ------------------------------------------------------------------ #
@@ -1101,7 +1074,6 @@ with tabs[1]:
             )
             top3_stations["Label"] = top3_stations["Location_clean"]
             top3_stations["color"] = "red"
-
             chart = alt.Chart(top3_stations).mark_bar().encode(
                 x=alt.X("TotalCount:Q", title="Total Deficiencies"),
                 y=alt.Y("Label:N", sort="-x", title="Station"),
@@ -1111,22 +1083,23 @@ with tabs[1]:
             st.altair_chart(chart, use_container_width=True)
         else:
             st.info("No station data found in the selected period.")
-
         # ------------------------------------------------------------------ #
         # 9. LOCATION FILTER → TOTAL PER DEPARTMENT + DETAILED BREAKDOWN
         # ------------------------------------------------------------------ #
         st.markdown("### Department wise deficiencies logged")
-
-        all_locations = sorted(df["Location_clean"].dropna().unique())
+        all_locations = sorted(all_locations)
         selected_locations = st.multiselect(
             "Select Locations (Stations / Gates / Routes)",
             options=all_locations,
             default=all_locations[:10] if len(all_locations) > 10 else all_locations
         )
-
         if selected_locations:
-            filtered = df[df["Location_clean"].isin(selected_locations)].copy()
-
+            # Expand selected locations to include subsections
+            expanded_locations = set(selected_locations)
+            for loc in selected_locations:
+                if loc in FOOTPLATE_ROUTE_HIERARCHY:
+                    expanded_locations.update(FOOTPLATE_ROUTE_HIERARCHY[loc])
+            filtered = df[df["Location_clean"].isin(expanded_locations)].copy()
             # Total per department
             dept_breakdown = (
                 filtered.groupby("Head_std")
@@ -1134,7 +1107,6 @@ with tabs[1]:
                 .reset_index(name="TotalCount")
                 .sort_values("TotalCount", ascending=False)
             )
-
             # Pending & Resolved per department
             status_breakdown = (
                 filtered.groupby(["Head_std", "Status"])
@@ -1143,12 +1115,10 @@ with tabs[1]:
             )
             status_breakdown.columns = [f"{col}Count" for col in status_breakdown.columns]
             status_breakdown = status_breakdown.reset_index()
-
             # Merge
             summary_df = dept_breakdown.merge(status_breakdown, on="Head_std", how="left")
             summary_df["PendingCount"] = summary_df.get("PendingCount", 0)
             summary_df["ResolvedCount"] = summary_df.get("ResolvedCount", 0)
-
             # Bar chart (total only)
             bar_chart = alt.Chart(summary_df).mark_bar(color="#1f77b4").encode(
                 x=alt.X("TotalCount:Q", title="Total Deficiencies Logged"),
@@ -1162,7 +1132,6 @@ with tabs[1]:
             ).properties(
                 height=max(300, len(summary_df) * 40)
             )
-
             # Add total count as text label
             text = bar_chart.mark_text(
                 align="left",
@@ -1173,26 +1142,21 @@ with tabs[1]:
             ).encode(
                 text=alt.Text("TotalCount:Q", format=",")
             )
-
             final_chart = (bar_chart + text).configure_axis(
                 labelFontSize=12,
                 titleFontSize=14
             ).configure_title(fontSize=16)
-
             st.altair_chart(final_chart, use_container_width=True)
-
             # Summary line
             total = summary_df["TotalCount"].sum()
             pending = summary_df["PendingCount"].sum()
             resolved = summary_df["ResolvedCount"].sum()
-
             st.markdown(
                 f"**Total Deficiencies Logged:** {total:,} | "
                 f"**Pending:** {pending:,} | "
                 f"**Resolved:** {resolved:,}"
             )
-
-                        # Department-wise breakdown
+            # Department-wise breakdown
             st.markdown("**Department-wise Breakdown:**")
             for _, row in summary_df.iterrows():
                 st.markdown(
@@ -1200,7 +1164,5 @@ with tabs[1]:
                     f"**Pending:** {row['PendingCount']:,} | "
                     f"**Resolved:** {row['ResolvedCount']:,}"
                 )
-
         else:
             st.info("Please select at least one location to view the breakdown.")
-
