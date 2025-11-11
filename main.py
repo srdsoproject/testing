@@ -13,7 +13,7 @@ from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from st_aggrid.shared import JsCode
 
 # ---------- CONFIG ----------
-st.set_page_config(page_title="Inspection App", layout="wide")
+st.set_page_config(page_title="Inspection Application", layout="wide")
 
 # Inject custom CSS for mobile responsiveness
 st.markdown("""
@@ -1213,3 +1213,4 @@ with tabs[1]:
         else:
             st.info("Please select at least one location.")
         
+
