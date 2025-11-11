@@ -110,8 +110,8 @@ def connect_to_gsheet():
         service_account_info["private_key"] = service_account_info["private_key"].replace("\\n", "\n")
     creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPES)
     gc = gspread.authorize(creds)
-    SHEET_ID = "1_WQyJCtdXuAIQn3IpFTI4KfkrveOHosNsvsZn42jAvw"
-    SHEET_NAME = "Sheet1"
+    SHEET_ID = st.secrets["google_sheets"]["sheet_id"]
+    SHEET_NAME = st.secrets["google_sheets"]["sheet_name"]
     return gc.open_by_key(SHEET_ID).worksheet(SHEET_NAME)
 
 sheet = connect_to_gsheet()
@@ -1203,3 +1203,4 @@ with tabs[1]:
 
         else:
             st.info("Please select at least one location to view the breakdown.")
+
