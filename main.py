@@ -144,12 +144,12 @@ GATE_LIST = list(dict.fromkeys([
 ]))
 # Updated Footplate Route Hierarchy
 FOOTPLATE_ROUTE_HIERARCHY = {
-    "SUR-DD": ["SUR-KWV"],
-    "SUR-WADI": ["SUR-KLBG", "SDB-WADI"],
+    "SUR-DD": ["SUR-KWV", "KWV-DD"],
+    "SUR-WADI": ["SUR-KLBG", "SDB-WADI", "KLBG-WADI"],
     "LUR-KWV": ["BTW-KWV"],
     "KWV-MRJ": ["KWV-PVR"],
-    "DD-SUR": [],
-    "WADI-SUR": [],
+    "DD-SUR": ["JEUR-KWV"],
+    "WADI-SUR": ["WADI-KLBG", "KLBG-SUR"],
     "KWV-LUR": ["KWV-BTW"],
     "MRJ-KWV": ["PVR-KWV"],
 }
@@ -1166,3 +1166,4 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
