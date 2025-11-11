@@ -13,164 +13,7 @@ from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from st_aggrid.shared import JsCode
 
 # ---------- CONFIG ----------
-st.set_page_config(page_title="Inspection Application", layout="wide")
-
-# Inject custom CSS for mobile responsiveness
-st.markdown("""
-<style>
-/* General styles */
-body {
-    font-family: 'Roboto', sans-serif;
-}
-.stButton > button {
-    width: 100%;
-    padding: 10px;
-    font-size: 1rem;
-    border-radius: 8px;
-}
-.stTextInput > div > input, .stSelectbox > div > select {
-    font-size: 1rem;
-    padding: 8px;
-}
-.stExpander summary {
-    font-size: 1rem;
-    padding: 10px;
-}
-.stTabs > div > button {
-    font-size: 1rem;
-    padding: 8px 16px;
-}
-.stDataFrame, .stTable {
-    width: 100% !important;
-    overflow-x: auto;
-}
-/* Mobile-specific styles */
-@media (max-width: 600px) {
-    .stApp {
-        padding: 10px;
-    }
-    h1 {
-        font-size: 1.5rem;
-        margin-bottom: 10px;
-    }
-    h3 {
-        font-size: 1.2rem;
-    }
-    .stButton > button {
-        font-size: 0.9rem;
-        padding: 8px;
-    }
-    .stTextInput > div > input, .stSelectbox > div > select {
-        font-size: 0.9rem;
-    }
-    .stExpander summary {
-        font-size: 0.9rem;
-    }
-    .stTabs > div > button {
-        font-size: 0.9rem;
-        padding: 6px 12px;
-    }
-    .stMetric {
-        font-size: 0.8rem;
-    }
-    .stDataFrame, .stTable {
-        font-size: 0.9rem;
-    }
-    .adaptive-credit {
-        padding: 10px 20px;
-        font-size: 0.9rem;
-    }
-    marquee {
-        display: none;
-    }
-    .vega-embed, canvas {
-        width: 100% !important;
-        max-width: 100%;
-    }
-    .stHorizontal > div {
-        flex-direction: column;
-    }
-    .stColumn {
-        width: 100% !important;
-        margin-bottom: 10px;
-    }
-    /* Card layout for mobile */
-    .card {
-        border: 1px solid #ccc;
-        border-radius: 8px;
-        padding: 10px;
-        margin-bottom: 10px;
-        background-color: #f9f9f9;
-    }
-    .card-header {
-        font-weight: bold;
-        font-size: 0.95rem;
-        margin-bottom: 8px;
-    }
-    .card-field {
-        margin-bottom: 8px;
-    }
-    .card-field label {
-        font-size: 0.9rem;
-        color: #555;
-    }
-    .card-field p {
-        font-size: 0.9rem;
-        margin: 4px 0;
-    }
-}
-/* AgGrid adjustments */
-.ag-root-wrapper {
-    font-size: 0.9rem;
-    overflow-x: auto;
-}
-.ag-cell {
-    padding: 8px !important;
-    line-height: 1.4 !important;
-    white-space: normal !important;
-}
-.ag-header-cell-text {
-    font-size: 0.9rem;
-    white-space: normal !important;
-}
-@media (max-width: 600px) {
-    .ag-root-wrapper {
-        font-size: 0.9rem;
-        max-width: 100%;
-        overflow-x: auto;
-    }
-    .ag-cell {
-        padding: 8px !important;
-        min-height: 40px;
-    }
-    .ag-header-cell-text {
-        font-size: 0.9rem;
-    }
-    .ag-header-cell {
-        padding: 6px !important;
-    }
-}
-.vega-embed text {
-    font-size: 10px;
-}
-@media (max-width: 600px) {
-    .vega-embed text {
-        font-size: 9px;
-    }
-}
-</style>
-""", unsafe_allow_html=True)
-
-# Inject JavaScript to detect screen width
-st.markdown("""
-<script>
-    if (window.innerWidth <= 600) {
-        window.sessionStorage.setItem('is_mobile', 'true');
-    } else {
-        window.sessionStorage.setItem('is_mobile', 'false');
-    }
-</script>
-""", unsafe_allow_html=True)
+st.set_page_config(page_title="Inspection App", layout="wide")
 
 # ---------- SESSION STATE INITIALIZATION ----------
 if "logged_in" not in st.session_state:
@@ -183,18 +26,17 @@ if "alerts_log" not in st.session_state:
     st.session_state.alerts_log = []
 if "df" not in st.session_state:
     st.session_state.df = None
-if "is_mobile" not in st.session_state:
-    st.session_state.is_mobile = False  # Default until JS updates it
 
 # ---------- LOGIN ----------
 def login(email, password):
+    """Check credentials against st.secrets['users']"""
     for user in st.secrets["users"]:
         if user["email"] == email and user["password"] == password:
             return user
     return None
 
 if not st.session_state.logged_in:
-    st.title("🔐 Login to S.A.R.A.L")
+    st.title("🔐 Login to S.A.R.A.L (Safety Abnormality Report & Action List)")
     with st.form("login_form", clear_on_submit=True):
         email = st.text_input("📧 Email")
         password = st.text_input("🔒 Password", type="password")
@@ -211,7 +53,7 @@ if not st.session_state.logged_in:
     st.stop()
 
 # ---------- ACKNOWLEDGMENT ----------
-user_id = st.session_state.user["email"]
+user_id = st.session_state.user["email"]  # use email as unique ID
 try:
     ack_df = pd.read_excel("responses.xlsx")
     if "UserID" not in ack_df.columns or "Name" not in ack_df.columns:
@@ -246,7 +88,7 @@ st.markdown("### 📝 Responses Received")
 try:
     df = pd.read_excel("responses.xlsx")
     if not df.empty:
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(df)
     else:
         st.write("No responses submitted yet.")
 except FileNotFoundError:
@@ -333,87 +175,65 @@ VALID_INSPECTIONS = [
 FOOTPLATE_LIST = STATION_LIST + GATE_LIST + FOOTPLATE_ROUTES
 
 # ---------- HELPERS ----------
-def clean_name(text):
-    if pd.isna(text) or text is None:
-        return ""
-    try:
-        return re.sub(r'\s+', ' ', str(text).upper()).strip()
-    except Exception as e:
-        st.warning(f"Error cleaning text: {text} ({type(text)}). Error: {e}")
-        return ""
-
 def normalize_str(text):
-    if pd.isna(text) or text is None:
+    if not isinstance(text, str):
         return ""
-    try:
-        return re.sub(r'\s+', ' ', str(text).lower()).strip()
-    except Exception as e:
-        st.warning(f"Error normalizing text: {text} ({type(text)}). Error: {e}")
-        return ""
+    return re.sub(r'\s+', ' ', text.lower()).strip()
 
 def classify_feedback(feedback, user_remark=""):
-    try:
-        if isinstance(feedback, str) and feedback.strip() == "`":
-            return ""
-        
-        def _classify(text_normalized):
-            if not isinstance(text_normalized, str) or not text_normalized:
-                return None
-            date_found = bool(re.search(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', text_normalized))
-            resolved_kw = [
-                "attended", "solved", "done", "completed", "confirmed by", "message given",
-                "tdc work completed", "replaced", "msg given", "msg sent", "counseled", "info shared",
-                "communicated", "sent successfully", "counselled", "gate will be closed soon",
-                "attending at the time", "handled", "resolved", "action taken", "spoken to", "warned",
-                "counselling", "hubli", "working normal", "met", "discussion held", "report sent",
-                "notified", "explained", "nil", "na", "tlc", "work completed", "acknowledged", "visited",
-                "briefed", "guided", "handover", "working properly", "checked found working", "supply restored",
-                "updated by", "adv to", "counselled the staff", "complied", "checked and found",
-                "maintained", "for needful action", "provided at", "in working condition", "is working",
-                "found working", "equipment is working", "item is working", "as per plan", "putright", "put right",
-                "operational feasibility", "will be provided", "will be supplied shortly", "advised to ubl", "updated"
-            ]
-            pending_kw = [
-                "work is going on", "tdc given", "target date", "expected by", "likely by", "planned by",
-                "will be", "needful", "to be", "pending", "not done", "awaiting", "waiting", "yet to", "next time",
-                "follow up", "tdc.", "tdc", "t d c", "will attend", "will be attended", "scheduled", "reminder",
-                "to inform", "to counsel", "to submit", "to do", "to replace", "prior", "remains", "still",
-                "under process", "not yet", "to be done", "will ensure", "during next", "action will be taken", "noted please tdc",
-                "will be supplied shortly", "not available", "not updated", "progress", "under progress",
-                "to arrange", "awaited", "material awaited", "approval awaited", "to procure", "yet pending",
-                "incomplete", "tentative", "ongoing", "in progress", "being done", "arranging", "waiting for",
-                "subject to", "awaiting approval", "awaiting material", "awaiting confirmation", "next schedule",
-                "planned for", "will arrange", "proposed date", "to complete", "to be completed",
-                "likely completion", "expected completion", "not received", "awaiting response"
-            ]
-            resolved_kw = [str(kw) for kw in resolved_kw]
-            pending_kw = [str(kw) for kw in pending_kw]
-            
-            if "tdc" in text_normalized and any(kw in text_normalized for kw in resolved_kw):
-                return "Resolved"
-            if any(kw in text_normalized for kw in pending_kw):
-                return "Pending"
-            if date_found:
-                return "Pending" if "tdc" in text_normalized else "Resolved"
-            if any(kw in text_normalized for kw in resolved_kw):
-                return "Resolved"
+    if isinstance(feedback, str) and feedback.strip() == "`":
+        return ""
+    def _classify(text_normalized):
+        if not text_normalized:
             return None
-        
-        fb = normalize_str(feedback)
-        rm = normalize_str(user_remark)
-        m = re.findall(r"[!#]", f"{fb} {rm}".strip())
-        if m:
-            return "Resolved" if m[-1] == "#" else "Pending"
-        a = _classify(fb)
-        b = _classify(rm)
-        if a == "Resolved" or b == "Resolved":
+        date_found = bool(re.search(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', text_normalized))
+        resolved_kw = [
+            "attended", "solved", "done", "completed", "confirmed by", "message given",
+            "tdc work completed", "replaced", "msg given", "msg sent", "counseled", "info shared",
+            "communicated", "sent successfully", "counselled", "gate will be closed soon",
+            "attending at the time", "handled", "resolved", "action taken", "spoken to", "warned",
+            "counselling", "hubli", "working normal", "met", "discussion held", "report sent",
+            "notified", "explained", "nil", "na", "tlc", "work completed", "acknowledged", "visited",
+            "briefed", "guided", "handover", "working properly", "checked found working", "supply restored",
+            "updated by", "adv to", "counselled the staff", "complied", "checked and found",
+            "maintained", "for needful action", "provided at", "in working condition", "is working",
+            "found working", "equipment is working", "item is working", "as per plan", "putright", "put right",
+            "operational feasibility", "will be provided", "will be supplied shortly", "advised to ubl", "updated"
+        ]
+        pending_kw = [
+            "work is going on", "tdc given", "target date", "expected by", "likely by", "planned by",
+            "will be", "needful", "to be", "pending", "not done", "awaiting", "waiting", "yet to", "next time",
+            "follow up", "tdc.", "tdc", "t d c", "will attend", "will be attended", "scheduled", "reminder",
+            "to inform", "to counsel", "to submit", "to do", "to replace", "prior", "remains", "still",
+            "under process", "not yet", "to be done", "will ensure", "during next", "action will be taken", 'noted please tdc',
+            "will be supplied shortly", "not available", "not updated", "progress", "under progress",
+            "to arrange", "awaited", "material awaited", "approval awaited", "to procure", "yet pending",
+            "incomplete", "tentative", "ongoing", "in progress", "being done", "arranging", "waiting for",
+            "subject to", "awaiting approval", "awaiting material", "awaiting confirmation", "next schedule",
+            "planned for", "will arrange", "proposed date", "to complete", "to be completed",
+            "likely completion", "expected completion", "not received", "awaiting response"
+        ]
+        if "tdc" in text_normalized and any(k in text_normalized for k in resolved_kw):
             return "Resolved"
-        if a == "Pending" or b == "Pending":
+        if any(k in text_normalized for k in pending_kw):
             return "Pending"
+        if date_found:
+            return "Pending" if "tdc" in text_normalized else "Resolved"
+        if any(k in text_normalized for k in resolved_kw):
+            return "Resolved"
+        return None
+    fb = normalize_str(feedback)
+    rm = normalize_str(user_remark)
+    m = re.findall(r"[!#]", f"{fb} {rm}".strip())
+    if m:
+        return "Resolved" if m[-1] == "#" else "Pending"
+    a = _classify(fb)
+    b = _classify(rm)
+    if a == "Resolved" or b == "Resolved":
+        return "Resolved"
+    if a == "Pending" or b == "Pending":
         return "Pending"
-    except Exception as e:
-        st.error(f"Error in classify_feedback: {e}. Feedback: {feedback}, Remark: {user_remark}")
-        return "Pending"
+    return "Pending"
 
 def get_status(feedback, remark):
     return classify_feedback(feedback, remark)
@@ -422,6 +242,19 @@ def color_text_status(status):
     return "🔴 Pending" if status == "Pending" else ("🟢 Resolved" if status == "Resolved" else status)
 
 def filter_dataframe(df: pd.DataFrame, include_index: bool = False) -> pd.DataFrame:
+    """
+    Adds a UI for filtering dataframes.
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Original dataframe to filter.
+    include_index : bool, optional
+        Whether to include the index column in the filter.
+    Returns
+    -------
+    pd.DataFrame
+        Filtered dataframe.
+    """
     df_filtered = df.copy()
     for column in column_selection:
         if is_categorical_dtype(df[column]) or df[column].dtype == "object":
@@ -492,13 +325,13 @@ def update_feedback_column(edited_df):
 
 # ---------- FILTER WIDGETS ----------
 def apply_common_filters(df, prefix=""):
-    with st.expander("🔍 Apply Additional Filters", expanded=False):
-        c1, c2 = st.columns([1, 1])
+    with st.expander("🔍 Apply Additional Filters", expanded=True):
+        c1, c2 = st.columns(2)
         c1.multiselect("Inspection By", INSPECTION_BY_LIST[1:],
                        default=st.session_state.get(prefix + "insp", []), key=prefix + "insp")
         c2.multiselect("Action By", ACTION_BY_LIST[1:],
                        default=st.session_state.get(prefix + "action", []), key=prefix + "action")
-        d1, d2 = st.columns([1, 1])
+        d1, d2 = st.columns(2)
         d1.date_input("📅 From Date", key=prefix + "from_date")
         d2.date_input("📅 To Date", key=prefix + "to_date")
     out = df.copy()
@@ -526,15 +359,15 @@ st.markdown(
     """
     <div style="display:flex;align-items:center;margin-top:10px;margin-bottom:20px;">
         <img src="https://raw.githubusercontent.com/srdsoproject/testing/main/Central%20Railway%20Logo.png"
-             style="height:40px;margin-right:10px;object-fit:contain;">
+             height="55" style="margin-right:15px;object-fit:contain;">
         <div>
-            <h3 style="margin:0;font-weight:bold;color:var(--text-color);font-size:1rem;">
+            <h3 style="margin:0;font-weight:bold;color:var(--text-color);">
                 An initiative by <b>Safety Department</b>, Solapur Division
             </h3>
         </div>
     </div>
-    <h1 style="margin-top:0;color:var(--text-color);font-size:1.8rem;">📋 S.A.R.A.L</h1>
-    <h3 style="margin-top:-10px;font-weight:normal;color:var(--text-color);font-size:1rem;">
+    <h1 style="margin-top:0;color:var(--text-color);">📋 S.A.R.A.L</h1>
+    <h3 style="margin-top:-10px;font-weight:normal;color:var(--text-color);">
         (Safety Abnormality Report & Action List – Version 1.1.8)
     </h3>
     """,
@@ -542,7 +375,7 @@ st.markdown(
 )
 
 # ---------- LOAD DATA ----------
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=0)
 def load_data():
     REQUIRED_COLS = [
         "Date of Inspection", "Type of Inspection", "Location",
@@ -553,7 +386,7 @@ def load_data():
     try:
         data = sheet.get_all_values()
         if not data or len(data) < 2:
-            st.warning("No data found in Google Sheet.")
+            st.warning("No data found in Google Sheet. Returning empty DataFrame.")
             return pd.DataFrame(columns=REQUIRED_COLS)
         headers = [c.strip() for c in data[0]]
         df = pd.DataFrame(data[1:], columns=headers)
@@ -563,20 +396,18 @@ def load_data():
         df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
         df["Location"] = df["Location"].astype(str).str.strip().str.upper()
         df["_sheet_row"] = df.index + 2
-        for col in ["Location", "Head", "Sub Head", "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "User Feedback/Remark"]:
-            if col in df.columns:
-                df[col] = df[col].fillna("").astype(str).str.strip()
         return df
     except Exception as e:
         st.error(f"❌ Error loading Google Sheet: {str(e)}")
+        st.warning("Returning empty DataFrame to prevent crashes.")
         return pd.DataFrame(columns=REQUIRED_COLS)
 
+# Initialize df if None
 if st.session_state.df is None:
     st.session_state.df = load_data()
 
 # ---------- TABS ----------
 tabs = st.tabs(["📊 View Records", "📈 Analytics"])
-
 with tabs[0]:
     df = st.session_state.df
     if df is None or df.empty:
@@ -591,17 +422,13 @@ with tabs[0]:
     df["Status"] = df.apply(lambda r: classify_feedback(r["Feedback"], r.get("User Feedback/Remark", "")), axis=1)
     start_date = df["Date of Inspection"].min() if not df["Date of Inspection"].isna().all() else pd.Timestamp.today()
     end_date = df["Date of Inspection"].max() if not df["Date of Inspection"].isna().all() else pd.Timestamp.today()
-    
-    # Responsive filter layout
-    with st.container():
-        c1, c2 = st.columns([1, 1])
-        c1.multiselect("Type of Inspection", VALID_INSPECTIONS, key="view_type_filter")
-        c2.multiselect("Location", FOOTPLATE_LIST, key="view_location_filter")
-        c3, c4 = st.columns([1, 1])
-        c3.multiselect("Head", HEAD_LIST[1:], key="view_head_filter")
-        sub_opts = sorted({s for h in st.session_state.view_head_filter for s in SUBHEAD_LIST.get(h, [])})
-        c4.multiselect("Sub Head", sub_opts, key="view_sub_filter")
-    
+    c1, c2 = st.columns(2)
+    c1.multiselect("Type of Inspection", VALID_INSPECTIONS, key="view_type_filter")
+    c2.multiselect("Location", FOOTPLATE_LIST, key="view_location_filter")
+    c3, c4 = st.columns(2)
+    c3.multiselect("Head", HEAD_LIST[1:], key="view_head_filter")
+    sub_opts = sorted({s for h in st.session_state.view_head_filter for s in SUBHEAD_LIST.get(h, [])})
+    c4.multiselect("Sub Head", sub_opts, key="view_sub_filter")
     selected_status = st.selectbox("🔘 Status", ["All", "Pending", "Resolved"], key="view_status_filter")
     filtered = df[(df["Date of Inspection"] >= start_date) & (df["Date of Inspection"] <= end_date)]
     if st.session_state.view_type_filter:
@@ -617,13 +444,9 @@ with tabs[0]:
     filtered = apply_common_filters(filtered, prefix="view_")
     filtered = filtered.apply(lambda x: x.str.replace("\n", " ") if x.dtype == "object" else x)
     filtered = filtered.sort_values("Date of Inspection")
-    
     st.write(f"🔹 Showing {len(filtered)} record(s) from **{start_date.strftime('%d.%m.%Y')}** "
              f"to **{end_date.strftime('%d.%m.%Y')}**")
-    
-    # Responsive metrics
-    col_a, col_b = st.columns([1, 1])
-    col_c, col_d = st.columns([1, 1])
+    col_a, col_b, col_c, col_d = st.columns(4)
     pending_count = (filtered["Status"] == "Pending").sum()
     no_response_count = filtered["Feedback"].isna().sum() + (filtered["Feedback"].astype(str).str.strip() == "").sum()
     resolved_count = (filtered["Status"] == "Resolved").sum()
@@ -631,8 +454,6 @@ with tabs[0]:
     col_b.metric("⚠️ No Response", no_response_count)
     col_c.metric("🟩 Resolved", resolved_count)
     col_d.metric("📊 Total Records", len(filtered))
-    
-    # Sub Head Distribution (Simplified for mobile)
     if st.session_state.view_head_filter and not filtered.empty:
         st.markdown("### 📊 Sub Head Distribution")
         subhead_summary = (
@@ -651,23 +472,49 @@ with tabs[0]:
             if not minor.empty:
                 major = pd.concat([major, pd.DataFrame([{"Sub Head": "Others", "Count": minor["Count"].sum()}])],
                                   ignore_index=True)
-            
-            fig, ax = plt.subplots(figsize=(8, 4))
-            wedges, texts, autotexts = ax.pie(
+            fig, axes = plt.subplots(1, 2, figsize=(16, 8))
+            wedges, texts, autotexts = axes[0].pie(
                 major["Count"], startangle=90, autopct='%1.1f%%',
                 textprops=dict(color='black', fontsize=8)
             )
-            ax.set_title("Sub Head Breakdown", fontsize=12)
-            plt.tight_layout()
+            for i, (wedge, (_, row)) in enumerate(zip(wedges, major.iterrows())):
+                ang = (wedge.theta2 + wedge.theta1) / 2.0
+                x = np.cos(np.deg2rad(ang))
+                y = np.sin(np.deg2rad(ang))
+                place_right = (i % 2 == 0)
+                lx = 1.5 if place_right else -1.5
+                ly = 1.2 * y
+                axes[0].text(lx, ly, f"{row['Sub Head']} ({row['Count']})",
+                             ha="left" if place_right else "right",
+                             va="center", fontsize=8,
+                             bbox=dict(facecolor="white", edgecolor="gray", alpha=0.7, pad=1))
+                axes[0].annotate("", xy=(0.9*x, 0.9*y), xytext=(lx, ly),
+                                 arrowprops=dict(arrowstyle="-", lw=0.8, color="black"))
+            table_data = [["Sub Head", "Count"]] + subhead_summary.values.tolist() + [["Total", total_subs]]
+            axes[1].axis('off')
+            tbl = axes[1].table(cellText=table_data, loc='center')
+            tbl.auto_set_font_size(False)
+            tbl.set_fontsize(10)
+            tbl.scale(1, 1.5)
+            fig.suptitle("📊 Sub Head Breakdown", fontsize=14, fontweight="bold")
+            dr = f"{start_date.strftime('%d-%m-%Y')} to {end_date.strftime('%d-%m-%Y')}"
+            heads = ", ".join(st.session_state.view_head_filter)
+            type_display = ", ".join(st.session_state.view_type_filter) if st.session_state.view_type_filter else "All Types"
+            location_display = st.session_state.view_location_filter or "All Locations"
+            fig.text(0.5, 0.02 + 0.015,
+                     f"Date Range: {dr} | Department: {heads} | Type: {type_display} | Location: {location_display}",
+                     ha='center', fontsize=9, color='gray')
+            if st.session_state.view_sub_filter:
+                fig.text(0.5, 0.02, f"Sub Head Filter: {st.session_state.view_sub_filter}",
+                         ha='center', fontsize=9, color='black', fontweight='bold')
+            plt.tight_layout(rect=[0, 0.06, 1, 0.94])
             buf = BytesIO()
-            plt.savefig(buf, format="png", dpi=150)
+            plt.savefig(buf, format="png", dpi=200, bbox_inches="tight")
             buf.seek(0)
             plt.close()
             st.image(buf, use_column_width=True)
             st.download_button("📥 Download Sub Head Distribution (PNG)", data=buf,
                                file_name="subhead_distribution.png", mime="image/png")
-    
-    # Export to Excel
     export_df = filtered[[
         "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
         "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "User Feedback/Remark",
@@ -695,7 +542,7 @@ with tabs[0]:
                         max_length = max(max_length, len(str(cell.value)))
                 except:
                     pass
-            adjusted_width = (max_length + 2) if max_length < 30 else 30
+            adjusted_width = (max_length + 2) if max_length < 50 else 50
             ws.column_dimensions[col_letter].width = adjusted_width
         thin_border = Border(left=Side(style='thin'),
                              right=Side(style='thin'),
@@ -708,9 +555,9 @@ with tabs[0]:
         for row in ws.iter_rows(min_row=2, min_col=status_col_idx, max_col=status_col_idx, max_row=len(export_df) + 1):
             for cell in row:
                 if str(cell.value).strip().lower() == "pending":
-                    cell.font = Font(color="FF0000")
+                    cell.font = Font(color="FF0000")  # Red
                 elif str(cell.value).strip().lower() == "resolved":
-                    cell.font = Font(color="008000")
+                    cell.font = Font(color="008000")  # Green
     towb.seek(0)
     st.download_button(
         "📥 Export Filtered Records to Excel",
@@ -718,35 +565,37 @@ with tabs[0]:
         file_name="filtered_records.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-    
+
     # ---------- EDITOR ----------
-    st.markdown("### ✍️ Edit User Feedback/Remarks")
+    st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
     if not filtered.empty:
-        # Use JavaScript-detected mobile status
-        is_mobile = st.session_state.get('is_mobile', 'false') == 'true'
-        
+        # Validate and select columns to avoid KeyError
         display_cols = [
-            "Date of Inspection", "Location", "Head", "Deficiencies Noted",
-            "User Feedback/Remark", "Status"
-        ] if is_mobile else [
             "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
-            "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "User Feedback/Remark"
+            "Deficiencies Noted", "Inspection By", "Action By", "Feedback",
+            "User Feedback/Remark"
         ]
         valid_cols = [col for col in display_cols if col in filtered.columns]
         if not valid_cols:
-            st.error("⚠️ No valid columns found.")
+            st.error("⚠️ No valid columns found in the DataFrame.")
             st.stop()
         if "Deficiencies Noted" not in valid_cols:
-            st.error("⚠️ 'Deficiencies Noted' column is required.")
+            st.error("⚠️ 'Deficiencies Noted' column is required for search functionality.")
             st.stop()
         editable_filtered = filtered.copy()
-        editable_filtered["_original_sheet_index"] = editable_filtered.index
-        editable_filtered["_sheet_row"] = editable_filtered.index + 2
+        # Ensure stable ID columns
+        if "_original_sheet_index" not in editable_filtered.columns:
+            editable_filtered["_original_sheet_index"] = editable_filtered.index
+        if "_sheet_row" not in editable_filtered.columns:
+            editable_filtered["_sheet_row"] = editable_filtered.index + 2
+        # Create editable DataFrame
         editable_df = editable_filtered[valid_cols + ["_original_sheet_index", "_sheet_row"]].copy()
+        # Format Date of Inspection
         if "Date of Inspection" in editable_df.columns:
             editable_df["Date of Inspection"] = pd.to_datetime(
                 editable_df["Date of Inspection"], errors="coerce"
-            ).dt.date
+            ).dt.date  # Changed to .dt.date for Excel compatibility
+        # Add Status column
         if "Feedback" in editable_df.columns and "User Feedback/Remark" in editable_df.columns:
             editable_df.insert(
                 editable_df.columns.get_loc("User Feedback/Remark") + 1,
@@ -754,94 +603,62 @@ with tabs[0]:
                 [get_status(r["Feedback"], r["User Feedback/Remark"]) for _, r in editable_df.iterrows()]
             )
             editable_df["Status"] = editable_df["Status"].apply(color_text_status)
-        
-        # Global Search
+        # Global Search (inbuilt search across all columns)
         st.markdown("#### 🔍 Search and Filter")
-        search_text = st.text_input("Search All Columns", "").strip().lower()
+        search_text = st.text_input("Search All Columns (case-insensitive)", "").strip().lower()
         if search_text:
             mask = editable_df[valid_cols].astype(str).apply(
                 lambda col: col.str.contains(search_text, case=False, na=False)
             ).any(axis=1)
             editable_df = editable_df[mask].copy()
-            st.info(f"Found {len(editable_df)} matching rows.")
-        
-        # Column Filtering
-        max_cols = st.slider("Max columns to filter on", 1, len(valid_cols), min(3, len(valid_cols)), key="max_cols_filter")
+            st.info(f"Found {len(editable_df)} matching rows after search.")
+        # Excel-like Column Filtering
+        max_cols = st.slider("Max columns to filter on", 1, len(valid_cols), min(5, len(valid_cols)), key="max_cols_filter")
+        candidate_columns = valid_cols[:max_cols]
         global column_selection
-        column_selection = st.multiselect("Select columns to filter", valid_cols[:max_cols], key="column_select_filter")
+        column_selection = st.multiselect("Select columns to filter", candidate_columns, key="column_select_filter")
         if column_selection:
             editable_df = filter_dataframe(editable_df)
             st.info(f"Applied filters to {len(editable_df)} rows.")
-        
-        if is_mobile:
-            # Card-based layout for mobile
-            st.markdown("#### 📋 Edit Records")
-            st.caption("Tap to expand and edit each record.")
-            for idx, row in editable_df.iterrows():
-                with st.expander(f"Record {idx + 1}: {row['Location']} - {row['Status']}"):
-                    st.markdown(f"<div class='card'>", unsafe_allow_html=True)
-                    for col in valid_cols:
-                        if col != "User Feedback/Remark":
-                            st.markdown(f"<div class='card-field'><label>{col}:</label><p>{row[col]}</p></div>", unsafe_allow_html=True)
-                    # Editable field
-                    new_remark = st.text_area(
-                        "User Feedback/Remark",
-                        value=row["User Feedback/Remark"],
-                        key=f"remark_{idx}",
-                        height=100
-                    )
-                    editable_df.at[idx, "User Feedback/Remark"] = new_remark
-                    st.markdown("</div>", unsafe_allow_html=True)
-        else:
-            # AgGrid Configuration for desktop
-            gb = GridOptionsBuilder.from_dataframe(editable_df)
-            gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True)
-            if "User Feedback/Remark" in editable_df.columns:
-                gb.configure_column(
-                    "User Feedback/Remark",
-                    editable=True,
-                    wrapText=True,
-                    autoHeight=True,
-                    cellEditor="agTextCellEditor",
-                    cellEditorPopup=False,
-                    cellEditorParams={"maxLength": 4000}
-                )
-                gb.configure_column("User Feedback/Remark", pinned="left")
-                gb.configure_column("Status", pinned="left")
-            gb.configure_column("_original_sheet_index", hide=True)
-            gb.configure_column("_sheet_row", hide=True)
-            gb.configure_grid_options(singleClickEdit=False, enterMovesDown=True)
-            auto_size_js = JsCode("""
-            function(params) {
-                let allColumnIds = [];
-                params.columnApi.getAllColumns().forEach(function(column) {
-                    if (!column.getColDef().pinned) {
-                        allColumnIds.push(column.getColId());
-                    }
-                });
-                params.columnApi.autoSizeColumns(allColumnIds);
-                params.columnApi.setColumnWidths([
-                    {key: 'User Feedback/Remark', newWidth: 200},
-                    {key: 'Status', newWidth: 100}
-                ]);
-            }
-            """)
-            gb.configure_grid_options(onFirstDataRendered=auto_size_js)
-            grid_options = gb.build()
-            
-            st.markdown("#### 📋 Editable Table")
-            st.caption("Double-click 'User Feedback/Remark' to edit. Click headers to sort.")
-            grid_response = AgGrid(
-                editable_df,
-                gridOptions=grid_options,
-                update_mode=GridUpdateMode.VALUE_CHANGED,
-                height=400,
-                allow_unsafe_jscode=True,
-                fit_columns_on_grid_load=True
+        # AgGrid Configuration
+        gb = GridOptionsBuilder.from_dataframe(editable_df)
+        gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True)
+        if "User Feedback/Remark" in editable_df.columns:
+            gb.configure_column(
+                "User Feedback/Remark",
+                editable=True,
+                wrapText=True,
+                autoHeight=True,
+                cellEditor="agTextCellEditor",
+                cellEditorPopup=False,
+                cellEditorParams={"maxLength": 4000}
             )
-            edited_df = pd.DataFrame(grid_response["data"])
-        
-        # Export Edited Records
+        gb.configure_column("_original_sheet_index", hide=True)
+        gb.configure_column("_sheet_row", hide=True)
+        gb.configure_grid_options(singleClickEdit=True)
+        auto_size_js = JsCode("""
+        function(params) {
+            let allColumnIds = [];
+            params.columnApi.getAllColumns().forEach(function(column) {
+                allColumnIds.push(column.getColId());
+            });
+            params.columnApi.autoSizeColumns(allColumnIds);
+        }
+        """)
+        gb.configure_grid_options(onFirstDataRendered=auto_size_js)
+        grid_options = gb.build()
+        # Render AgGrid
+        st.markdown("#### 📋 Editable Table")
+        st.caption("Edit 'User Feedback/Remark' column. Use column headers to sort.")
+        grid_response = AgGrid(
+            editable_df,
+            gridOptions=grid_options,
+            update_mode=GridUpdateMode.VALUE_CHANGED,
+            height=600,
+            allow_unsafe_jscode=True
+        )
+        edited_df = pd.DataFrame(grid_response["data"])
+        # Download button for filtered/edited results as Excel
         export_cols = [col for col in valid_cols if col not in ["_original_sheet_index", "_sheet_row"]] + ["Status"]
         export_edited_df = edited_df[export_cols].copy()
         export_edited_df["Date of Inspection"] = pd.to_datetime(export_edited_df["Date of Inspection"]).dt.date
@@ -866,7 +683,7 @@ with tabs[0]:
                             max_length = max(max_length, len(str(cell.value)))
                     except:
                         pass
-                adjusted_width = (max_length + 2) if max_length < 30 else 30
+                adjusted_width = (max_length + 2) if max_length < 50 else 50
                 ws.column_dimensions[col_letter].width = adjusted_width
             thin_border = Border(left=Side(style='thin'),
                                  right=Side(style='thin'),
@@ -879,9 +696,9 @@ with tabs[0]:
             for row in ws.iter_rows(min_row=2, min_col=status_col_idx, max_col=status_col_idx, max_row=len(export_edited_df) + 1):
                 for cell in row:
                     if str(cell.value).strip().lower() == "pending":
-                        cell.font = Font(color="FF0000")
+                        cell.font = Font(color="FF0000")  # Red
                     elif str(cell.value).strip().lower() == "resolved":
-                        cell.font = Font(color="008000")
+                        cell.font = Font(color="008000")  # Green
         towb_edited.seek(0)
         st.download_button(
             label="📥 Export Edited Records to Excel",
@@ -889,20 +706,18 @@ with tabs[0]:
             file_name=f"edited_records_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-        
         # Buttons
-        c1, c2 = st.columns([1, 1])
+        c1, c2, _ = st.columns([1, 1, 1])
         submitted = c1.button("✅ Submit Feedback")
         if c2.button("🔄 Refresh Data"):
             st.session_state.df = load_data()
             st.success("✅ Data refreshed successfully!")
             st.rerun()
-        
         # Submit logic
         if submitted:
             need_cols = {"_original_sheet_index", "User Feedback/Remark"}
             if not need_cols.issubset(edited_df.columns) or "Feedback" not in editable_filtered.columns:
-                st.error("⚠️ Required columns are missing.")
+                st.error("⚠️ Required columns are missing from the data.")
             else:
                 orig = editable_filtered.set_index("_original_sheet_index")
                 new = edited_df.set_index("_original_sheet_index")
@@ -915,20 +730,21 @@ with tabs[0]:
                     diffs = new.loc[changed_ids].copy()
                     diffs["_sheet_row"] = orig.loc[changed_ids, "_sheet_row"].values
                     routing = {
-                        "OPTG": ("OPTG", "Sr.DOM"),
-                        "S&T": ("SIGNAL & TELECOM", "Sr.DSTE"),
-                        "COMMERCIAL": ("COMMERCIAL", "Sr.DCM"),
-                        "ELECT/G": ("ELECT/G", "Sr.DEE/G"),
-                        "MECHANICAL": ("MECHANICAL", "Sr.DME"),
-                        "ELECT/TRD": ("ELECT/TRD", "Sr.DEE/TRD"),
-                        "ELECT/TRO": ("ELECT/TRO", "Sr.DEE/TRO"),
-                        "Sr.DEN/S": ("ENGINEERING", "Sr.DEN/S"),
-                        "Sr.DEN/C": ("ENGINEERING", "Sr.DEN/C"),
-                        "FINAINCE": ("FINANCE", "Sr.DFM"),
-                        "STORE": ("STORE", "Sr.DMM"),
-                        "MEDICAL": ("MEDICAL", "CMS"),
-                        "SECURITY": ("SECURITY", "DSC")
-                    }
+                    "Pertains to S&T":        ("SIGNAL & TELECOM", "Sr.DSTE"),
+                    "Pertains to SECURITY": ("SECURITY","DSC"),
+                    "Pertains to OPTG":       ("OPTG", "Sr.DOM"),
+                    "Pertains to COMMERCIAL": ("COMMERCIAL", "Sr.DCM"),
+                    "Pertains to ELECT/G":    ("ELECT/G", "Sr.DEE/G"),
+                    "Pertains to ELECT/TRD":  ("ELECT/TRD", "Sr.DEE/TRD"),
+                    "Pertains to MECHANICAL":  ("MECHANICAL", "Sr.DME"),
+                    "Pertains to ELECT/TRO":  ("ELECT/TRO", "Sr.DEE/TRO"),
+                    "Pertains to Sr.DEN/S":   ("ENGINEERING", "Sr.DEN/S"),
+                    "Pertains to Sr.DEN/C":   ("ENGINEERING", "Sr.DEN/C"),
+                    "Pertains to Sr.DEN/Co":  ("ENGINEERING", "Sr.DEN/Co"),
+                    "Pertains to FINAINCE": ("FINANCE","Sr.DFM"),
+                    "Pertains to STORE" : ("STORE","Sr.DMM"),
+                    "Pertains to MEDICAL" : ("MEDICAL", "CMS"),
+                }
                     for oid in changed_ids:
                         user_remark = new.loc[oid, "User Feedback/Remark"].strip()
                         if not user_remark:
@@ -959,54 +775,57 @@ with tabs[0]:
                     update_feedback_column(
                         diffs.reset_index().rename(columns={"index": "_original_sheet_index"})
                     )
-                    st.success(f"✅ Updated {len(changed_ids)} Feedback row(s).")
+                    st.success(f"✅ Updated {len(changed_ids)} Feedback row(s) with new remarks.")
                 else:
-                    st.info("ℹ️ No changes detected.")
+                    st.info("ℹ️ No changes detected to save.")
     else:
         st.info("Deficiencies will be updated soon!")
-
 # ---------------- ALERT LOG SECTION ----------------
 st.markdown("## 📋 Alerts Log")
+
 if st.session_state.alerts_log:
     for i, log in enumerate(st.session_state.alerts_log):
-        with st.expander(f"🔔 Alert {i+1}", expanded=False):
+        with st.expander(f"🔔 Alert {i+1}", expanded=True):
             st.markdown(log, unsafe_allow_html=True)
             if st.button("Mark as Read", key=f"mark_{i}"):
                 st.session_state.alerts_log.pop(i)
-                st.session_state.last_alert_clicked = i
+                st.session_state.last_alert_clicked = i  # save position
                 st.rerun()
 
+# After rerun, if we just clicked
 if "last_alert_clicked" in st.session_state:
     st.markdown(
-        """
+        f"""
         <script>
             var el = window.document.querySelector('details');
-            if (el) {
-                el.scrollIntoView({behavior: "smooth", block: "start"});
-            }
+            if (el) {{
+                el.scrollIntoView({{behavior: "smooth", block: "start"}});
+            }}
         </script>
         """,
         unsafe_allow_html=True
     )
     del st.session_state.last_alert_clicked
+
 else:
     st.info("✅ No pending alerts.")
+
 
 # -------------------- FOOTER --------------------
 st.markdown(
     """
-    <div style="text-align: center; margin: 20px 0;">
-        <p style="color:red;font-weight:bold;font-size:0.9rem;">
-            For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
-        </p>
-    </div>
+    <marquee behavior="scroll" direction="left" style="color:red;font-weight:bold;font-size:16px;">
+        For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
+    </marquee>
     """,
     unsafe_allow_html=True
 )
+
 st.markdown("""
-**Use the following syntax to forward attention to other department:**
-- For Operating: Pertains to **OPTG**
-- For Signal & Telecom: Pertains to **S&T**
+**Use the following syntax or copy to forward attention to other department:**  
+
+- For Operating: Pertains to **OPTG**  
+- For Signal & Telecom: Pertains to **S&T** 
 - For Commercial: Pertains to **COMMERCIAL**
 - For ELECT/G: Pertains to **ELECT/G**
 - For MECHANICAL: Pertains to **MECHANICAL**
@@ -1019,22 +838,133 @@ st.markdown("""
 - For Medical Department: Pertains to **MEDICAL**
 - For Security Department: Pertains to **SECURITY**
 """)
+
+
+
 st.markdown("""
-<div style="text-align: center; margin: 20px 0;">
+<div style="text-align: center; margin: 35px 0;">
   <div class="adaptive-credit">
     <p>
-      <strong>Designed & Developed by</strong>
-      <span class="highlight">Safety Department</span>,
+      <strong>Designed & Developed by</strong> 
+      <span class="highlight">Safety Department</span>, 
       <em>Solapur Division</em>
     </p>
   </div>
 </div>
+
+<style>
+/* Adaptive Colors for Light & Dark Mode */
+@media (prefers-color-scheme: light) {
+  :root {
+    --text-color: #1a1a1a;
+    --text-highlight: #0d47a1;
+    --text-sub: #1565c0;
+    --bg-glass: rgba(255, 255, 255, 0.75);
+    --border-color: #40c4ff;
+    --shadow-base: rgba(64, 196, 255, 0.2);
+    --shadow-hover: rgba(64, 196, 255, 0.35);
+    --glow-color: rgba(179, 229, 252, 0.9);
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text-color: #ffffff;
+    --text-highlight: #e3f2fd;
+    --text-sub: #bbdefb;
+    --bg-glass: rgba(15, 25, 45, 0.65);
+    --border-color: #40c4ff;
+    --shadow-base: rgba(64, 196, 255, 0.15);
+    --shadow-hover: rgba(64, 196, 255, 0.4);
+    --glow-color: rgba(179, 229, 252, 0.95);
+  }
+}
+
+/* Credit Card Style */
+.adaptive-credit {
+  display: inline-block;
+  padding: 14px 36px;
+  background: var(--bg-glass);
+  border: 2px solid var(--border-color);
+  border-radius: 18px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 8px 25px var(--shadow-base);
+  transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+  font-family: 'Roboto', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.adaptive-credit p {
+  margin: 0;
+  color: var(--text-color);
+  font-weight: 500;
+  letter-spacing: 0.8px;
+  text-shadow: none;
+  transition: text-shadow 0.4s ease;
+}
+
+.adaptive-credit p span.highlight {
+  color: var(--text-highlight);
+  font-weight: 700;
+}
+
+.adaptive-credit p em {
+  font-style: normal;
+  color: var(--text-sub);
+}
+
+/* Hover: Glow + Lift */
+.adaptive-credit:hover {
+  transform: translateY(-4px);
+  box-shadow: 
+    0 14px 35px var(--shadow-hover),
+    0 0 40px var(--glow-color),
+    0 0 0 1px var(--border-color);
+}
+
+.adaptive-credit:hover p {
+  text-shadow: 
+    0 0 10px var(--glow-color),
+    0 0 20px var(--glow-color),
+    0 0 30px var(--glow-color),
+    0 0 40px rgba(179, 229, 252, 0.6);
+}
+</style>
 """, unsafe_allow_html=True)
 
-# Analytics Tab
+# ---- PREDEFINED LISTS ----
+STATION_LIST = list(dict.fromkeys([
+    'BRB','MLM','BGVN','JNTR','PRWD','WSB','PPJ','JEUR','KEM','BLNI','DHS','KWV','WDS','MA','AAG',
+    'MKPT','MO','MVE','PK','BALE',"SUR",'TKWD','HG','TLT','AKOR','NGS','BOT','DUD','KUI','GDGN','GUR',
+    'HHD','SVG','BBD','TJSP','KLBG','HQR','MR','SDB','WADI','ARAG','BLNK','SGRE','KVK','LNP','DLGN',
+    'JTRD','MSDG','JVA','WSD','SGLA','PVR','MLB','SEI','BTW','PJR','DRSV','YSI','KMRD','DKY','MRX',
+    'OSA','HGL','LUR','NTPC','MRJ','BHLI'
+]))
+
+GATE_LIST = list(dict.fromkeys([
+    'LC-19','LC-22A','LC-25','LC-26','LC-27C','LC-28','LC-30','LC-31','LC-35','LC-37','LC-40','LC-41',
+    'LC-43','LC-44','LC-45','LC-46C','LC-54','LC-61','LC-66','LC-74','LC-76','LC-78','LC-82','LC-1',
+    'LC-60A','LC-1 TLT ZCL','LC-1 ACC','LC-2 ACC','LC-91','LC-22','LC-24','LC-32','LC-49','LC-70',
+    'LC-10','LC-34','LC-36','LC-47','LC-55','LC-59','LC-2','LC-4','LC-42','LC-02','LC-128','LC-63',
+    'LC-04','LC-67','LC-77','LC-75','LC-64','LC-65','LC-5','LC-6','LC-57','LC-62','LC-39','LC-2/C',
+    'LC-6/C','LC-11','LC-03','LC-15/C','LC-21','LC-26-A','LC-60'
+]))
+
+FOOTPLATE_ROUTES = ["SUR-DD","SUR-WADI","LUR-KWV",'KWV-MRJ','DD-SUR','WADI-SUR','KWV-LUR','MRJ-KWV']
+
+
+ALL_LOCATIONS = STATION_LIST + GATE_LIST + FOOTPLATE_ROUTES   # combined master list
+
+# ---- STREAMLIT BLOCK ----
 with tabs[1]:
-    st.markdown("### Total Deficiencies Trend")
+    st.markdown("### Total Deficiencies Trend (Bar + Trend Line)")
     df = st.session_state.df.copy()
+
+    # ------------------------------------------------------------------ #
+    # 1. Ensure Status column (Pending / Resolved)
+    # ------------------------------------------------------------------ #
     if "Status" not in df.columns:
         df["Status"] = df.apply(
             lambda r: classify_feedback(r["Feedback"], r.get("User Feedback/Remark", "")), axis=1
@@ -1043,11 +973,19 @@ with tabs[1]:
     df["Status"] = df["Status"].str.strip().str.upper().map({
         "PENDING": "Pending", "RESOLVED": "Resolved", "CLOSED": "Resolved"
     }).fillna("Pending")
+
     if df.empty:
         st.info("No data available for analytics.")
     else:
+        # ------------------------------------------------------------------ #
+        # 2. Parse dates
+        # ------------------------------------------------------------------ #
         df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
         df = df.dropna(subset=["Date of Inspection"])
+
+        # ------------------------------------------------------------------ #
+        # 3. Date filter
+        # ------------------------------------------------------------------ #
         min_date = df["Date of Inspection"].min().date()
         max_date = df["Date of Inspection"].max().date()
         start_date, end_date = st.date_input(
@@ -1060,66 +998,97 @@ with tabs[1]:
             (df["Date of Inspection"] >= pd.to_datetime(start_date)) &
             (df["Date of Inspection"] <= pd.to_datetime(end_date))
         ].copy()
+
+        # ------------------------------------------------------------------ #
+        # 4. Clean department names
+        # ------------------------------------------------------------------ #
+        import re
+        def clean_name(text):
+            if pd.isna(text):
+                return "UNKNOWN"
+            s = str(text).strip()
+            s = re.sub(r"[\*\-\_\'\"]", "", s)
+            s = re.sub(r"\s+", " ", s).strip()
+            return s.upper()
+
         df["Head_clean"] = df["Head"].apply(clean_name)
         dept_map = {
-            "ELECT/TRD": "ELECT/TRD",
-            "ELECT/G": "ELECT/G",
-            "ELECT/TRO": "ELECT/TRO",
-            "SIGNAL & TELECOM": "SIGNAL & TELECOM",
-            "OPTG": "OPERATING",
-            "MECHANICAL": "MECHANICAL",
             "ENGINEERING": "ENGINEERING",
+            "ELECT/G": "ELECT/G", "ELECTG": "ELECT/G",
+            "ELECT/TRD": "ELECT/TRD",
+            "ELECT/TRO": "ELECT/TRO",
+            "OPTG": "OPTG", "OPERATING": "OPTG",
+            "SIGNAL & TELECOM": "SIGNAL & TELECOM", "S&T": "SIGNAL & TELECOM",
+            "MECHANICAL": "MECHANICAL",
             "COMMERCIAL": "COMMERCIAL",
-            "C&W": "CARRIAGE & WAGON",
-            "PERSONNEL": "PERSONNEL",
+            "C&W": "C&W", "CW": "C&W",
             "SECURITY": "SECURITY",
-            "FINANCE": "FINANCE",
+            "PERSONNEL": "PERSONNEL",
             "MEDICAL": "MEDICAL",
+            "FINANCE": "FINANCE",
             "STORE": "STORE",
-            "": "UNKNOWN"
+            "": "UNKNOWN", "UNKNOWN": "UNKNOWN", "--": "UNKNOWN", "---": "UNKNOWN"
         }
         df["Head_std"] = df["Head_clean"].map(dept_map).fillna("UNKNOWN")
+
+        # ------------------------------------------------------------------ #
+        # 5. Clean Location & identify stations
+        # ------------------------------------------------------------------ #
+        if "Location" not in df.columns:
+            df["Location"] = ""
         df["Location_clean"] = df["Location"].astype(str).apply(clean_name)
         STATIONS_NORM = {clean_name(x) for x in STATION_LIST}
         df["Is_Station"] = df["Location_clean"].isin(STATIONS_NORM)
-        
-        # Trend chart
+
+        # ------------------------------------------------------------------ #
+        # 6. Trend chart (total deficiencies)
+        # ------------------------------------------------------------------ #
         trend = df.groupby(pd.Grouper(key="Date of Inspection", freq="M")).size().reset_index(name="TotalCount")
         if not trend.empty:
             trend = trend.sort_values("Date of Inspection")
             trend["Month"] = trend["Date of Inspection"].dt.strftime("%b-%Y")
-            bars = alt.Chart(trend).mark_bar(color="#1f77b4", cornerRadius=2).encode(
-                x=alt.X("Month:O", title="Month", sort=trend["Month"].tolist(), axis=alt.Axis(labelAngle=45, labelFontSize=10)),
+            bars = alt.Chart(trend).mark_bar(color="#1f77b4", cornerRadius=3).encode(
+                x=alt.X("Month:O", title="Month", sort=trend["Month"].tolist()),
                 y=alt.Y("TotalCount:Q", title="Total Deficiencies"),
                 tooltip=["Month", "TotalCount"]
-            ).properties(width="container")
+            )
             line = alt.Chart(trend).transform_regression("Date of Inspection", "TotalCount").mark_line(
-                color="red", strokeDash=[4, 2], strokeWidth=2
+                color="red", strokeDash=[6, 4], strokeWidth=2.5
             ).encode(x="Month:O", y="TotalCount:Q")
             st.altair_chart(bars + line, use_container_width=True)
         else:
             st.info("No data in selected range.")
-        
-        # Department summary
-        st.markdown("### Department-wise Total Deficiencies")
+
+        # ------------------------------------------------------------------ #
+        # 7. Department summary (overall)
+        # ------------------------------------------------------------------ #
+        st.markdown("### Department-wise **Total** Deficiencies Logged")
         dept_counts = df.groupby("Head_std").size().reset_index(name="TotalCount") \
                         .sort_values("TotalCount", ascending=False)
         total_deficiencies = dept_counts["TotalCount"].sum()
         dept_counts["color"] = "#ff7f0e"
         dept_counts.loc[:2, "color"] = "red"
+
         for _, row in dept_counts.iterrows():
             st.markdown(f"- **{row['Head_std']}** : **{row['TotalCount']:,}**")
         st.markdown(f"**Grand Total: {total_deficiencies:,}**")
+
         dept_chart = alt.Chart(dept_counts).mark_bar().encode(
             x=alt.X("TotalCount:Q", title="Total Deficiencies"),
             y=alt.Y("Head_std:N", sort="-x", title="Department"),
             color=alt.Color("color:N", scale=None),
             tooltip=["Head_std", alt.Tooltip("TotalCount", format=",")]
-        ).properties(height=300)
+        ).properties(height=400)
         st.altair_chart(dept_chart, use_container_width=True)
-        
-        # Top 3 stations
-        st.markdown("### Top 3 Stations")
+
+        top3 = dept_counts.head(3)
+        critical_text = ", ".join([f"**{r['Head_std']}** ({r['TotalCount']:,})" for _, r in top3.iterrows()])
+        st.markdown(f"**Critical Departments:** {critical_text}")
+
+        # ------------------------------------------------------------------ #
+        # 8. TOP 3 STATIONS ONLY
+        # ------------------------------------------------------------------ #
+        st.markdown("### Top 3 Stations having most logged deficiencies")
         station_df = df[df["Is_Station"]].copy()
         if not station_df.empty:
             top3_stations = (
@@ -1132,33 +1101,41 @@ with tabs[1]:
             )
             top3_stations["Label"] = top3_stations["Location_clean"]
             top3_stations["color"] = "red"
+
             chart = alt.Chart(top3_stations).mark_bar().encode(
                 x=alt.X("TotalCount:Q", title="Total Deficiencies"),
                 y=alt.Y("Label:N", sort="-x", title="Station"),
                 color=alt.Color("color:N", scale=None),
                 tooltip=["Label", alt.Tooltip("TotalCount", format=",")]
-            ).properties(height=200, width="container")
+            ).properties(height=260)
             st.altair_chart(chart, use_container_width=True)
         else:
-            st.info("No station data found.")
-        
-        # Location filter
-        # Department-wise Breakdown
-        st.markdown("### Department-wise Breakdown")
+            st.info("No station data found in the selected period.")
+
+        # ------------------------------------------------------------------ #
+        # 9. LOCATION FILTER → TOTAL PER DEPARTMENT + DETAILED BREAKDOWN
+        # ------------------------------------------------------------------ #
+        st.markdown("### Department wise deficiencies logged")
+
         all_locations = sorted(df["Location_clean"].dropna().unique())
         selected_locations = st.multiselect(
-            "Select Locations",
+            "Select Locations (Stations / Gates / Routes)",
             options=all_locations,
-            default=all_locations[:5] if len(all_locations) > 5 else all_locations
+            default=all_locations[:10] if len(all_locations) > 10 else all_locations
         )
+
         if selected_locations:
             filtered = df[df["Location_clean"].isin(selected_locations)].copy()
+
+            # Total per department
             dept_breakdown = (
                 filtered.groupby("Head_std")
                 .size()
                 .reset_index(name="TotalCount")
                 .sort_values("TotalCount", ascending=False)
             )
+
+            # Pending & Resolved per department
             status_breakdown = (
                 filtered.groupby(["Head_std", "Status"])
                 .size()
@@ -1166,51 +1143,63 @@ with tabs[1]:
             )
             status_breakdown.columns = [f"{col}Count" for col in status_breakdown.columns]
             status_breakdown = status_breakdown.reset_index()
-            summary_df = dept_breakdown.merge(status_breakdown, on="Head_std", how="left")
-            summary_df["PendingCount"] = summary_df.get("PendingCount", 0).fillna(0).astype(int)
-            summary_df["ResolvedCount"] = summary_df.get("ResolvedCount", 0).fillna(0).astype(int)
-        
-            if summary_df.empty or not all(col in summary_df.columns for col in ["Head_std", "TotalCount", "PendingCount", "ResolvedCount"]):
-                st.warning("⚠️ No data available for the selected locations or required columns are missing.")
-            else:
-                bar_chart = alt.Chart(summary_df).mark_bar(color="#1f77b4").encode(
-                    x=alt.X("TotalCount:Q", title="Total Deficiencies"),
-                    y=alt.Y("Head_std:N", title="Department", sort="-x"),
-                    tooltip=[
-                        "Head_std",
-                        alt.Tooltip("TotalCount", title="Total", format=","),
-                        alt.Tooltip("PendingCount", title="Pending", format=","),  # Fixed typo
-                        alt.Tooltip("ResolvedCount", title="Resolved", format=",")
-                    ]
-                ).properties(
-                    height=max(200, len(summary_df) * 30)
-                )
-                text = bar_chart.mark_text(
-                    align="left",
-                    baseline="middle",
-                    dx=3,
-                    fontWeight="bold",
-                    color="black"
-                ).encode(
-                    text=alt.Text("TotalCount:Q", format=",")
-                )
-                st.altair_chart((bar_chart + text), use_container_width=True)
-                total = summary_df["TotalCount"].sum()
-                pending = summary_df["PendingCount"].sum()
-                resolved = summary_df["ResolvedCount"].sum()
-                st.markdown(
-                    f"**Total Deficiencies:** {total:,} | "
-                    f"**Pending:** {pending:,} | "
-                    f"**Resolved:** {resolved:,}"
-                )
-                st.markdown("**Department-wise Breakdown:**")
-                for _, row in summary_df.iterrows():
-                    st.markdown(
-                        f"- **{row['Head_std']}**: **Total:** {row['TotalCount']:,} | "
-                        f"**Pending:** {row['PendingCount']:,} | "
-                        f"**Resolved:** {row['ResolvedCount']:,}"
-                    )
-        else:
-            st.info("Please select at least one location.")
-        
 
+            # Merge
+            summary_df = dept_breakdown.merge(status_breakdown, on="Head_std", how="left")
+            summary_df["PendingCount"] = summary_df.get("PendingCount", 0)
+            summary_df["ResolvedCount"] = summary_df.get("ResolvedCount", 0)
+
+            # Bar chart (total only)
+            bar_chart = alt.Chart(summary_df).mark_bar(color="#1f77b4").encode(
+                x=alt.X("TotalCount:Q", title="Total Deficiencies Logged"),
+                y=alt.Y("Head_std:N", title="Department", sort="-x"),
+                tooltip=[
+                    "Head_std",
+                    alt.Tooltip("TotalCount", title="Total", format=","),
+                    alt.Tooltip("PendingCount", title="Pending", format=","),
+                    alt.Tooltip("ResolvedCount", title="Resolved", format=",")
+                ]
+            ).properties(
+                height=max(300, len(summary_df) * 40)
+            )
+
+            # Add total count as text label
+            text = bar_chart.mark_text(
+                align="left",
+                baseline="middle",
+                dx=3,
+                fontWeight="bold",
+                color="black"
+            ).encode(
+                text=alt.Text("TotalCount:Q", format=",")
+            )
+
+            final_chart = (bar_chart + text).configure_axis(
+                labelFontSize=12,
+                titleFontSize=14
+            ).configure_title(fontSize=16)
+
+            st.altair_chart(final_chart, use_container_width=True)
+
+            # Summary line
+            total = summary_df["TotalCount"].sum()
+            pending = summary_df["PendingCount"].sum()
+            resolved = summary_df["ResolvedCount"].sum()
+
+            st.markdown(
+                f"**Total Deficiencies Logged:** {total:,} | "
+                f"**Pending:** {pending:,} | "
+                f"**Resolved:** {resolved:,}"
+            )
+
+                        # Department-wise breakdown
+            st.markdown("**Department-wise Breakdown:**")
+            for _, row in summary_df.iterrows():
+                st.markdown(
+                    f"- **{row['Head_std']}**: **Total Deficiencies:** {row['TotalCount']:,} | "
+                    f"**Pending:** {row['PendingCount']:,} | "
+                    f"**Resolved:** {row['ResolvedCount']:,}"
+                )
+
+        else:
+            st.info("Please select at least one location to view the breakdown.")
