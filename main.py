@@ -304,11 +304,9 @@ def update_feedback_column(edited_df):
     header = sheet.row_values(1)
     def col_idx(name):
         try:
-            idx = header.index(name) + 1
-            st.write(f"Found column '{name}' at index {idx}")
-            return idx
+            return header.index(name) + 1
         except ValueError:
-            st.error(f"⚠️ Column '{name}' not found in Google Sheet headers: {header}")
+            st.error(f"⚠️ '{name}' column not found")
             return None
     feedback_col = col_idx("Feedback")
     remark_col = col_idx("User Feedback/Remark")
@@ -316,45 +314,28 @@ def update_feedback_column(edited_df):
     action_col = col_idx("Action By")
     subhead_col = col_idx("Sub Head")
     if None in (feedback_col, remark_col, head_col, action_col, subhead_col):
-        st.error("Aborting update due to missing columns.")
         return
     updates = []
-    changed_rows = []
     for _, row in edited_df.iterrows():
         r = int(row["_sheet_row"])
         def a1(c): return gspread.utils.rowcol_to_a1(r, c)
-        fv = str(row.get("Feedback", "") or "")
-        rv = str(row.get("User Feedback/Remark", "") or "")
-        hv = str(row.get("Head", "") or "")
-        av = str(row.get("Action By", "") or "")
-        sv = str(row.get("Sub Head", "") or "")
-        # Check if User Feedback/Remark has changed
-        original_row = st.session_state.df[st.session_state.df["_sheet_row"] == r]
-        if not original_row.empty:
-            original_remark = str(original_row["User Feedback/Remark"].iloc[0] or "")
-            if rv != original_remark:
-                changed_rows.append({"Row": r, "New Remark": rv, "Old Remark": original_remark})
-        updates.append({
-            "range": a1(remark_col),
-            "values": [[rv]]
-        })  # Only update User Feedback/Remark for simplicity
-        # Update session state
+        fv = row.get("Feedback", "") or ""
+        rv = row.get("User Feedback/Remark", "") or ""
+        hv = row.get("Head", "") or ""
+        av = row.get("Action By", "") or ""
+        sv = row.get("Sub Head", "") or ""
+        updates += [
+            {"range": a1(feedback_col), "values": [[fv]]},
+            {"range": a1(remark_col), "values": [[rv]]},
+            {"range": a1(head_col), "values": [[hv]]},
+            {"range": a1(action_col), "values": [[av]]},
+            {"range": a1(subhead_col), "values": [[sv]]},
+        ]
         s = st.session_state.df
-        s.loc[s["_sheet_row"] == r, ["User Feedback/Remark"]] = rv
-    if changed_rows:
-        st.write("### Changes to be Submitted")
-        st.dataframe(pd.DataFrame(changed_rows))
-    else:
-        st.warning("No changes detected in User Feedback/Remark.")
-        return
+        s.loc[s["_sheet_row"] == r, ["Feedback", "User Feedback/Remark", "Head", "Action By", "Sub Head"]] = [fv, rv, hv, av, sv]
     if updates:
-        try:
-            st.write(f"Submitting {len(updates)} updates to Google Sheet...")
-            sheet.spreadsheet.values_batch_update({"valueInputOption": "USER_ENTERED", "data": updates})
-            st.write("Updates sent to Google Sheet successfully.")
-        except Exception as e:
-            st.error(f"❌ Failed to update Google Sheet: {str(e)}")
-            return
+        sheet.spreadsheet.values_batch_update({"valueInputOption": "USER_ENTERED", "data": updates})
+
 # ---------- FILTER WIDGETS ----------
 def apply_common_filters(df, prefix=""):
     with st.expander("🔍 Apply Additional Filters", expanded=True):
@@ -683,7 +664,7 @@ with tabs[0]:
         if "Date of Inspection" in editable_df.columns:
             editable_df["Date of Inspection"] = pd.to_datetime(
                 editable_df["Date of Inspection"], errors="coerce"
-            ).dt.date
+            ).dt.date  # Changed to .dt.date for Excel compatibility
         # Add Status column
         if "Feedback" in editable_df.columns and "User Feedback/Remark" in editable_df.columns:
             editable_df.insert(
@@ -692,7 +673,7 @@ with tabs[0]:
                 [get_status(r["Feedback"], r["User Feedback/Remark"]) for _, r in editable_df.iterrows()]
             )
             editable_df["Status"] = editable_df["Status"].apply(color_text_status)
-        # Global Search
+        # Global Search (inbuilt search across all columns)
         st.markdown("#### 🔍 Search and Filter")
         search_text = st.text_input("Search All Columns (case-insensitive)", "").strip().lower()
         if search_text:
@@ -704,10 +685,8 @@ with tabs[0]:
         # Excel-like Column Filtering
         max_cols = st.slider("Max columns to filter on", 1, len(valid_cols), min(5, len(valid_cols)), key="max_cols_filter")
         candidate_columns = valid_cols[:max_cols]
-        if "column_selection" not in st.session_state:
-            st.session_state.column_selection = []
-        column_selection = st.multiselect("Select columns to filter", candidate_columns, default=st.session_state.column_selection, key="column_select_filter")
-        st.session_state.column_selection = column_selection
+        global column_selection
+        column_selection = st.multiselect("Select columns to filter", candidate_columns, key="column_select_filter")
         if column_selection:
             editable_df = filter_dataframe(editable_df)
             st.info(f"Applied filters to {len(editable_df)} rows.")
@@ -720,60 +699,36 @@ with tabs[0]:
                 editable=True,
                 wrapText=True,
                 autoHeight=True,
-                cellEditor="agLargeTextCellEditor",  # Changed to support larger text input
-                cellEditorPopup=True,  # Use popup for better editing experience
+                cellEditor="agTextCellEditor",
+                cellEditorPopup=False,
                 cellEditorParams={"maxLength": 4000}
             )
         gb.configure_column("_original_sheet_index", hide=True)
         gb.configure_column("_sheet_row", hide=True)
-        gb.configure_grid_options(singleClickEdit=True, enableCellChangeFlash=True)  # Flash cells on change
-        fit_columns_js = JsCode("""
+        gb.configure_grid_options(singleClickEdit=True)
+        auto_size_js = JsCode("""
         function(params) {
-            params.api.sizeColumnsToFit();
+            let allColumnIds = [];
+            params.columnApi.getAllColumns().forEach(function(column) {
+                allColumnIds.push(column.getColId());
+            });
+            params.columnApi.autoSizeColumns(allColumnIds);
         }
         """)
-        gb.configure_grid_options(onFirstDataRendered=fit_columns_js, onGridSizeChanged=fit_columns_js)
+        gb.configure_grid_options(onFirstDataRendered=auto_size_js)
         grid_options = gb.build()
-        st.markdown("""
-        <style>
-            .ag-root-wrapper {
-                width: 100% !important;
-                max-width: 100%;
-                margin: 0 auto;
-            }
-            .ag-theme-alpine {
-                --ag-grid-size: 4px;
-                --ag-cell-horizontal-padding: 8px;
-                width: 100%;
-            }
-            .ag-header-cell {
-                font-weight: bold;
-                white-space: normal !important;
-                text-align: left;
-            }
-            .ag-cell {
-                white-space: normal !important;
-                line-height: 1.5;
-            }
-        </style>
-        """, unsafe_allow_html=True)
+        # Render AgGrid
         st.markdown("#### 📋 Editable Table")
-        st.caption("Edit 'User Feedback/Remark' column. Use column headers to sort. Click 'Submit Feedback' to save changes.")
+        st.caption("Edit 'User Feedback/Remark' column. Use column headers to sort.")
         grid_response = AgGrid(
             editable_df,
             gridOptions=grid_options,
-            update_mode=GridUpdateMode.VALUE_CHANGED | GridUpdateMode.SELECTION_CHANGED,  # Capture both value and selection changes
+            update_mode=GridUpdateMode.VALUE_CHANGED,
             height=600,
-            allow_unsafe_jscode=True,
-            fit_columns_on_grid_load=True
+            allow_unsafe_jscode=True
         )
         edited_df = pd.DataFrame(grid_response["data"])
-        # Debug: Display changes
-        if not edited_df.equals(editable_df):
-            st.write("### Detected Changes in Table")
-            changed_rows = edited_df[edited_df["User Feedback/Remark"] != editable_df["User Feedback/Remark"]]
-            st.write("Rows with updated User Feedback/Remark:", changed_rows[["_sheet_row", "User Feedback/Remark"]])
-        # Export edited DataFrame
+        # Download button for filtered/edited results as Excel
         export_cols = [col for col in valid_cols if col not in ["_original_sheet_index", "_sheet_row"]] + ["Status"]
         export_edited_df = edited_df[export_cols].copy()
         export_edited_df["Date of Inspection"] = pd.to_datetime(export_edited_df["Date of Inspection"]).dt.date
@@ -800,7 +755,10 @@ with tabs[0]:
                         pass
                 adjusted_width = (max_length + 2) if max_length < 50 else 50
                 ws.column_dimensions[col_letter].width = adjusted_width
-            thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+            thin_border = Border(left=Side(style='thin'),
+                                 right=Side(style='thin'),
+                                 top=Side(style='thin'),
+                                 bottom=Side(style='thin'))
             for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
                 for cell in row:
                     cell.border = thin_border
@@ -808,65 +766,117 @@ with tabs[0]:
             for row in ws.iter_rows(min_row=2, min_col=status_col_idx, max_col=status_col_idx, max_row=len(export_edited_df) + 1):
                 for cell in row:
                     if str(cell.value).strip().lower() == "pending":
-                        cell.font = Font(color="FF0000")
+                        cell.font = Font(color="FF0000")  # Red
                     elif str(cell.value).strip().lower() == "resolved":
-                        cell.font = Font(color="008000")
+                        cell.font = Font(color="008000")  # Green
         towb_edited.seek(0)
-        # [Keep your existing print_html code unchanged]
-        # Buttons
-        c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
-        if c1.button("✅ Submit Feedback"):
-            try:
-                update_feedback_column(edited_df)
-                st.success("✅ Feedback submitted successfully!")
-                st.session_state.df = load_data()  # Refresh data to reflect changes
-                st.rerun()
-            except Exception as e:
-                st.error(f"❌ Failed to submit feedback: {str(e)}")
-        c2.download_button(
+        st.download_button(
             label="📥 Export Edited Records to Excel",
             data=towb_edited,
             file_name=f"edited_records_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-        c3.download_button(
-            label="🖨️ Print",
-            data=print_html.encode('utf-8'),
-            file_name="saral_print_preview.html",
-            mime="text/html",
-            key="print_download"
-        )
-        st.info("Click 'Print' to download the print preview. Open the downloaded HTML file in your browser to print. If the print dialog doesn't appear, click 'Print Document' or use Ctrl+P.")
-        if c4.button("🔄 Refresh Data"):
+        # Buttons
+        c1, c2, _ = st.columns([1, 1, 1])
+        submitted = c1.button("✅ Submit Feedback")
+        if c2.button("🔄 Refresh Data"):
             st.session_state.df = load_data()
             st.success("✅ Data refreshed successfully!")
             st.rerun()
-    # ---------------- ALERT LOG SECTION ----------------
-    st.markdown("## 📋 Alerts Log")
-    if st.session_state.alerts_log:
-        for i, log in enumerate(st.session_state.alerts_log):
-            with st.expander(f"🔔 Alert {i+1}", expanded=True):
-                st.markdown(log, unsafe_allow_html=True)
-                if st.button("Mark as Read", key=f"mark_{i}"):
-                    st.session_state.alerts_log.pop(i)
-                    st.session_state.last_alert_clicked = i  # save position
-                    st.rerun()
-    # After rerun, if we just clicked
-    if "last_alert_clicked" in st.session_state:
-        st.markdown(
-            f"""
-            <script>
-                var el = window.document.querySelector('details');
-                if (el) {{
-                    el.scrollIntoView({{behavior: "smooth", block: "start"}});
-                }}
-            </script>
-            """,
-            unsafe_allow_html=True
-        )
-        del st.session_state.last_alert_clicked
+        # Submit logic
+        if submitted:
+            need_cols = {"_original_sheet_index", "User Feedback/Remark"}
+            if not need_cols.issubset(edited_df.columns) or "Feedback" not in editable_filtered.columns:
+                st.error("⚠️ Required columns are missing from the data.")
+            else:
+                orig = editable_filtered.set_index("_original_sheet_index")
+                new = edited_df.set_index("_original_sheet_index")
+                old_remarks = orig["User Feedback/Remark"].fillna("").astype(str)
+                new_remarks = new["User Feedback/Remark"].fillna("").astype(str)
+                common_ids = new_remarks.index.intersection(old_remarks.index)
+                diff_mask = new_remarks.loc[common_ids] != old_remarks.loc[common_ids]
+                changed_ids = diff_mask[diff_mask].index.tolist()
+                if changed_ids:
+                    diffs = new.loc[changed_ids].copy()
+                    diffs["_sheet_row"] = orig.loc[changed_ids, "_sheet_row"].values
+                    routing = {
+                        "Pertains to S&T": ("SIGNAL & TELECOM", "Sr.DSTE"),
+                        "Pertains to SECURITY": ("SECURITY", "DSC"),
+                        "Pertains to OPTG": ("OPTG", "Sr.DOM"),
+                        "Pertains to COMMERCIAL": ("COMMERCIAL", "Sr.DCM"),
+                        "Pertains to ELECT/G": ("ELECT/G", "Sr.DEE/G"),
+                        "Pertains to ELECT/TRD": ("ELECT/TRD", "Sr.DEE/TRD"),
+                        "Pertains to MECHANICAL": ("MECHANICAL", "Sr.DME"),
+                        "Pertains to ELECT/TRO": ("ELECT/TRO", "Sr.DEE/TRO"),
+                        "Pertains to Sr.DEN/S": ("ENGINEERING", "Sr.DEN/S"),
+                        "Pertains to Sr.DEN/C": ("ENGINEERING", "Sr.DEN/C"),
+                        "Pertains to Sr.DEN/Co": ("ENGINEERING", "Sr.DEN/Co"),
+                        "Pertains to FINAINCE": ("FINANCE", "Sr.DFM"),
+                        "Pertains to STORE": ("STORE", "Sr.DMM"),
+                        "Pertains to MEDICAL": ("MEDICAL", "CMS"),
+                    }
+                    for oid in changed_ids:
+                        user_remark = new.loc[oid, "User Feedback/Remark"].strip()
+                        if not user_remark:
+                            continue
+                        for key, (head, action_by) in routing.items():
+                            if key in user_remark:
+                                st.session_state.df.at[oid, "Head"] = head
+                                st.session_state.df.at[oid, "Action By"] = action_by
+                                st.session_state.df.at[oid, "Sub Head"] = ""
+                                diffs.at[oid, "Head"] = head
+                                diffs.at[oid, "Action By"] = action_by
+                                diffs.at[oid, "Sub Head"] = ""
+                                date_str = orig.loc[oid, "Date of Inspection"]
+                                deficiency = orig.loc[oid, "Deficiencies Noted"]
+                                forwarded_by = orig.loc[oid, "Head"]
+                                alert_msg = (
+                                    f"📌 **{head} Department Alert**\n"
+                                    f"- Date: {date_str}\n"
+                                    f"- Deficiency: {deficiency}\n"
+                                    f"- Forwarded By: {forwarded_by}\n"
+                                    f"- Forwarded Remark: {user_remark}"
+                                )
+                                st.session_state.alerts_log.insert(0, alert_msg)
+                        diffs.at[oid, "Feedback"] = user_remark
+                        diffs.at[oid, "User Feedback/Remark"] = ""
+                        st.session_state.df.at[oid, "Feedback"] = user_remark
+                        st.session_state.df.at[oid, "User Feedback/Remark"] = ""
+                    update_feedback_column(
+                        diffs.reset_index().rename(columns={"index": "_original_sheet_index"})
+                    )
+                    st.success(f"✅ Updated {len(changed_ids)} Feedback row(s) with new remarks.")
+                else:
+                    st.info("ℹ️ No changes detected to save.")
     else:
-        st.info("✅ No pending alerts.")
+        st.info("Deficiencies will be updated soon!")
+
+# ---------------- ALERT LOG SECTION ----------------
+st.markdown("## 📋 Alerts Log")
+if st.session_state.alerts_log:
+    for i, log in enumerate(st.session_state.alerts_log):
+        with st.expander(f"🔔 Alert {i+1}", expanded=True):
+            st.markdown(log, unsafe_allow_html=True)
+            if st.button("Mark as Read", key=f"mark_{i}"):
+                st.session_state.alerts_log.pop(i)
+                st.session_state.last_alert_clicked = i  # save position
+                st.rerun()
+# After rerun, if we just clicked
+if "last_alert_clicked" in st.session_state:
+    st.markdown(
+        f"""
+        <script>
+            var el = window.document.querySelector('details');
+            if (el) {{
+                el.scrollIntoView({{behavior: "smooth", block: "start"}});
+            }}
+        </script>
+        """,
+        unsafe_allow_html=True
+    )
+    del st.session_state.last_alert_clicked
+else:
+    st.info("✅ No pending alerts.")
 
 # -------------------- FOOTER --------------------
 st.markdown(
@@ -1207,5 +1217,4 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
-
 
