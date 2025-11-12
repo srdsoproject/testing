@@ -729,6 +729,7 @@ with tabs[0]:
         )
         edited_df = pd.DataFrame(grid_response["data"])
         # Download and Print buttons for filtered/edited results as Excel
+            # Download and Print buttons for filtered/edited results as Excel
         export_cols = [col for col in valid_cols if col not in ["_original_sheet_index", "_sheet_row"]] + ["Status"]
         export_edited_df = edited_df[export_cols].copy()
         export_edited_df["Date of Inspection"] = pd.to_datetime(export_edited_df["Date of Inspection"]).dt.date
@@ -772,13 +773,30 @@ with tabs[0]:
         towb_edited.seek(0)
         # Create HTML for print view
         print_html = f"""
-    <div id="printTable" style="display:none;">
-        <h2 style="text-align:center;">S.A.R.A.L - Filtered Records</h2>
-        <p style="text-align:center;">Date Range: {start_date.strftime('%d-%m-%Y')} to {end_date.strftime('%d-%m-%Y')}</p>
-        <table border="1" style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif;">
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>S.A.R.A.L - Filtered Records</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; margin: 1cm; }}
+            h2 {{ text-align: center; }}
+            p {{ text-align: center; }}
+            table {{ width: 100%; border-collapse: collapse; }}
+            th, td {{ border: 1px solid black; padding: 8px; text-align: left; }}
+            th {{ background-color: #f2f2f2; }}
+            @media print {{
+                @page {{ margin: 1cm; }}
+                body {{ margin: 0; }}
+            }}
+        </style>
+    </head>
+    <body>
+        <h2>S.A.R.A.L - Filtered Records</h2>
+        <p>Date Range: {start_date.strftime('%d-%m-%Y')} to {end_date.strftime('%d-%m-%Y')}</p>
+        <table>
             <thead>
-                <tr style="background-color:#f2f2f2;">
-                    {''.join(f'<th style="padding:8px; text-align:left;">{col}</th>' for col in export_edited_df.columns)}
+                <tr>
+                    {''.join(f'<th>{col}</th>' for col in export_edited_df.columns)}
                 </tr>
             </thead>
             <tbody>
@@ -789,24 +807,21 @@ with tabs[0]:
                 value = str(row[col]) if pd.notnull(row[col]) else ""
                 if col == "Status":
                     color = "red" if value.lower() == "pending" else "green" if value.lower() == "resolved" else "black"
-                    print_html += f'<td style="padding:8px; color:{color};">{value}</td>'
+                    print_html += f'<td style="color:{color};">{value}</td>'
                 else:
-                    print_html += f'<td style="padding:8px;">{value}</td>'
+                    print_html += f'<td>{value}</td>'
             print_html += '</tr>'
         print_html += """
             </tbody>
         </table>
-    </div>
-    <script>
-    function printTable() {
-        var printContent = document.getElementById('printTable').innerHTML;
-        var originalContent = document.body.innerHTML;
-        document.body.innerHTML = printContent;
-        window.print();
-        document.body.innerHTML = originalContent;
-        window.location.reload(); // Reload to restore Streamlit state
-    }
-    </script>
+        <script>
+            window.onload = function() {
+                window.print();
+                setTimeout(function() { window.close(); }, 100);
+            };
+        </script>
+    </body>
+    </html>
     """
         # Display buttons
         c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
@@ -817,105 +832,48 @@ with tabs[0]:
             file_name=f"edited_records_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-        c3.button("🖨️ Print", on_click=lambda: st.markdown(print_html, unsafe_allow_html=True) or st.markdown("<script>printTable();</script>", unsafe_allow_html=True))
+        if c3.button("🖨️ Print"):
+            st.session_state.print_html = print_html
+            st.markdown(
+                f"""
+                <script>
+                    var win = window.open('', '_blank');
+                    win.document.write(`{print_html}`);
+                </script>
+                """,
+                unsafe_allow_html=True
+            )
         if c4.button("🔄 Refresh Data"):
             st.session_state.df = load_data()
             st.success("✅ Data refreshed successfully!")
             st.rerun()
-        # Submit logic
-        if submitted:
-            need_cols = {"_original_sheet_index", "User Feedback/Remark"}
-            if not need_cols.issubset(edited_df.columns) or "Feedback" not in editable_filtered.columns:
-                st.error("⚠️ Required columns are missing from the data.")
-            else:
-                orig = editable_filtered.set_index("_original_sheet_index")
-                new = edited_df.set_index("_original_sheet_index")
-                old_remarks = orig["User Feedback/Remark"].fillna("").astype(str)
-                new_remarks = new["User Feedback/Remark"].fillna("").astype(str)
-                common_ids = new_remarks.index.intersection(old_remarks.index)
-                diff_mask = new_remarks.loc[common_ids] != old_remarks.loc[common_ids]
-                changed_ids = diff_mask[diff_mask].index.tolist()
-                if changed_ids:
-                    diffs = new.loc[changed_ids].copy()
-                    diffs["_sheet_row"] = orig.loc[changed_ids, "_sheet_row"].values
-                    routing = {
-                        "Pertains to S&T": ("SIGNAL & TELECOM", "Sr.DSTE"),
-                        "Pertains to SECURITY": ("SECURITY", "DSC"),
-                        "Pertains to OPTG": ("OPTG", "Sr.DOM"),
-                        "Pertains to COMMERCIAL": ("COMMERCIAL", "Sr.DCM"),
-                        "Pertains to ELECT/G": ("ELECT/G", "Sr.DEE/G"),
-                        "Pertains to ELECT/TRD": ("ELECT/TRD", "Sr.DEE/TRD"),
-                        "Pertains to MECHANICAL": ("MECHANICAL", "Sr.DME"),
-                        "Pertains to ELECT/TRO": ("ELECT/TRO", "Sr.DEE/TRO"),
-                        "Pertains to Sr.DEN/S": ("ENGINEERING", "Sr.DEN/S"),
-                        "Pertains to Sr.DEN/C": ("ENGINEERING", "Sr.DEN/C"),
-                        "Pertains to Sr.DEN/Co": ("ENGINEERING", "Sr.DEN/Co"),
-                        "Pertains to FINAINCE": ("FINANCE", "Sr.DFM"),
-                        "Pertains to STORE": ("STORE", "Sr.DMM"),
-                        "Pertains to MEDICAL": ("MEDICAL", "CMS"),
-                    }
-                    for oid in changed_ids:
-                        user_remark = new.loc[oid, "User Feedback/Remark"].strip()
-                        if not user_remark:
-                            continue
-                        for key, (head, action_by) in routing.items():
-                            if key in user_remark:
-                                st.session_state.df.at[oid, "Head"] = head
-                                st.session_state.df.at[oid, "Action By"] = action_by
-                                st.session_state.df.at[oid, "Sub Head"] = ""
-                                diffs.at[oid, "Head"] = head
-                                diffs.at[oid, "Action By"] = action_by
-                                diffs.at[oid, "Sub Head"] = ""
-                                date_str = orig.loc[oid, "Date of Inspection"]
-                                deficiency = orig.loc[oid, "Deficiencies Noted"]
-                                forwarded_by = orig.loc[oid, "Head"]
-                                alert_msg = (
-                                    f"📌 **{head} Department Alert**\n"
-                                    f"- Date: {date_str}\n"
-                                    f"- Deficiency: {deficiency}\n"
-                                    f"- Forwarded By: {forwarded_by}\n"
-                                    f"- Forwarded Remark: {user_remark}"
-                                )
-                                st.session_state.alerts_log.insert(0, alert_msg)
-                        diffs.at[oid, "Feedback"] = user_remark
-                        diffs.at[oid, "User Feedback/Remark"] = ""
-                        st.session_state.df.at[oid, "Feedback"] = user_remark
-                        st.session_state.df.at[oid, "User Feedback/Remark"] = ""
-                    update_feedback_column(
-                        diffs.reset_index().rename(columns={"index": "_original_sheet_index"})
-                    )
-                    st.success(f"✅ Updated {len(changed_ids)} Feedback row(s) with new remarks.")
-                else:
-                    st.info("ℹ️ No changes detected to save.")
+    
+    # ---------------- ALERT LOG SECTION ----------------
+    st.markdown("## 📋 Alerts Log")
+    if st.session_state.alerts_log:
+        for i, log in enumerate(st.session_state.alerts_log):
+            with st.expander(f"🔔 Alert {i+1}", expanded=True):
+                st.markdown(log, unsafe_allow_html=True)
+                if st.button("Mark as Read", key=f"mark_{i}"):
+                    st.session_state.alerts_log.pop(i)
+                    st.session_state.last_alert_clicked = i  # save position
+                    st.rerun()
+    # After rerun, if we just clicked
+    if "last_alert_clicked" in st.session_state:
+        st.markdown(
+            f"""
+            <script>
+                var el = window.document.querySelector('details');
+                if (el) {{
+                    el.scrollIntoView({{behavior: "smooth", block: "start"}});
+                }}
+            </script>
+            """,
+            unsafe_allow_html=True
+        )
+        del st.session_state.last_alert_clicked
     else:
-        st.info("Deficiencies will be updated soon!")
-
-# ---------------- ALERT LOG SECTION ----------------
-st.markdown("## 📋 Alerts Log")
-if st.session_state.alerts_log:
-    for i, log in enumerate(st.session_state.alerts_log):
-        with st.expander(f"🔔 Alert {i+1}", expanded=True):
-            st.markdown(log, unsafe_allow_html=True)
-            if st.button("Mark as Read", key=f"mark_{i}"):
-                st.session_state.alerts_log.pop(i)
-                st.session_state.last_alert_clicked = i  # save position
-                st.rerun()
-# After rerun, if we just clicked
-if "last_alert_clicked" in st.session_state:
-    st.markdown(
-        f"""
-        <script>
-            var el = window.document.querySelector('details');
-            if (el) {{
-                el.scrollIntoView({{behavior: "smooth", block: "start"}});
-            }}
-        </script>
-        """,
-        unsafe_allow_html=True
-    )
-    del st.session_state.last_alert_clicked
-else:
-    st.info("✅ No pending alerts.")
+        st.info("✅ No pending alerts.")
 
 # -------------------- FOOTER --------------------
 st.markdown(
@@ -1256,4 +1214,5 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
 
