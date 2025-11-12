@@ -664,7 +664,7 @@ with tabs[0]:
         if "Date of Inspection" in editable_df.columns:
             editable_df["Date of Inspection"] = pd.to_datetime(
                 editable_df["Date of Inspection"], errors="coerce"
-            ).dt.date # Changed to .dt.date for Excel compatibility
+            ).dt.date  # Changed to .dt.date for Excel compatibility
         # Add Status column
         if "Feedback" in editable_df.columns and "User Feedback/Remark" in editable_df.columns:
             editable_df.insert(
@@ -685,8 +685,11 @@ with tabs[0]:
         # Excel-like Column Filtering
         max_cols = st.slider("Max columns to filter on", 1, len(valid_cols), min(5, len(valid_cols)), key="max_cols_filter")
         candidate_columns = valid_cols[:max_cols]
-        global column_selection
-        column_selection = st.multiselect("Select columns to filter", candidate_columns, key="column_select_filter")
+        # Use session state instead of global variable
+        if "column_selection" not in st.session_state:
+            st.session_state.column_selection = []
+        column_selection = st.multiselect("Select columns to filter", candidate_columns, default=st.session_state.column_selection, key="column_select_filter")
+        st.session_state.column_selection = column_selection
         if column_selection:
             editable_df = filter_dataframe(editable_df)
             st.info(f"Applied filters to {len(editable_df)} rows.")
@@ -706,17 +709,38 @@ with tabs[0]:
         gb.configure_column("_original_sheet_index", hide=True)
         gb.configure_column("_sheet_row", hide=True)
         gb.configure_grid_options(singleClickEdit=True)
-        auto_size_js = JsCode("""
+        # Use sizeColumnsToFit instead of autoSizeColumns
+        fit_columns_js = JsCode("""
         function(params) {
-            let allColumnIds = [];
-            params.columnApi.getAllColumns().forEach(function(column) {
-                allColumnIds.push(column.getColId());
-            });
-            params.columnApi.autoSizeColumns(allColumnIds);
+            params.api.sizeColumnsToFit();
         }
         """)
-        gb.configure_grid_options(onFirstDataRendered=auto_size_js)
+        gb.configure_grid_options(onFirstDataRendered=fit_columns_js, onGridSizeChanged=fit_columns_js)
         grid_options = gb.build()
+        # Add CSS to make AgGrid responsive
+        st.markdown("""
+        <style>
+            .ag-root-wrapper {
+                width: 100% !important;
+                max-width: 100%;
+                margin: 0 auto;
+            }
+            .ag-theme-alpine {
+                --ag-grid-size: 4px;
+                --ag-cell-horizontal-padding: 8px;
+                width: 100%;
+            }
+            .ag-header-cell {
+                font-weight: bold;
+                white-space: normal !important;
+                text-align: left;
+            }
+            .ag-cell {
+                white-space: normal !important;
+                line-height: 1.5;
+            }
+        </style>
+        """, unsafe_allow_html=True)
         # Render AgGrid
         st.markdown("#### 📋 Editable Table")
         st.caption("Edit 'User Feedback/Remark' column. Use column headers to sort.")
@@ -725,11 +749,11 @@ with tabs[0]:
             gridOptions=grid_options,
             update_mode=GridUpdateMode.VALUE_CHANGED,
             height=600,
-            allow_unsafe_jscode=True
+            allow_unsafe_jscode=True,
+            fit_columns_on_grid_load=True  # Ensure initial fit
         )
         edited_df = pd.DataFrame(grid_response["data"])
         # Download and Print buttons for filtered/edited results as Excel
-            # Download and Print buttons for filtered/edited results as Excel
         export_cols = [col for col in valid_cols if col not in ["_original_sheet_index", "_sheet_row"]] + ["Status"]
         export_edited_df = edited_df[export_cols].copy()
         export_edited_df["Date of Inspection"] = pd.to_datetime(export_edited_df["Date of Inspection"]).dt.date
@@ -767,9 +791,9 @@ with tabs[0]:
             for row in ws.iter_rows(min_row=2, min_col=status_col_idx, max_col=status_col_idx, max_row=len(export_edited_df) + 1):
                 for cell in row:
                     if str(cell.value).strip().lower() == "pending":
-                        cell.font = Font(color="FF0000") # Red
+                        cell.font = Font(color="FF0000")  # Red
                     elif str(cell.value).strip().lower() == "resolved":
-                        cell.font = Font(color="008000") # Green
+                        cell.font = Font(color="008000")  # Green
         towb_edited.seek(0)
         # Create HTML for print view
         print_html = f"""
@@ -784,10 +808,10 @@ with tabs[0]:
             table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
             th, td {{ border: 1px solid black; padding: 10px; text-align: left; }}
             th {{ background-color: #f2f2f2; font-weight: bold; }}
-            button {{ 
-                display: block; margin: 20px auto; padding: 10px 20px; 
-                background-color: #4CAF50; color: white; border: none; 
-                cursor: pointer; font-size: 16px; border-radius: 5px; 
+            button {{
+                display: block; margin: 20px auto; padding: 10px 20px;
+                background-color: #4CAF50; color: white; border: none;
+                cursor: pointer; font-size: 16px; border-radius: 5px;
             }}
             button:hover {{ background-color: #45a049; }}
             @media print {{
@@ -1228,6 +1252,7 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
 
 
 
