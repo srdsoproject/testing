@@ -729,7 +729,6 @@ with tabs[0]:
         )
         edited_df = pd.DataFrame(grid_response["data"])
         # Download and Print buttons for filtered/edited results as Excel
-            # Download and Print buttons for filtered/edited results as Excel
         export_cols = [col for col in valid_cols if col not in ["_original_sheet_index", "_sheet_row"]] + ["Status"]
         export_edited_df = edited_df[export_cols].copy()
         export_edited_df["Date of Inspection"] = pd.to_datetime(export_edited_df["Date of Inspection"]).dt.date
@@ -778,21 +777,29 @@ with tabs[0]:
     <head>
         <title>S.A.R.A.L - Filtered Records</title>
         <style>
-            body {{ font-family: Arial, sans-serif; margin: 1cm; }}
+            body {{ font-family: Arial, sans-serif; margin: 2cm; }}
             h2 {{ text-align: center; }}
             p {{ text-align: center; }}
-            table {{ width: 100%; border-collapse: collapse; }}
-            th, td {{ border: 1px solid black; padding: 8px; text-align: left; }}
-            th {{ background-color: #f2f2f2; }}
+            table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
+            th, td {{ border: 1px solid black; padding: 10px; text-align: left; }}
+            th {{ background-color: #f2f2f2; font-weight: bold; }}
+            button {{ 
+                display: block; margin: 20px auto; padding: 10px 20px; 
+                background-color: #4CAF50; color: white; border: none; 
+                cursor: pointer; font-size: 16px; border-radius: 5px; 
+            }}
+            button:hover {{ background-color: #45a049; }}
             @media print {{
                 @page {{ margin: 1cm; }}
                 body {{ margin: 0; }}
+                button {{ display: none; }}
             }}
         </style>
     </head>
     <body>
         <h2>S.A.R.A.L - Filtered Records</h2>
         <p>Date Range: {start_date.strftime('%d-%m-%Y')} to {end_date.strftime('%d-%m-%Y')}</p>
+        <button onclick="printDocument()">Print Document</button>
         <table>
             <thead>
                 <tr>
@@ -815,9 +822,23 @@ with tabs[0]:
             </tbody>
         </table>
         <script>
+            function printDocument() {
+                try {
+                    window.print();
+                } catch (e) {
+                    console.error('Print error:', e);
+                    alert('Failed to open print dialog. Please use the browser print option (Ctrl+P).');
+                }
+            }
+            // Attempt auto-print after load
             window.onload = function() {
-                window.print();
-                setTimeout(function() { window.close(); }, 100);
+                try {
+                    setTimeout(function() {
+                        window.print();
+                    }, 500); // Delay to ensure content is rendered
+                } catch (e) {
+                    console.error('Auto-print error:', e);
+                }
             };
         </script>
     </body>
@@ -833,12 +854,23 @@ with tabs[0]:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
         if c3.button("🖨️ Print"):
-            st.session_state.print_html = print_html
             st.markdown(
                 f"""
                 <script>
-                    var win = window.open('', '_blank');
-                    win.document.write(`{print_html}`);
+                    try {{
+                        var win = window.open('', '_blank');
+                        if (win) {{
+                            win.document.write(`{print_html}`);
+                            win.document.close();
+                            win.focus();
+                        }} else {{
+                            console.error('Pop-up blocked. Please allow pop-ups for this site.');
+                            alert('Pop-up blocked. Please allow pop-ups and try again.');
+                        }}
+                    }} catch (e) {{
+                        console.error('Error opening print window:', e);
+                        alert('Failed to open print window. Please try again.');
+                    }}
                 </script>
                 """,
                 unsafe_allow_html=True
@@ -1214,5 +1246,6 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
 
 
