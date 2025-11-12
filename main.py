@@ -729,6 +729,7 @@ with tabs[0]:
         )
         edited_df = pd.DataFrame(grid_response["data"])
         # Download and Print buttons for filtered/edited results as Excel
+            # Download and Print buttons for filtered/edited results as Excel
         export_cols = [col for col in valid_cols if col not in ["_original_sheet_index", "_sheet_row"]] + ["Status"]
         export_edited_df = edited_df[export_cols].copy()
         export_edited_df["Date of Inspection"] = pd.to_datetime(export_edited_df["Date of Inspection"]).dt.date
@@ -771,6 +772,7 @@ with tabs[0]:
                         cell.font = Font(color="008000") # Green
         towb_edited.seek(0)
         # Create HTML for print view
+        # Escape special characters to prevent JavaScript injection issues
         print_html = f"""
     <!DOCTYPE html>
     <html>
@@ -827,23 +829,23 @@ with tabs[0]:
                     window.print();
                 } catch (e) {
                     console.error('Print error:', e);
-                    alert('Failed to open print dialog. Please use the browser print option (Ctrl+P).');
+                    alert('Failed to open print dialog. Please use the browser print option (Ctrl+P or Cmd+P).');
                 }
             }
-            // Attempt auto-print after load
-            window.onload = function() {
+            // Auto-print with delay
+            setTimeout(function() {
                 try {
-                    setTimeout(function() {
-                        window.print();
-                    }, 500); // Delay to ensure content is rendered
+                    window.print();
                 } catch (e) {
                     console.error('Auto-print error:', e);
                 }
-            };
+            }, 500);
         </script>
     </body>
     </html>
     """
+        # Escape print_html for JavaScript injection
+        print_html_escaped = print_html.replace('`', '\\`').replace('\n', '\\n')
         # Display buttons
         c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
         submitted = c1.button("✅ Submit Feedback")
@@ -855,22 +857,22 @@ with tabs[0]:
         )
         if c3.button("🖨️ Print"):
             st.markdown(
-                f"""
+                """
                 <script>
-                    try {{
+                    try {
                         var win = window.open('', '_blank');
-                        if (win) {{
-                            win.document.write(`{print_html}`);
+                        if (win) {
+                            win.document.write('""" + print_html_escaped + """');
                             win.document.close();
                             win.focus();
-                        }} else {{
+                        } else {
                             console.error('Pop-up blocked. Please allow pop-ups for this site.');
                             alert('Pop-up blocked. Please allow pop-ups and try again.');
-                        }}
-                    }} catch (e) {{
+                        }
+                    } catch (e) {
                         console.error('Error opening print window:', e);
                         alert('Failed to open print window. Please try again.');
-                    }}
+                    }
                 </script>
                 """,
                 unsafe_allow_html=True
@@ -1246,6 +1248,7 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
 
 
 
