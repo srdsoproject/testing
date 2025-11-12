@@ -770,64 +770,76 @@ with tabs[0]:
                     elif str(cell.value).strip().lower() == "resolved":
                         cell.font = Font(color="008000") # Green
         towb_edited.seek(0)
-        # Create HTML for print view (hidden by default)
+        # Create HTML for print view
         print_html = f"""
-        <div id="printTable" style="display: none;">
-            <h2 style="text-align: center;">S.A.R.A.L - Filtered Records</h2>
-            <p style="text-align: center;">Date Range: {start_date.strftime('%d-%m-%Y')} to {end_date.strftime('%d-%m-%Y')}</p>
-            <table style="width: 100%; border-collapse: collapse; font-family: Arial, sans-serif;">
-                <thead>
-                    <tr style="background-color: #f2f2f2;">
-                        {''.join(f'<th style="border: 1px solid black; padding: 10px; text-align: left; font-weight: bold;">{col}</th>' for col in export_edited_df.columns)}
-                    </tr>
-                </thead>
-                <tbody>
-        """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>S.A.R.A.L - Filtered Records</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; margin: 2cm; }}
+            h2 {{ text-align: center; }}
+            p {{ text-align: center; }}
+            table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
+            th, td {{ border: 1px solid black; padding: 10px; text-align: left; }}
+            th {{ background-color: #f2f2f2; font-weight: bold; }}
+            button {{ 
+                display: block; margin: 20px auto; padding: 10px 20px; 
+                background-color: #4CAF50; color: white; border: none; 
+                cursor: pointer; font-size: 16px; border-radius: 5px; 
+            }}
+            button:hover {{ background-color: #45a049; }}
+            @media print {{
+                @page {{ margin: 1cm; }}
+                body {{ margin: 0; }}
+                button {{ display: none; }}
+                table {{ border-collapse: collapse; }}
+                th, td {{ border: 1px solid black; }}
+                th {{ background-color: #f2f2f2; }}
+                * {{ -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
+            }}
+        </style>
+    </head>
+    <body>
+        <h2>S.A.R.A.L - Filtered Records</h2>
+        <p>Date Range: {start_date.strftime('%d-%m-%Y')} to {end_date.strftime('%d-%m-%Y')}</p>
+        <button onclick="window.print()">Print Document</button>
+        <table>
+            <thead>
+                <tr>
+                    {''.join(f'<th>{col}</th>' for col in export_edited_df.columns)}
+                </tr>
+            </thead>
+            <tbody>
+    """
         for _, row in export_edited_df.iterrows():
             print_html += '<tr>'
             for col in export_edited_df.columns:
                 value = str(row[col]) if pd.notnull(row[col]) else ""
                 if col == "Status":
                     color = "red" if value.lower() == "pending" else "green" if value.lower() == "resolved" else "black"
-                    print_html += f'<td style="border: 1px solid black; padding: 10px; color: {color};">{value}</td>'
+                    print_html += f'<td style="color: {color};">{value}</td>'
                 else:
-                    print_html += f'<td style="border: 1px solid black; padding: 10px;">{value}</td>'
+                    print_html += f'<td>{value}</td>'
             print_html += '</tr>'
         print_html += """
-                </tbody>
-            </table>
-            <style>
-                @media print {
-                    body * { display: none; }
-                    #printTable, #printTable * { display: block; }
-                    @page { margin: 1cm; }
-                    #printTable { 
-                        width: 100%; 
-                        font-family: Arial, sans-serif; 
-                        -webkit-print-color-adjust: exact; 
-                        print-color-adjust: exact; 
-                    }
-                    #printTable table { border-collapse: collapse; }
-                    #printTable th, #printTable td { border: 1px solid black; padding: 10px; }
-                    #printTable th { background-color: #f2f2f2; }
-                }
-            </style>
-        </div>
+            </tbody>
+        </table>
         <script>
-            function triggerPrint() {
+            window.onload = function() {
                 try {
                     console.log('Attempting to print...');
                     window.print();
                     console.log('Print dialog triggered');
                 } catch (e) {
                     console.error('Print error:', e);
-                    alert('Failed to open print dialog. Please use Ctrl+P or Cmd+P to print.');
+                    alert('Failed to open print dialog. Please click the "Print Document" button or use Ctrl+P/Cmd+P.');
                 }
-            }
+            };
         </script>
-        """
-        # Render hidden print content and print script
-        st.markdown(print_html, unsafe_allow_html=True)
+    </body>
+    </html>
+    """
         # Display buttons
         c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
         submitted = c1.button("✅ Submit Feedback")
@@ -838,14 +850,20 @@ with tabs[0]:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
         if c3.button("🖨️ Print"):
-            st.markdown(
-                '<script>triggerPrint();</script>',
-                unsafe_allow_html=True
-            )
+            try:
+                import tempfile
+                import webbrowser
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".html", mode='w', encoding='utf-8') as tmp:
+                    tmp.write(print_html)
+                    tmp_path = tmp.name
+                webbrowser.open(f"file://{tmp_path}")
+                st.success("Print preview opened in a new tab. If the print dialog doesn't appear, click 'Print Document' or use Ctrl+P.")
+            except Exception as e:
+                st.error(f"Failed to open print preview: {str(e)}. Please use Ctrl+P to print the table manually.")
         if c4.button("🔄 Refresh Data"):
             st.session_state.df = load_data()
             st.success("✅ Data refreshed successfully!")
-            st.rerun()    
+            st.rerun()
     # ---------------- ALERT LOG SECTION ----------------
     st.markdown("## 📋 Alerts Log")
     if st.session_state.alerts_log:
@@ -1212,6 +1230,7 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
 
 
 
