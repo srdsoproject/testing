@@ -664,7 +664,7 @@ with tabs[0]:
         if "Date of Inspection" in editable_df.columns:
             editable_df["Date of Inspection"] = pd.to_datetime(
                 editable_df["Date of Inspection"], errors="coerce"
-            ).dt.date  # Changed to .dt.date for Excel compatibility
+            ).dt.date # Changed to .dt.date for Excel compatibility
         # Add Status column
         if "Feedback" in editable_df.columns and "User Feedback/Remark" in editable_df.columns:
             editable_df.insert(
@@ -728,7 +728,7 @@ with tabs[0]:
             allow_unsafe_jscode=True
         )
         edited_df = pd.DataFrame(grid_response["data"])
-        # Download button for filtered/edited results as Excel
+        # Download and Print buttons for filtered/edited results as Excel
         export_cols = [col for col in valid_cols if col not in ["_original_sheet_index", "_sheet_row"]] + ["Status"]
         export_edited_df = edited_df[export_cols].copy()
         export_edited_df["Date of Inspection"] = pd.to_datetime(export_edited_df["Date of Inspection"]).dt.date
@@ -766,20 +766,59 @@ with tabs[0]:
             for row in ws.iter_rows(min_row=2, min_col=status_col_idx, max_col=status_col_idx, max_row=len(export_edited_df) + 1):
                 for cell in row:
                     if str(cell.value).strip().lower() == "pending":
-                        cell.font = Font(color="FF0000")  # Red
+                        cell.font = Font(color="FF0000") # Red
                     elif str(cell.value).strip().lower() == "resolved":
-                        cell.font = Font(color="008000")  # Green
+                        cell.font = Font(color="008000") # Green
         towb_edited.seek(0)
-        st.download_button(
+        # Create HTML for print view
+        print_html = f"""
+    <div id="printTable" style="display:none;">
+        <h2 style="text-align:center;">S.A.R.A.L - Filtered Records</h2>
+        <p style="text-align:center;">Date Range: {start_date.strftime('%d-%m-%Y')} to {end_date.strftime('%d-%m-%Y')}</p>
+        <table border="1" style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif;">
+            <thead>
+                <tr style="background-color:#f2f2f2;">
+                    {''.join(f'<th style="padding:8px; text-align:left;">{col}</th>' for col in export_edited_df.columns)}
+                </tr>
+            </thead>
+            <tbody>
+    """
+        for _, row in export_edited_df.iterrows():
+            print_html += '<tr>'
+            for col in export_edited_df.columns:
+                value = str(row[col]) if pd.notnull(row[col]) else ""
+                if col == "Status":
+                    color = "red" if value.lower() == "pending" else "green" if value.lower() == "resolved" else "black"
+                    print_html += f'<td style="padding:8px; color:{color};">{value}</td>'
+                else:
+                    print_html += f'<td style="padding:8px;">{value}</td>'
+            print_html += '</tr>'
+        print_html += """
+            </tbody>
+        </table>
+    </div>
+    <script>
+    function printTable() {
+        var printContent = document.getElementById('printTable').innerHTML;
+        var originalContent = document.body.innerHTML;
+        document.body.innerHTML = printContent;
+        window.print();
+        document.body.innerHTML = originalContent;
+        window.location.reload(); // Reload to restore Streamlit state
+    }
+    </script>
+    """
+        # Display buttons
+        c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
+        submitted = c1.button("✅ Submit Feedback")
+        c2.download_button(
             label="📥 Export Edited Records to Excel",
             data=towb_edited,
             file_name=f"edited_records_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-        # Buttons
-        c1, c2, _ = st.columns([1, 1, 1])
-        submitted = c1.button("✅ Submit Feedback")
-        if c2.button("🔄 Refresh Data"):
+        c3.button("🖨️ Print", on_click=lambda: st.markdown(print_html, unsafe_allow_html=True) or st.markdown("<script>printTable();</script>", unsafe_allow_html=True))
+        if c4.button("🔄 Refresh Data"):
             st.session_state.df = load_data()
             st.success("✅ Data refreshed successfully!")
             st.rerun()
@@ -1217,3 +1256,4 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
