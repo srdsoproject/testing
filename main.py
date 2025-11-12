@@ -729,6 +729,7 @@ with tabs[0]:
         )
         edited_df = pd.DataFrame(grid_response["data"])
         # Download and Print buttons for filtered/edited results as Excel
+            # Download and Print buttons for filtered/edited results as Excel
         export_cols = [col for col in valid_cols if col not in ["_original_sheet_index", "_sheet_row"]] + ["Status"]
         export_edited_df = edited_df[export_cols].copy()
         export_edited_df["Date of Inspection"] = pd.to_datetime(export_edited_df["Date of Inspection"]).dt.date
@@ -849,17 +850,14 @@ with tabs[0]:
             file_name=f"edited_records_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-        if c3.button("🖨️ Print"):
-            try:
-                import tempfile
-                import webbrowser
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".html", mode='w', encoding='utf-8') as tmp:
-                    tmp.write(print_html)
-                    tmp_path = tmp.name
-                webbrowser.open(f"file://{tmp_path}")
-                st.success("Print preview opened in a new tab. If the print dialog doesn't appear, click 'Print Document' or use Ctrl+P.")
-            except Exception as e:
-                st.error(f"Failed to open print preview: {str(e)}. Please use Ctrl+P to print the table manually.")
+        c3.download_button(
+            label="🖨️ Print",
+            data=print_html.encode('utf-8'),
+            file_name="saral_print_preview.html",
+            mime="text/html",
+            key="print_download"
+        )
+        st.info("Click 'Print' to download the print preview. Open the downloaded HTML file in your browser to print. If the print dialog doesn't appear, click 'Print Document' or use Ctrl+P.")
         if c4.button("🔄 Refresh Data"):
             st.session_state.df = load_data()
             st.success("✅ Data refreshed successfully!")
@@ -1230,6 +1228,7 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
 
 
 
