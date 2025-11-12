@@ -771,81 +771,43 @@ with tabs[0]:
                     elif str(cell.value).strip().lower() == "resolved":
                         cell.font = Font(color="008000") # Green
         towb_edited.seek(0)
-        # Create HTML for print view
-        # Escape special characters to prevent JavaScript injection issues
+        # Create HTML for print view (hidden by default)
         print_html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>S.A.R.A.L - Filtered Records</title>
-        <style>
-            body {{ font-family: Arial, sans-serif; margin: 2cm; }}
-            h2 {{ text-align: center; }}
-            p {{ text-align: center; }}
-            table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
-            th, td {{ border: 1px solid black; padding: 10px; text-align: left; }}
-            th {{ background-color: #f2f2f2; font-weight: bold; }}
-            button {{ 
-                display: block; margin: 20px auto; padding: 10px 20px; 
-                background-color: #4CAF50; color: white; border: none; 
-                cursor: pointer; font-size: 16px; border-radius: 5px; 
-            }}
-            button:hover {{ background-color: #45a049; }}
-            @media print {{
-                @page {{ margin: 1cm; }}
-                body {{ margin: 0; }}
-                button {{ display: none; }}
-            }}
-        </style>
-    </head>
-    <body>
-        <h2>S.A.R.A.L - Filtered Records</h2>
-        <p>Date Range: {start_date.strftime('%d-%m-%Y')} to {end_date.strftime('%d-%m-%Y')}</p>
-        <button onclick="printDocument()">Print Document</button>
-        <table>
-            <thead>
-                <tr>
-                    {''.join(f'<th>{col}</th>' for col in export_edited_df.columns)}
-                </tr>
-            </thead>
-            <tbody>
-    """
+        <div id="printTable" style="display: none;">
+            <h2 style="text-align: center;">S.A.R.A.L - Filtered Records</h2>
+            <p style="text-align: center;">Date Range: {start_date.strftime('%d-%m-%Y')} to {end_date.strftime('%d-%m-%Y')}</p>
+            <table style="width: 100%; border-collapse: collapse; font-family: Arial, sans-serif;">
+                <thead>
+                    <tr style="background-color: #f2f2f2;">
+                        {''.join(f'<th style="border: 1px solid black; padding: 10px; text-align: left; font-weight: bold;">{col}</th>' for col in export_edited_df.columns)}
+                    </tr>
+                </thead>
+                <tbody>
+        """
         for _, row in export_edited_df.iterrows():
             print_html += '<tr>'
             for col in export_edited_df.columns:
                 value = str(row[col]) if pd.notnull(row[col]) else ""
                 if col == "Status":
                     color = "red" if value.lower() == "pending" else "green" if value.lower() == "resolved" else "black"
-                    print_html += f'<td style="color:{color};">{value}</td>'
+                    print_html += f'<td style="border: 1px solid black; padding: 10px; color: {color};">{value}</td>'
                 else:
-                    print_html += f'<td>{value}</td>'
+                    print_html += f'<td style="border: 1px solid black; padding: 10px;">{value}</td>'
             print_html += '</tr>'
         print_html += """
-            </tbody>
-        </table>
-        <script>
-            function printDocument() {
-                try {
-                    window.print();
-                } catch (e) {
-                    console.error('Print error:', e);
-                    alert('Failed to open print dialog. Please use the browser print option (Ctrl+P or Cmd+P).');
+                </tbody>
+            </table>
+            <style>
+                @media print {
+                    body * { display: none; }
+                    #printTable, #printTable * { display: block; }
+                    @page { margin: 1cm; }
                 }
-            }
-            // Auto-print with delay
-            setTimeout(function() {
-                try {
-                    window.print();
-                } catch (e) {
-                    console.error('Auto-print error:', e);
-                }
-            }, 500);
-        </script>
-    </body>
-    </html>
-    """
-        # Escape print_html for JavaScript injection
-        print_html_escaped = print_html.replace('`', '\\`').replace('\n', '\\n')
+            </style>
+        </div>
+        """
+        # Render hidden print content
+        st.markdown(print_html, unsafe_allow_html=True)
         # Display buttons
         c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
         submitted = c1.button("✅ Submit Feedback")
@@ -860,18 +822,10 @@ with tabs[0]:
                 """
                 <script>
                     try {
-                        var win = window.open('', '_blank');
-                        if (win) {
-                            win.document.write('""" + print_html_escaped + """');
-                            win.document.close();
-                            win.focus();
-                        } else {
-                            console.error('Pop-up blocked. Please allow pop-ups for this site.');
-                            alert('Pop-up blocked. Please allow pop-ups and try again.');
-                        }
+                        window.print();
                     } catch (e) {
-                        console.error('Error opening print window:', e);
-                        alert('Failed to open print window. Please try again.');
+                        console.error('Print error:', e);
+                        alert('Failed to open print dialog. Please use Ctrl+P or Cmd+P to print.');
                     }
                 </script>
                 """,
@@ -1248,6 +1202,7 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
 
 
 
