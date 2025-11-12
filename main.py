@@ -683,7 +683,7 @@ with tabs[0]:
             editable_df = editable_df[mask].copy()
             st.info(f"Found {len(editable_df)} matching rows after search.")
         # Excel-like Column Filtering
-        max_cols = st.slider("Max columns to filter on", 1, len(valid_cols), min(5, len(valid_cols)), key="max_cols_filter")
+        max_cols = st.slider("Max columns to filter on", 1, len(valid_cols), min(10, len(valid_cols)), key="max_cols_filter")
         candidate_columns = valid_cols[:max_cols]
         global column_selection
         column_selection = st.multiselect("Select columns to filter", candidate_columns, key="column_select_filter")
@@ -1217,4 +1217,5 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
 
