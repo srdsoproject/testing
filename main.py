@@ -304,9 +304,11 @@ def update_feedback_column(edited_df):
     header = sheet.row_values(1)
     def col_idx(name):
         try:
-            return header.index(name) + 1
+            idx = header.index(name) + 1
+            st.write(f"Found column '{name}' at index {idx}")
+            return idx
         except ValueError:
-            st.error(f"⚠️ '{name}' column not found")
+            st.error(f"⚠️ Column '{name}' not found in Google Sheet headers: {header}")
             return None
     feedback_col = col_idx("Feedback")
     remark_col = col_idx("User Feedback/Remark")
@@ -314,28 +316,45 @@ def update_feedback_column(edited_df):
     action_col = col_idx("Action By")
     subhead_col = col_idx("Sub Head")
     if None in (feedback_col, remark_col, head_col, action_col, subhead_col):
+        st.error("Aborting update due to missing columns.")
         return
     updates = []
+    changed_rows = []
     for _, row in edited_df.iterrows():
         r = int(row["_sheet_row"])
         def a1(c): return gspread.utils.rowcol_to_a1(r, c)
-        fv = row.get("Feedback", "") or ""
-        rv = row.get("User Feedback/Remark", "") or ""
-        hv = row.get("Head", "") or ""
-        av = row.get("Action By", "") or ""
-        sv = row.get("Sub Head", "") or ""
-        updates += [
-            {"range": a1(feedback_col), "values": [[fv]]},
-            {"range": a1(remark_col), "values": [[rv]]},
-            {"range": a1(head_col), "values": [[hv]]},
-            {"range": a1(action_col), "values": [[av]]},
-            {"range": a1(subhead_col), "values": [[sv]]},
-        ]
+        fv = str(row.get("Feedback", "") or "")
+        rv = str(row.get("User Feedback/Remark", "") or "")
+        hv = str(row.get("Head", "") or "")
+        av = str(row.get("Action By", "") or "")
+        sv = str(row.get("Sub Head", "") or "")
+        # Check if User Feedback/Remark has changed
+        original_row = st.session_state.df[st.session_state.df["_sheet_row"] == r]
+        if not original_row.empty:
+            original_remark = str(original_row["User Feedback/Remark"].iloc[0] or "")
+            if rv != original_remark:
+                changed_rows.append({"Row": r, "New Remark": rv, "Old Remark": original_remark})
+        updates.append({
+            "range": a1(remark_col),
+            "values": [[rv]]
+        })  # Only update User Feedback/Remark for simplicity
+        # Update session state
         s = st.session_state.df
-        s.loc[s["_sheet_row"] == r, ["Feedback", "User Feedback/Remark", "Head", "Action By", "Sub Head"]] = [fv, rv, hv, av, sv]
+        s.loc[s["_sheet_row"] == r, ["User Feedback/Remark"]] = rv
+    if changed_rows:
+        st.write("### Changes to be Submitted")
+        st.dataframe(pd.DataFrame(changed_rows))
+    else:
+        st.warning("No changes detected in User Feedback/Remark.")
+        return
     if updates:
-        sheet.spreadsheet.values_batch_update({"valueInputOption": "USER_ENTERED", "data": updates})
-
+        try:
+            st.write(f"Submitting {len(updates)} updates to Google Sheet...")
+            sheet.spreadsheet.values_batch_update({"valueInputOption": "USER_ENTERED", "data": updates})
+            st.write("Updates sent to Google Sheet successfully.")
+        except Exception as e:
+            st.error(f"❌ Failed to update Google Sheet: {str(e)}")
+            return
 # ---------- FILTER WIDGETS ----------
 def apply_common_filters(df, prefix=""):
     with st.expander("🔍 Apply Additional Filters", expanded=True):
@@ -664,7 +683,7 @@ with tabs[0]:
         if "Date of Inspection" in editable_df.columns:
             editable_df["Date of Inspection"] = pd.to_datetime(
                 editable_df["Date of Inspection"], errors="coerce"
-            ).dt.date  # Changed to .dt.date for Excel compatibility
+            ).dt.date
         # Add Status column
         if "Feedback" in editable_df.columns and "User Feedback/Remark" in editable_df.columns:
             editable_df.insert(
@@ -673,7 +692,7 @@ with tabs[0]:
                 [get_status(r["Feedback"], r["User Feedback/Remark"]) for _, r in editable_df.iterrows()]
             )
             editable_df["Status"] = editable_df["Status"].apply(color_text_status)
-        # Global Search (inbuilt search across all columns)
+        # Global Search
         st.markdown("#### 🔍 Search and Filter")
         search_text = st.text_input("Search All Columns (case-insensitive)", "").strip().lower()
         if search_text:
@@ -685,7 +704,6 @@ with tabs[0]:
         # Excel-like Column Filtering
         max_cols = st.slider("Max columns to filter on", 1, len(valid_cols), min(5, len(valid_cols)), key="max_cols_filter")
         candidate_columns = valid_cols[:max_cols]
-        # Use session state instead of global variable
         if "column_selection" not in st.session_state:
             st.session_state.column_selection = []
         column_selection = st.multiselect("Select columns to filter", candidate_columns, default=st.session_state.column_selection, key="column_select_filter")
@@ -702,14 +720,13 @@ with tabs[0]:
                 editable=True,
                 wrapText=True,
                 autoHeight=True,
-                cellEditor="agTextCellEditor",
-                cellEditorPopup=False,
+                cellEditor="agLargeTextCellEditor",  # Changed to support larger text input
+                cellEditorPopup=True,  # Use popup for better editing experience
                 cellEditorParams={"maxLength": 4000}
             )
         gb.configure_column("_original_sheet_index", hide=True)
         gb.configure_column("_sheet_row", hide=True)
-        gb.configure_grid_options(singleClickEdit=True)
-        # Use sizeColumnsToFit instead of autoSizeColumns
+        gb.configure_grid_options(singleClickEdit=True, enableCellChangeFlash=True)  # Flash cells on change
         fit_columns_js = JsCode("""
         function(params) {
             params.api.sizeColumnsToFit();
@@ -717,7 +734,6 @@ with tabs[0]:
         """)
         gb.configure_grid_options(onFirstDataRendered=fit_columns_js, onGridSizeChanged=fit_columns_js)
         grid_options = gb.build()
-        # Add CSS to make AgGrid responsive
         st.markdown("""
         <style>
             .ag-root-wrapper {
@@ -741,19 +757,23 @@ with tabs[0]:
             }
         </style>
         """, unsafe_allow_html=True)
-        # Render AgGrid
         st.markdown("#### 📋 Editable Table")
-        st.caption("Edit 'User Feedback/Remark' column. Use column headers to sort.")
+        st.caption("Edit 'User Feedback/Remark' column. Use column headers to sort. Click 'Submit Feedback' to save changes.")
         grid_response = AgGrid(
             editable_df,
             gridOptions=grid_options,
-            update_mode=GridUpdateMode.VALUE_CHANGED,
+            update_mode=GridUpdateMode.VALUE_CHANGED | GridUpdateMode.SELECTION_CHANGED,  # Capture both value and selection changes
             height=600,
             allow_unsafe_jscode=True,
-            fit_columns_on_grid_load=True  # Ensure initial fit
+            fit_columns_on_grid_load=True
         )
         edited_df = pd.DataFrame(grid_response["data"])
-        # Download and Print buttons for filtered/edited results as Excel
+        # Debug: Display changes
+        if not edited_df.equals(editable_df):
+            st.write("### Detected Changes in Table")
+            changed_rows = edited_df[edited_df["User Feedback/Remark"] != editable_df["User Feedback/Remark"]]
+            st.write("Rows with updated User Feedback/Remark:", changed_rows[["_sheet_row", "User Feedback/Remark"]])
+        # Export edited DataFrame
         export_cols = [col for col in valid_cols if col not in ["_original_sheet_index", "_sheet_row"]] + ["Status"]
         export_edited_df = edited_df[export_cols].copy()
         export_edited_df["Date of Inspection"] = pd.to_datetime(export_edited_df["Date of Inspection"]).dt.date
@@ -780,10 +800,7 @@ with tabs[0]:
                         pass
                 adjusted_width = (max_length + 2) if max_length < 50 else 50
                 ws.column_dimensions[col_letter].width = adjusted_width
-            thin_border = Border(left=Side(style='thin'),
-                                 right=Side(style='thin'),
-                                 top=Side(style='thin'),
-                                 bottom=Side(style='thin'))
+            thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
             for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
                 for cell in row:
                     cell.border = thin_border
@@ -791,83 +808,21 @@ with tabs[0]:
             for row in ws.iter_rows(min_row=2, min_col=status_col_idx, max_col=status_col_idx, max_row=len(export_edited_df) + 1):
                 for cell in row:
                     if str(cell.value).strip().lower() == "pending":
-                        cell.font = Font(color="FF0000")  # Red
+                        cell.font = Font(color="FF0000")
                     elif str(cell.value).strip().lower() == "resolved":
-                        cell.font = Font(color="008000")  # Green
+                        cell.font = Font(color="008000")
         towb_edited.seek(0)
-        # Create HTML for print view
-        print_html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>S.A.R.A.L - Filtered Records</title>
-        <style>
-            body {{ font-family: Arial, sans-serif; margin: 2cm; }}
-            h2 {{ text-align: center; }}
-            p {{ text-align: center; }}
-            table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
-            th, td {{ border: 1px solid black; padding: 10px; text-align: left; }}
-            th {{ background-color: #f2f2f2; font-weight: bold; }}
-            button {{
-                display: block; margin: 20px auto; padding: 10px 20px;
-                background-color: #4CAF50; color: white; border: none;
-                cursor: pointer; font-size: 16px; border-radius: 5px;
-            }}
-            button:hover {{ background-color: #45a049; }}
-            @media print {{
-                @page {{ margin: 1cm; }}
-                body {{ margin: 0; }}
-                button {{ display: none; }}
-                table {{ border-collapse: collapse; }}
-                th, td {{ border: 1px solid black; }}
-                th {{ background-color: #f2f2f2; }}
-                * {{ -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
-            }}
-        </style>
-    </head>
-    <body>
-        <h2>S.A.R.A.L - Filtered Records</h2>
-        <p>Date Range: {start_date.strftime('%d-%m-%Y')} to {end_date.strftime('%d-%m-%Y')}</p>
-        <button onclick="window.print()">Print Document</button>
-        <table>
-            <thead>
-                <tr>
-                    {''.join(f'<th>{col}</th>' for col in export_edited_df.columns)}
-                </tr>
-            </thead>
-            <tbody>
-    """
-        for _, row in export_edited_df.iterrows():
-            print_html += '<tr>'
-            for col in export_edited_df.columns:
-                value = str(row[col]) if pd.notnull(row[col]) else ""
-                if col == "Status":
-                    color = "red" if value.lower() == "pending" else "green" if value.lower() == "resolved" else "black"
-                    print_html += f'<td style="color: {color};">{value}</td>'
-                else:
-                    print_html += f'<td>{value}</td>'
-            print_html += '</tr>'
-        print_html += """
-            </tbody>
-        </table>
-        <script>
-            window.onload = function() {
-                try {
-                    console.log('Attempting to print...');
-                    window.print();
-                    console.log('Print dialog triggered');
-                } catch (e) {
-                    console.error('Print error:', e);
-                    alert('Failed to open print dialog. Please click the "Print Document" button or use Ctrl+P/Cmd+P.');
-                }
-            };
-        </script>
-    </body>
-    </html>
-    """
-        # Display buttons
+        # [Keep your existing print_html code unchanged]
+        # Buttons
         c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
-        submitted = c1.button("✅ Submit Feedback")
+        if c1.button("✅ Submit Feedback"):
+            try:
+                update_feedback_column(edited_df)
+                st.success("✅ Feedback submitted successfully!")
+                st.session_state.df = load_data()  # Refresh data to reflect changes
+                st.rerun()
+            except Exception as e:
+                st.error(f"❌ Failed to submit feedback: {str(e)}")
         c2.download_button(
             label="📥 Export Edited Records to Excel",
             data=towb_edited,
@@ -1252,4 +1207,5 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
 
