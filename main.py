@@ -128,7 +128,7 @@ if st.sidebar.button("🚪 Logout"):
 
 # ---------- CONSTANT LISTS ----------
 STATION_LIST = list(dict.fromkeys([
-    'BRB', 'MLM', 'BGVN', 'JNTR', 'PRWD', 'WSB', 'PPJ', 'JEUR', 'KEM', 'BLNI', 'DHS', 'KWV', 'WDS', 'MA', 'AAG',
+    'BRB', 'MLM', 'BGVN', 'JNTR', 'KEU', 'WSB', 'PPJ', 'JEUR', 'KEM', 'BLNI', 'DHS', 'KWV', 'WDS', 'MA', 'AAG',
     'MKPT', 'MO', 'MVE', 'PK', 'BALE', "SUR", 'TKWD', 'HG', 'TLT', 'AKOR', 'NGS', 'BOT', 'DUD', 'KUI', 'GDGN', 'GUR',
     'HHD', 'SVG', 'BBD', 'TJSP', 'KLBG', 'HQR', 'MR', 'SDB', 'WADI', 'ARAG', 'BLNK', 'SGRE', 'KVK', 'LNP', 'DLGN',
     'JTRD', 'MSDG', 'JVA', 'WSD', 'SGLA', 'PVR', 'MLB', 'SEI', 'BTW', 'PJR', 'DRSV', 'YSI', 'KMRD', 'DKY', 'MRX',
@@ -144,14 +144,14 @@ GATE_LIST = list(dict.fromkeys([
 ]))
 # Updated Footplate Route Hierarchy
 FOOTPLATE_ROUTE_HIERARCHY = {
-    "SUR-DD": ["SUR-KWV", "KWV-DD"],
-    "SUR-WADI": ["SUR-KLBG", "SDB-WADI", "KLBG-WADI"],
-    "LUR-KWV": ["BTW-KWV"],
+    "SUR-DD": ["SUR-KWV", "KWV-DD", "BRB-DD"],
+    "SUR-WADI": ["SUR-KLBG", "SDB-WADI", "KLBG-WADI", "BOT-DUD", "DUD-WADI", "SUR-TKWD"],
+    "LUR-KWV": ["BTW-KWV", "DRSV-KWV"],
     "KWV-MRJ": ["KWV-PVR"],
-    "DD-SUR": ["JEUR-KWV"],
-    "WADI-SUR": ["WADI-KLBG", "KLBG-SUR"],
+    "DD-SUR": ["JEUR-KWV", "BGVN-JNTR"],
+    "WADI-SUR": ["WADI-KLBG", "KLBG-SUR", "DUD-HG"],
     "KWV-LUR": ["KWV-BTW"],
-    "MRJ-KWV": ["PVR-KWV"],
+    "MRJ-KWV": ["PVR-KWV", "SGLA-PVR"],
 }
 FOOTPLATE_ROUTES = list(FOOTPLATE_ROUTE_HIERARCHY.keys())
 ALL_FOOTPLATE_LOCATIONS = FOOTPLATE_ROUTES + [sub for subs in FOOTPLATE_ROUTE_HIERARCHY.values() for sub in subs]
@@ -1217,5 +1217,6 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
 
 
