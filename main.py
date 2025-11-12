@@ -729,7 +729,6 @@ with tabs[0]:
         )
         edited_df = pd.DataFrame(grid_response["data"])
         # Download and Print buttons for filtered/edited results as Excel
-            # Download and Print buttons for filtered/edited results as Excel
         export_cols = [col for col in valid_cols if col not in ["_original_sheet_index", "_sheet_row"]] + ["Status"]
         export_edited_df = edited_df[export_cols].copy()
         export_edited_df["Date of Inspection"] = pd.to_datetime(export_edited_df["Date of Inspection"]).dt.date
@@ -802,11 +801,32 @@ with tabs[0]:
                     body * { display: none; }
                     #printTable, #printTable * { display: block; }
                     @page { margin: 1cm; }
+                    #printTable { 
+                        width: 100%; 
+                        font-family: Arial, sans-serif; 
+                        -webkit-print-color-adjust: exact; 
+                        print-color-adjust: exact; 
+                    }
+                    #printTable table { border-collapse: collapse; }
+                    #printTable th, #printTable td { border: 1px solid black; padding: 10px; }
+                    #printTable th { background-color: #f2f2f2; }
                 }
             </style>
         </div>
+        <script>
+            function triggerPrint() {
+                try {
+                    console.log('Attempting to print...');
+                    window.print();
+                    console.log('Print dialog triggered');
+                } catch (e) {
+                    console.error('Print error:', e);
+                    alert('Failed to open print dialog. Please use Ctrl+P or Cmd+P to print.');
+                }
+            }
+        </script>
         """
-        # Render hidden print content
+        # Render hidden print content and print script
         st.markdown(print_html, unsafe_allow_html=True)
         # Display buttons
         c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
@@ -819,23 +839,13 @@ with tabs[0]:
         )
         if c3.button("🖨️ Print"):
             st.markdown(
-                """
-                <script>
-                    try {
-                        window.print();
-                    } catch (e) {
-                        console.error('Print error:', e);
-                        alert('Failed to open print dialog. Please use Ctrl+P or Cmd+P to print.');
-                    }
-                </script>
-                """,
+                '<script>triggerPrint();</script>',
                 unsafe_allow_html=True
             )
         if c4.button("🔄 Refresh Data"):
             st.session_state.df = load_data()
             st.success("✅ Data refreshed successfully!")
-            st.rerun()
-    
+            st.rerun()    
     # ---------------- ALERT LOG SECTION ----------------
     st.markdown("## 📋 Alerts Log")
     if st.session_state.alerts_log:
@@ -1202,6 +1212,7 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
 
 
 
