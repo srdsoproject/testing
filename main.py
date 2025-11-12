@@ -1174,3 +1174,123 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
+# NEW: Submit Deficiency Tab
+with tabs[2]:
+    st.markdown("### ➕ Submit New Deficiency")
+    st.markdown("""
+    <style>
+        @media (max-width: 768px) {
+            .stForm { padding: 10px; }
+            .stSelectbox, .stDateInput, .stTextArea, .stTextInput { margin-bottom: 10px; }
+            .stTextArea > textarea { height: 100px; font-size: 14px; }
+            .stButton > button { width: 100%; padding: 10px; font-size: 16px; }
+            .stSelectbox > div, .stDateInput > div, .stTextInput > div { width: 100%; }
+        }
+        .stForm { max-width: 800px; margin: 0 auto; }
+        .error-text { color: red; font-size: 14px; }
+    </style>
+    """, unsafe_allow_html=True)
+    with st.form("new_deficiency"):
+        st.markdown("#### 📝 Deficiency Details")
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            date = st.date_input("📅 Date of Inspection", value=pd.Timestamp.today())
+            inspection_type = st.selectbox("🔍 Type of Inspection", VALID_INSPECTIONS)
+            location = st.selectbox("📍 Location", ALL_LOCATIONS)
+            head = st.selectbox("🏛️ Head", HEAD_LIST[1:])
+        with col2:
+            sub_head = st.selectbox("📌 Sub Head", SUBHEAD_LIST.get(head, []))
+            inspection_by = st.selectbox("👤 Inspection By", INSPECTION_BY_LIST[1:])
+            action_by = st.selectbox("📋 Action By", ACTION_BY_LIST[1:])
+            deficiencies_noted = st.text_area("📝 Deficiencies Noted", height=100)
+        feedback = st.text_input("💬 Initial Feedback (Optional)")
+        remark = st.text_input("📝 Initial Remark (Optional)")
+        submitted = st.form_submit_button("✅ Submit Deficiency")
+        if submitted:
+            if not deficiencies_noted.strip():
+                st.markdown('<p class="error-text">❌ Deficiencies Noted is required.</p>', unsafe_allow_html=True)
+            else:
+                new_row = {
+                    "Date of Inspection": pd.Timestamp(date),
+                    "Type of Inspection": inspection_type,
+                    "Location": location,
+                    "Head": head,
+                    "Sub Head": sub_head,
+                    "Deficiencies Noted": deficiencies_noted,
+                    "Inspection By": inspection_by,
+                    "Action By": action_by,
+                    "Feedback": feedback,
+                    "User Feedback/Remark": remark
+                }
+                if submit_deficiency(new_row):
+                    st.success(f"✅ Deficiency submitted for {location} on {date.strftime('%d-%m-%Y')}!")
+                    st.rerun()
+
+# -------------------- FOOTER --------------------
+st.markdown(
+    """
+    <marquee behavior="scroll" direction="left" style="color:red;font-weight:bold;font-size:16px;">
+        For any correction in data, contact Safety Department on sursafetyposition@gmail.com, Contact: Rly phone no. 55620, Cell: +91 9022507772
+    </marquee>
+    """,
+    unsafe_allow_html=True
+)
+st.markdown("""
+**Use the following syntax or copy to forward attention to other department:**
+- For Operating: Pertains to **OPTG**
+- For Signal & Telecom: Pertains to **S&T**
+- For Commercial: Pertains to **COMMERCIAL**
+- For ELECT/G: Pertains to **ELECT/G**
+- For MECHANICAL: Pertains to **MECHANICAL**
+- For ELECT/TRD: Pertains to **ELECT/TRD**
+- For ELECT/TRO: Pertains to **ELECT/TRO**
+- For Engineering South: Pertains to **Sr.DEN/S**
+- For Engineering North: Pertains to **Sr.DEN/C**
+- For Finance Department: Pertains to **FINAINCE**
+- For Store Department: Pertains to **STORE**
+- For Medical Department: Pertains to **MEDICAL**
+- For Security Department: Pertains to **SECURITY**
+""")
+st.markdown("""
+<div style="text-align: center; margin: 35px 0;">
+  <div class="adaptive-credit">
+    <p>
+      <strong>Designed & Developed by</strong>
+      <span class="highlight">Safety Department</span>,
+      <em>Solapur Division</em>
+    </p>
+  </div>
+</div>
+<style>
+@media (prefers-color-scheme: light) {
+  :root {
+    --text-color: #1a1a1a;
+    --text-highlight: #0d47a1;
+    --text-sub: #1565c0;
+    --bg-glass: rgba(255, 255, 255, 0.75);
+    --border-color: #40c4ff;
+    --shadow-base: rgba(64, 196, 255, 0.2);
+    --shadow-hover: rgba(64, 196, 255, 0.35);
+    --glow-color: rgba(179, 229, 252, 0.9);
+  }
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text-color: #ffffff;
+    --text-highlight: #e3f2fd;
+    --text-sub: #bbdefb;
+    --bg-glass: rgba(15, 25, 45, 0.65);
+    --border-color: #40c4ff;
+    --shadow-base: rgba(64, 196, 255, 0.15);
+    --shadow-hover: rgba(64, 196, 255, 0.4);
+    --glow-color: rgba(179, 229, 252, 0.95);
+  }
+}
+.adaptive-credit {
+  display: inline-block;
+  padding: 14px 36px;
+  background: var(--bg-glass);
+  border: 2px solid var(--border-color);
+  border-radius: 18px;
+  backdrop-filter: blur(12px);
