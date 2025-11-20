@@ -13,5 +13,3 @@ openpyxl
 transformers
 torch
 altair
-streamlit-translator
-googletrans==4.0.0-rc1
