@@ -13,5 +13,3 @@ openpyxl
 transformers
 torch
 altair
-# --- IMPROVED MAP VIEW (No Conflicts!) ---
-streamlit-kepler-component>=0.1.0
