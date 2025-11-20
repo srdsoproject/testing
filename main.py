@@ -882,40 +882,7 @@ else:
 
 # -------------------- FOOTER --------------------
 # -------------------- CONTACT BUTTON --------------------
-st.markdown("### 📞 Need Help or Correction in Data?")
-col1, col2, col3 = st.columns([1, 2, 1])
-with col2:
-    whatsapp_url = "https://wa.me/919022507772?text=Hello%20Safety%20Department%2C%20I%20need%20assistance%20regarding%20S.A.R.A.L%20data."
-    st.markdown(
-        f"""
-        <div style="text-align: center;">
-            <a href="{whatsapp_url}" target="_blank">
-                <button style="
-                    background-color: #25D366;
-                    color: white;
-                    font-size: 18px;
-                    font-weight: bold;
-                    padding: 14px 32px;
-                    border: none;
-                    border-radius: 50px;
-                    cursor: pointer;
-                    box-shadow: 0 4px 15px rgba(37, 211, 102, 0.4);
-                    transition: all 0.3s ease;
-                "
-                onmouseover="this.style.backgroundColor='#128C7E'; this.style.transform='scale(1.05)';"
-                onmouseout="this.style.backgroundColor='#25D366'; this.style.transform='scale(1)';">
-                    📱 Contact Us on WhatsApp<br>
-                    <small>+91 90225 07772</small>
-                </button>
-            </a>
-            <p style="margin-top: 15px; color: gray; font-size: 14px;">
-                For data corrections: <br>
-                ✉️ <a href="mailto:sursafetyposition@gmail.com">sursafetyposition@gmail.com</a> | Rly: 55620
-            </p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+
 st.markdown("""
 **Use the following syntax or copy to forward attention to other department:**
 - For Operating: Pertains to **OPTG**
@@ -1016,7 +983,40 @@ st.markdown("""
 }
 </style>
 """, unsafe_allow_html=True)
-
+st.markdown("### 📞 Need Help or Correction in Data?")
+col1, col2, col3 = st.columns([1, 2, 1])
+with col2:
+    whatsapp_url = "https://wa.me/919022507772?text=Hello%20Safety%20Department%2C%20I%20need%20assistance%20regarding%20S.A.R.A.L%20data."
+    st.markdown(
+        f"""
+        <div style="text-align: center;">
+            <a href="{whatsapp_url}" target="_blank">
+                <button style="
+                    background-color: #25D366;
+                    color: white;
+                    font-size: 18px;
+                    font-weight: bold;
+                    padding: 14px 32px;
+                    border: none;
+                    border-radius: 50px;
+                    cursor: pointer;
+                    box-shadow: 0 4px 15px rgba(37, 211, 102, 0.4);
+                    transition: all 0.3s ease;
+                "
+                onmouseover="this.style.backgroundColor='#128C7E'; this.style.transform='scale(1.05)';"
+                onmouseout="this.style.backgroundColor='#25D366'; this.style.transform='scale(1)';">
+                    📱 Contact Us on WhatsApp<br>
+                    <small>+91 90225 07772</small>
+                </button>
+            </a>
+            <p style="margin-top: 15px; color: gray; font-size: 14px;">
+                For data corrections: <br>
+                ✉️ <a href="mailto:sursafetyposition@gmail.com">sursafetyposition@gmail.com</a> | Rly: 55620
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 # ---- STREAMLIT BLOCK ----
 with tabs[1]:
     st.markdown("### Total Deficiencies Trend (Bar + Trend Line)")
@@ -1246,6 +1246,7 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
 
 
 
