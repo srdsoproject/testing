@@ -638,11 +638,10 @@ with tabs[0]:
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
     # ---------- EDITOR ----------
-    st.markdown("### ✍️ Edit User Feedback/Remarks in Table")
     if not filtered.empty:
         # Validate and select columns to avoid KeyError
         display_cols = [
-            "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
+            "Date of Inspection", "Type of Inspection",  "Head", "Sub Head","Location",
             "Deficiencies Noted", "Inspection By", "Action By", "Feedback",
             "User Feedback/Remark"
         ]
@@ -1220,6 +1219,7 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
 
 
 
