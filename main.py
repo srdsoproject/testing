@@ -815,7 +815,7 @@ with tabs[0]:
                         "Pertains to FINAINCE": ("FINANCE", "Sr.DFM"),
                         "Pertains to STORE": ("STORE", "Sr.DMM"),
                         "Pertains to MEDICAL": ("MEDICAL", "CMS"),
-                        "
+                        
                     }
                     for oid in changed_ids:
                         user_remark = new.loc[oid, "User Feedback/Remark"].strip()
@@ -1219,6 +1219,7 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
 
 
 
