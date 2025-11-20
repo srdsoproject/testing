@@ -144,14 +144,15 @@ GATE_LIST = list(dict.fromkeys([
 ]))
 # Updated Footplate Route Hierarchy
 FOOTPLATE_ROUTE_HIERARCHY = {
-    "SUR-DD": ["SUR-KWV", "KWV-DD", "BRB-DD"],
-    "SUR-WADI": ["SUR-KLBG", "SDB-WADI", "KLBG-WADI", "BOT-DUD", "DUD-WADI", "SUR-TKWD"],
-    "LUR-KWV": ["BTW-KWV", "DRSV-KWV"],
-    "KWV-MRJ": ["KWV-PVR"],
-    "DD-SUR": ["JEUR-KWV", "BGVN-JNTR"],
-    "WADI-SUR": ["WADI-KLBG", "KLBG-SUR", "DUD-HG"],
-    "KWV-LUR": ["KWV-BTW"],
-    "MRJ-KWV": ["PVR-KWV", "SGLA-PVR"],
+    "SUR-DD": ["SUR-KWV", "KWV-DD", "BRB-DD", 'PPJ-WSB', 'SUR-BGVN', 'SUR-MA', 'SUR-PUNE'],
+    "SUR-WADI": ["SUR-KLBG", "SDB-WADI", "KLBG-WADI", "BOT-DUD", "DUD-WADI", "SUR-TKWD", 'BBD-KLBG', 'SUR-DUD', 'SUR-SDB'],
+    "LUR-KWV": ["BTW-KWV", "DRSV-KWV", 'SEI-KWV'],
+    "KWV-MRJ": ["KWV-PVR", 'DLGN-KVK', 'DLGN-PVR', 'PVR-MRJ'],
+    "DD-SUR": ["JEUR-KWV", "BGVN-JNTR", 'BGVN-JNTR', 'DD-KWV', 'KWV-SUR'],
+    "WADI-SUR": ["WADI-KLBG", "KLBG-SUR", "DUD-HG", 'BOT-NGS', 'WADI-SDB'],
+    "KWV-LUR": ["KWV-BTW", 'DRSV-LUR'],
+    "MRJ-KWV": ["PVR-KWV", "SGLA-PVR", 'SGRE-KVK'],
+    "KLBG-TJSP", "TJSP-KLBG",
 }
 FOOTPLATE_ROUTES = list(FOOTPLATE_ROUTE_HIERARCHY.keys())
 ALL_FOOTPLATE_LOCATIONS = FOOTPLATE_ROUTES + [sub for subs in FOOTPLATE_ROUTE_HIERARCHY.values() for sub in subs]
@@ -163,9 +164,8 @@ SUBHEAD_LIST = {
     "ELECT/G": ["TL/AC COACH", "POWER/PANTRY CAR", "WIRING/EQUIPMENT", "UPS", "AC", "DG", "SOLAR LIGHT", "MISC"],
     "ELECT/TRO": ["LOCO DEFECTS", "RUNNING ROOM DEFICIENCIES", "LOBBY DEFICIENCIES", "LRD RELATED", "PERSONAL STORE", "PR RELATED",
                   "CMS", "FSD","MISC"],
-    "MECHANICAL": ["DEMU RELATED", "VANDE BHARAT RELATED", "MISC"],
-    "SIGNAL & TELECOM": ["SIGNAL PUTBACK/BLANK", "OTHER SIGNAL FAILURE", "BPAC", "GATE", "RELAY ROOM",
-                         "STATION(VDU/BLOCK INSTRUMENT)", "MISC", "CCTV", "DISPLAY BOARDS", "KAVACH RELATED"],
+    "MECHANICAL": ['C&W RELATED', "DEMU RELATED", "VANDE BHARAT RELATED", "MISC", 'MECHANICAL RELATED', 'HABD'],
+    "SIGNAL & TELECOM": ["S&T ASSETS", 'WALKIE-TALKIE/PHONE', 'VDU/BPAC/BLOCK INST./PANEL', 'PASSENGER AMENITIES', 'SIGNAL RELATED', 'P&C', 'TRACK CIRCUIT', 'RELAY ROOM', 'MISC'],
     "OPTG": ["SWR/CSR/CSL/TWRD", "COMPETENCY RELATED", "STATION RECORDS", "STATION DEFICIENCIES",
              "SM OFFICE DEFICIENCIES", "MISC"],
     "ENGINEERING": ["IOW WORKS", "GSU", "ROUGH RIDING", "TRACK NEEDS ATTENTION", "MISC"],
@@ -176,7 +176,7 @@ SUBHEAD_LIST = {
 }
 INSPECTION_BY_LIST = [""] + ["HQ OFFICER CCE/CR", 'DRM/SUR', 'ADRM', 'Sr.DSO', 'Sr.DOM', 'Sr.DEN/S', 'Sr.DEN/C', 'Sr.DEN/Co', 'Sr.DSTE',
                              'Sr.DEE/TRD', 'Sr.DEE/G', 'Sr.DEE/TRO', 'Sr.DME', 'Sr.DCM', 'Sr.DPO', 'Sr.DFM', 'Sr.DMM', 'DSC',
-                             'DME,DEE/TRD', 'DFM', 'DSTE/HQ', 'DSTE/KLBG', 'ADEN/T/SUR', 'ADEN/W/SUR', 'ADEN/KWV',
+                             'DME','DEE/TRD', 'DFM', 'DSTE/HQ', 'DSTE/KLBG', 'ADEN/T/SUR', 'ADEN/W/SUR', 'ADEN/KWV',
                              'ADEN/PVR', 'ADEN/LUR', 'ADEN/KLBG', 'ADSTE/SUR', 'ADSTE/I/KWV', 'ADSTE/II/KWV',
                              'ADME/SUR', 'AOM/GD', 'AOM/GEN', 'ACM/Cog', 'ACM/TC', 'ACM/GD', 'APO/GEN', 'APO/WEL',
                              'ADFM/I', 'ADFMII', 'ASC', 'ADSO/SUR']
@@ -184,7 +184,7 @@ ACTION_BY_LIST = [""] + ['DRM/SUR', 'ADRM', 'Sr.DSO', 'Sr.DOM', 'Sr.DEN/S', 'Sr.
                          'Sr.DEE/TRD', 'Sr.DEE/G', 'Sr.DEE/TRO', 'Sr.DME', 'Sr.DCM', 'Sr.DPO', 'Sr.DFM', 'Sr.DMM', 'DSC', 'CMS']
 VALID_INSPECTIONS = [
     "FOOTPLATE INSPECTION", "STATION INSPECTION", "LC GATE INSPECTION",
-    "MISC", "COACHING DEPOT", "ON TRAIN", "SURPRISE/AMBUSH INSPECTION", "WORKSITE INSPECTION", "OTHER (UNUSUAL)",
+    "COACHING DEPOT", "ON TRAIN", "SURPRISE/AMBUSH INSPECTION", "WORKSITE INSPECTION", "OTHER (UNUSUAL)",
 ]
 
 # ---------- HELPERS ----------
@@ -210,7 +210,7 @@ def classify_feedback(feedback, user_remark=""):
             "briefed", "guided", "handover", "working properly", "checked found working", "supply restored",
             "updated by", "adv to", "counselled the staff", "complied", "checked and found",
             "maintained", "for needful action", "provided at", "in working condition", "is working",
-            "found working", "equipment is working", "item is working", "as per plan", "putright", "put right",
+            "found working", "equipment is working", "item is working", "as per plan", "putright", "put right", 'attend dt','attend dt.', 
             "operational feasibility", "will be provided", "will be supplied shortly", "advised to ubl", "updated"
         ]
         pending_kw = [
@@ -381,7 +381,7 @@ st.markdown(
     </div>
     <h1 style="margin-top:0;color:var(--text-color);">📋 S.A.R.A.L</h1>
     <h3 style="margin-top:-10px;font-weight:normal;color:var(--text-color);">
-        (Safety Abnormality Report & Action List – Version 1.1.8)
+        (Safety Abnormality Report & Action List – Version 1.2.2)
     </h3>
     """,
     unsafe_allow_html=True
@@ -463,8 +463,8 @@ with tabs[0]:
     filtered = apply_common_filters(filtered, prefix="view_")
     filtered = filtered.apply(lambda x: x.str.replace("\n", " ") if x.dtype == "object" else x)
     filtered = filtered.sort_values("Date of Inspection")
-    st.write(f"🔹 Showing {len(filtered)} record(s) from **{start_date.strftime('%d.%m.%Y')}** "
-             f"to **{end_date.strftime('%d.%m.%Y')}**")
+    #st.write(f"🔹 Showing {len(filtered)} record(s) from **{start_date.strftime('%d.%m.%Y')}** "
+             #f"to **{end_date.strftime('%d.%m.%Y')}**")
     col_a, col_b, col_c, col_d = st.columns(4)
     pending_count = (filtered["Status"] == "Pending").sum()
     no_response_count = filtered["Feedback"].isna().sum() + (filtered["Feedback"].astype(str).str.strip() == "").sum()
@@ -718,8 +718,8 @@ with tabs[0]:
         gb.configure_grid_options(onFirstDataRendered=auto_size_js)
         grid_options = gb.build()
         # Render AgGrid
-        st.markdown("#### 📋 Editable Table")
-        st.caption("Edit 'User Feedback/Remark' column. Use column headers to sort.")
+        st.markdown("#### 🚈 Inspection Details")
+        st.caption("Type your compliance in 'User Feedback/Remark' column. Use column headers to sort.")
         grid_response = AgGrid(
             editable_df,
             gridOptions=grid_options,
@@ -809,11 +809,13 @@ with tabs[0]:
                         "Pertains to MECHANICAL": ("MECHANICAL", "Sr.DME"),
                         "Pertains to ELECT/TRO": ("ELECT/TRO", "Sr.DEE/TRO"),
                         "Pertains to Sr.DEN/S": ("ENGINEERING", "Sr.DEN/S"),
+                        "Pertains to Sr. DEN(South)" : ("ENGINEERING", "Sr.DEN/S"),
                         "Pertains to Sr.DEN/C": ("ENGINEERING", "Sr.DEN/C"),
                         "Pertains to Sr.DEN/Co": ("ENGINEERING", "Sr.DEN/Co"),
                         "Pertains to FINAINCE": ("FINANCE", "Sr.DFM"),
                         "Pertains to STORE": ("STORE", "Sr.DMM"),
                         "Pertains to MEDICAL": ("MEDICAL", "CMS"),
+                        "
                     }
                     for oid in changed_ids:
                         user_remark = new.loc[oid, "User Feedback/Remark"].strip()
@@ -1217,6 +1219,7 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
 
 
 
