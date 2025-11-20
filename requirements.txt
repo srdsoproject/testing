@@ -13,9 +13,5 @@ openpyxl
 transformers
 torch
 altair
-# --- MAP VIEW (Kepler.gl) – Fixed versions ---
-keplergl==0.3.2
-streamlit-keplergl==0.2.0
-rich==13.7.1          # ← This line fixes the conflict
-traitlets==5.14.3
-ipython>=7.0,<9.0
+# --- IMPROVED MAP VIEW (No Conflicts!) ---
+streamlit-kepler-component>=0.1.0
