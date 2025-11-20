@@ -152,7 +152,8 @@ FOOTPLATE_ROUTE_HIERARCHY = {
     "WADI-SUR": ["WADI-KLBG", "KLBG-SUR", "DUD-HG", 'BOT-NGS', 'WADI-SDB'],
     "KWV-LUR": ["KWV-BTW", 'DRSV-LUR'],
     "MRJ-KWV": ["PVR-KWV", "SGLA-PVR", 'SGRE-KVK'],
-    "KLBG-TJSP", "TJSP-KLBG",
+    "KLBG-TJSP" : [], 
+    "TJSP-KLBG" : [],
 }
 FOOTPLATE_ROUTES = list(FOOTPLATE_ROUTE_HIERARCHY.keys())
 ALL_FOOTPLATE_LOCATIONS = FOOTPLATE_ROUTES + [sub for subs in FOOTPLATE_ROUTE_HIERARCHY.values() for sub in subs]
@@ -1219,6 +1220,7 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
 
 
 
