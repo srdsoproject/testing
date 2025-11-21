@@ -438,29 +438,18 @@ def generate_please_explain_pdf(officer_name, officer_post, pending_items):
         pagesize=A4,
         rightMargin=60,
         leftMargin=60,
-        topMargin=60,      # Increased to make space for letterhead
-        bottomMargin=0.6*inch
+        topMargin=120,           # Perfect for your letterhead height
+        bottomMargin=0.7*inch
     )
 
     # ------------------------------------------------------------------
-    # Custom Letterhead (full width, fixed at top of every page)
+    # Letterhead (placed only once at the top of first page)
     # ------------------------------------------------------------------
-    letterhead_path = "https://raw.githubusercontent.com/srdsoproject/testing/main/image.png"  # Direct URL to your letterhead image
-
-    letterhead = Image(letterhead_path, width=470, height=100)  # adjust height if needed
+    letterhead_url = "https://raw.githubusercontent.com/srdsoproject/testing/main/image.png"
+    letterhead = Image(letterhead_url, width=520, height=115)   # Exact fit for your image
     letterhead.hAlign = 'CENTER'
-
-    # Create a frame that starts after the letterhead
-    frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height - 140,
-                  id='normal', showBoundary=0)
-
-    # Page template with letterhead on every page
-    template = PageTemplate(id='letterhead_page', frames=frame,
-                            onPage=lambda canvas, doc: canvas.drawImage(letterhead_path,
-                                                                        x=35, y=750,
-                                                                        width=520, height=110,
-                                                                        preserveAspectRatio=True))
-    doc.addPageTemplates([template])
+    
+    story = [letterhead, Spacer(1, 12)]   # Only 12pt gap below letterhead → looks perfect
 
     # ------------------------------------------------------------------
     # Styles
@@ -472,21 +461,17 @@ def generate_please_explain_pdf(officer_name, officer_post, pending_items):
     styles.add(ParagraphStyle(name='Small', alignment=0, fontSize=9.5, leading=11))
     styles.add(ParagraphStyle(name='RightSign', alignment=2, fontSize=11, fontName='Helvetica-Bold'))
 
-    story = []
-
     # ------------------------------------------------------------------
-    # Start content below the letterhead
+    # Content starts here
     # ------------------------------------------------------------------
-    story.append(Spacer(1, 30))   # Extra space after letterhead
-
-    # Letter No & Date (side by side)
+    # Letter No & Date
     header = Table([
         [Paragraph(f"No. SUR/SAFETY/DEF/{datetime.now().strftime('%Y')}", styles['Normal']),
          Paragraph(f"Date: {datetime.now().strftime('%d %B %Y')}", styles['Normal'])]
     ], colWidths=[320, 180])
     header.setStyle(TableStyle([('ALIGN', (1,0), (1,0), 'RIGHT')]))
     story.append(header)
-    story.append(Spacer(1, 20))
+    story.append(Spacer(1, 18))
 
     story.append(Paragraph(f"To,<br/>The {officer_post}<br/>Central Railway, Solapur", styles['LeftNormal']))
     story.append(Spacer(1, 18))
@@ -499,7 +484,7 @@ def generate_please_explain_pdf(officer_name, officer_post, pending_items):
     story.append(Paragraph("The following safety-related deficiencies are pending for compliance for more than 45 days:", styles['Justify']))
     story.append(Spacer(1, 8))
 
-    # Pending items table
+    # Table
     data = [["Sr.", "Location", "Date", "Deficiency", "Days"]]
     for i, item in enumerate(pending_items, 1):
         days = (datetime.now().date() - item["Date"].date()).days
@@ -534,12 +519,8 @@ def generate_please_explain_pdf(officer_name, officer_post, pending_items):
 
     story.append(Paragraph("Yours faithfully,", styles['LeftNormal']))
     story.append(Spacer(1, 50))
-
-    # Signature (right aligned)
     story.append(Paragraph("Sr.DSO/SUR", styles['RightSign']))
     story.append(Spacer(1, 40))
-
-    # C/- line below signature
     story.append(Paragraph("C/- DRM/SUR – for kind information and necessary action please.", styles['LeftNormal']))
 
     # ------------------------------------------------------------------
@@ -1432,6 +1413,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
