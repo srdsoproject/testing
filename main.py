@@ -433,23 +433,27 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 def generate_please_explain_pdf(officer_name, officer_post, pending_items):
     buffer = io.BytesIO()
 
+    # Reduced top margin to minimum and place letterhead exactly at top
     doc = SimpleDocTemplate(
         buffer,
         pagesize=A4,
         rightMargin=60,
         leftMargin=60,
-        topMargin=120,           # Perfect for your letterhead height
+        topMargin=10,        # Almost zero top margin
         bottomMargin=0.7*inch
     )
 
     # ------------------------------------------------------------------
-    # Letterhead (placed only once at the top of first page)
+    # Letterhead - placed at absolute top
     # ------------------------------------------------------------------
     letterhead_url = "https://raw.githubusercontent.com/srdsoproject/testing/main/image.png"
-    letterhead = Image(letterhead_url, width=520, height=115)   # Exact fit for your image
+    letterhead = Image(letterhead_url, width=520, height=115)
     letterhead.hAlign = 'CENTER'
-    
-    story = [letterhead, Spacer(1, 12)]   # Only 12pt gap below letterhead → looks perfect
+
+    story = [
+        letterhead,                    # Letterhead right at the top
+        Spacer(1, 15)                  # Only 15pt natural gap below letterhead
+    ]
 
     # ------------------------------------------------------------------
     # Styles
@@ -462,9 +466,8 @@ def generate_please_explain_pdf(officer_name, officer_post, pending_items):
     styles.add(ParagraphStyle(name='RightSign', alignment=2, fontSize=11, fontName='Helvetica-Bold'))
 
     # ------------------------------------------------------------------
-    # Content starts here
+    # Content
     # ------------------------------------------------------------------
-    # Letter No & Date
     header = Table([
         [Paragraph(f"No. SUR/SAFETY/DEF/{datetime.now().strftime('%Y')}", styles['Normal']),
          Paragraph(f"Date: {datetime.now().strftime('%d %B %Y')}", styles['Normal'])]
@@ -511,7 +514,6 @@ def generate_please_explain_pdf(officer_name, officer_post, pending_items):
     story.append(table)
     story.append(Spacer(1, 12))
 
-    # Body
     story.append(Paragraph("These deficiencies pertain to safety of train operations and their continued pendency is viewed seriously.", styles['Justify']))
     story.append(Paragraph("You are requested to explain in writing within 7 days why compliance has not been ensured despite repeated reminders.", styles['Justify']))
     story.append(Paragraph("A copy is marked to PCPO for placing in your APAR folder.", styles['Justify']))
@@ -1413,6 +1415,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
