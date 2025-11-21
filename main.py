@@ -449,7 +449,7 @@ def generate_please_explain_pdf(officer_name, officer_post, pending_items):
     
     story.append(Spacer(1, 20))
     story.append(Paragraph("CENTRAL RAILWAY", styles['Title']))
-    story.append(Paragraph("Office of the Divisional Railway Manager<br/>Solapur Division", styles['CenterBold']))
+    story.append(Paragraph("Office of the Senior Divisional Safety Officer<br/>Solapur Division", styles['CenterBold']))
     story.append(Spacer(1, 30))
     
     story.append(Paragraph(f"No. SUR/SAFETY/DEF/{datetime.now().strftime('%Y')}", styles['Normal']))
@@ -501,7 +501,7 @@ def generate_please_explain_pdf(officer_name, officer_post, pending_items):
     
     story.append(Paragraph("Yours faithfully,", styles['LeftNormal']))
     story.append(Spacer(1, 40))
-    story.append(Paragraph("For Divisional Railway Manager<br/>Solapur", styles['CenterBold']))
+    story.append(Paragraph("C/- DRM/SUR for necessary action.", styles['CenterBold']))
     
     doc.build(story)
     buffer.seek(0)
@@ -1390,6 +1390,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
