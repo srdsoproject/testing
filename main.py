@@ -438,7 +438,7 @@ def generate_please_explain_pdf(officer_name, officer_post, pending_items):
         pagesize=A4,
         rightMargin=60,
         leftMargin=60,
-        topMargin=100,      # Increased to make space for letterhead
+        topMargin=60,      # Increased to make space for letterhead
         bottomMargin=0.6*inch
     )
 
@@ -1432,6 +1432,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
