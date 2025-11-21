@@ -420,8 +420,95 @@ def load_data():
 if st.session_state.df is None:
     st.session_state.df = load_data()
 
-# ---------- TABS ----------
-tabs = st.tabs(["📊 View Records", "📈 Analytics"])
+# ---------- PLEASE EXPLAIN LETTER FEATURE ----------
+from reportlab.lib.pagesizes import A4
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
+from reportlab.lib.units import inch
+from datetime import datetime, timedelta
+import io
+import base64
+
+def generate_please_explain_pdf(officer_name, officer_post, pending_items):
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=0.8*inch, bottomMargin=0.8*inch)
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(name='CenterBold', alignment=1, fontSize=12, fontName='Helvetica-Bold'))
+    styles.add(ParagraphStyle(name='LeftNormal', alignment=0, fontSize=11, leading=14))
+    
+    story = []
+    
+    # Header with logo
+    try:
+        logo = Image("https://raw.githubusercontent.com/srdsoproject/testing/main/Central%20Railway%20Logo.png", width=80, height=80)
+        logo.hAlign = 'LEFT'
+        story.append(logo)
+    except:
+        pass
+    
+    story.append(Spacer(1, 20))
+    story.append(Paragraph("CENTRAL RAILWAY", styles['Title']))
+    story.append(Paragraph("Office of the Divisional Railway Manager<br/>Solapur Division", styles['CenterBold']))
+    story.append(Spacer(1, 30))
+    
+    story.append(Paragraph(f"No. SUR/SAFETY/DEF/{datetime.now().strftime('%Y')}", styles['Normal']))
+    story.append(Paragraph(f"Date: {datetime.now().strftime('%d-%b-%Y')}", styles['Normal']))
+    story.append(Spacer(1, 30))
+    
+    story.append(Paragraph(f"To,<br/>The {officer_post}<br/>Central Railway, Solapur", styles['LeftNormal']))
+    story.append(Spacer(1, 20))
+    
+    story.append(Paragraph("Sub: Non-compliance of Safety Deficiencies beyond stipulated period – Reg.", styles['CenterBold']))
+    story.append(Paragraph("Ref: S.A.R.A.L entries pending for more than 45 days", styles['Normal']))
+    story.append(Spacer(1, 20))
+    
+    story.append(Paragraph("Sir,", styles['LeftNormal']))
+    story.append(Paragraph("It has been observed that the following safety-related deficiencies are still pending for more than 45 days:", styles['LeftNormal']))
+    story.append(Spacer(1, 12))
+    
+    # Table
+    data = [["Sr.", "Location", "Date Logged", "Deficiency", "Days Pending"]]
+    for i, item in enumerate(pending_items, 1):
+        days = (datetime.now().date() - item["Date"].date()).days
+        data.append([
+            str(i),
+            item["Location"],
+            item["Date"].strftime("%d-%m-%Y"),
+            item["Deficiency"][:80] + "..." if len(item["Deficiency"]) > 80 else item["Deficiency"],
+            str(days)
+        ])
+    
+    table = Table(data, colWidths=[40, 100, 80, 200, 80])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.black),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,0), 11),
+        ('BOTTOMPADDING', (0,0), (-1,0), 12),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+    ]))
+    story.append(table)
+    story.append(Spacer(1, 20))
+    
+    story.append(Paragraph("These deficiencies pertain to safety of train operations and their continued pendency is viewed seriously.", styles['LeftNormal']))
+    story.append(Spacer(1, 12))
+    story.append(Paragraph("You are requested to kindly explain in writing within 7 days why compliance has not been ensured despite repeated reminders.", styles['LeftNormal']))
+    story.append(Spacer(1, 12))
+    story.append(Paragraph("A copy of this letter is being marked to PCPO for placing in your APAR folder.", styles['LeftNormal']))
+    story.append(Spacer(1, 40))
+    
+    story.append(Paragraph("Yours faithfully,", styles['LeftNormal']))
+    story.append(Spacer(1, 40))
+    story.append(Paragraph("For Divisional Railway Manager<br/>Solapur", styles['CenterBold']))
+    
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
+# ---------- MAIN TABS ----------
+tabs = st.tabs(["View Records", "Analytics", "Please Explain Letters"])
 with tabs[0]:
     df = st.session_state.df
     if df is None or df.empty:
@@ -1248,6 +1335,52 @@ with tabs[1]:
             st.info("Please select at least one location to view the breakdown.")
 
 
+with tabs[2]:
+    st.markdown("### “Please Explain” Letters (45+ Days Pending)")
+    
+    if st.session_state.df is None or st.session_state.df.empty:
+        st.info("No data loaded.")
+    else:
+        df = st.session_state.df.copy()
+        df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors='coerce')
+        today = datetime.now()
+        df["Days Pending"] = (today - df["Date of Inspection"]).dt.days
+        
+        overdue = df[(df["Status"] == "Pending") & (df["Days Pending"] > 45)]
+        
+        if overdue.empty:
+            st.success("Congratulations! No deficiency pending for more than 45 days.")
+            st.balloons()
+        else:
+            officer_groups = overdue.groupby("Action By")
+            
+            for officer, group in officer_groups:
+                with st.expander(f"{officer} → {len(group)} items pending ({group['Days Pending'].min()}–{group['Days Pending'].max()} days)", expanded=True):
+                    st.warning(f"Overdue by {group['Days Pending'].max()} days")
+                    
+                    items = group[["Location", "Date of Inspection", "Deficiencies Noted"]].to_dict('records')
+                    items_list = []
+                    for item in items:
+                        items_list.append({
+                            "Location": item["Location"],
+                            "Date": item["Date of Inspection"],
+                            "Deficiency": item["Deficiencies Noted"]
+                        })
+                    
+                    # Generate PDF
+                    pdf_buffer = generate_please_explain_pdf(officer, officer, items_list)
+                    pdf_base64 = base64.b64encode(pdf_buffer.read()).decode()
+                    pdf_url = f"data:application/pdf;base64,{pdf_base64}"
+                    
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.markdown(f"**[Download Draft Letter]({pdf_url})**", unsafe_allow_html=True)
+                    with col2:
+                        if st.button(f"Send WhatsApp Reminder → {officer}", key=f"wa_{officer}"):
+                            msg = f"Respected {officer},\n\n{len(group)} safety deficiencies are pending for more than 45 days.\nDraft 'Please Explain' letter has been generated.\nKindly ensure compliance TODAY to avoid issuance of final letter.\n\nLink: your-app-url.streamlit.app"
+                            st.markdown(f"[Send WhatsApp Reminder](https://wa.me/?text={msg.replace(' ', '%20')})", unsafe_allow_html=True)
+                    with col3:
+                        st.caption("Final letter will be issued in 7 days if not complied")
 
 
 
