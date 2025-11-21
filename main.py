@@ -1368,19 +1368,29 @@ with tabs[2]:
                         })
                     
                     # Generate PDF
+                    # Generate PDF
                     pdf_buffer = generate_please_explain_pdf(officer, officer, items_list)
-                    pdf_base64 = base64.b64encode(pdf_buffer.read()).decode()
-                    pdf_url = f"data:application/pdf;base64,{pdf_base64}"
                     
-                    col1, col2, col3 = st.columns(3)
+                    col1, col2, col3 = st.columns([2, 2, 2])
                     with col1:
-                        st.markdown(f"**[Download Draft Letter]({pdf_url})**", unsafe_allow_html=True)
+                        pdf_buffer.seek(0)
+                        st.download_button(
+                            label="Download Draft Letter (PDF)",
+                            data=pdf_buffer.read(),
+                            file_name=f"Please_Explain_{officer.replace('/', '_').replace(' ', '_')}_{datetime.now().strftime('%d%b%Y')}.pdf",
+                            mime="application/pdf",
+                            key=f"dl_{officer}_{datetime.now().microsecond}"
+                        )
+                    
                     with col2:
-                        if st.button(f"Send WhatsApp Reminder → {officer}", key=f"wa_{officer}"):
-                            msg = f"Respected {officer},\n\n{len(group)} safety deficiencies are pending for more than 45 days.\nDraft 'Please Explain' letter has been generated.\nKindly ensure compliance TODAY to avoid issuance of final letter.\n\nLink: your-app-url.streamlit.app"
-                            st.markdown(f"[Send WhatsApp Reminder](https://wa.me/?text={msg.replace(' ', '%20')})", unsafe_allow_html=True)
+                        if st.button(f"WhatsApp Reminder → {officer}", key=f"wa_{officer}"):
+                            msg = f"Respected {officer}%0A%0A{len(group)} safety deficiencies pending >45 days.%0A%0ADraft 'Please Explain' letter ready.%0A%0APlease comply TODAY to avoid final letter.%0A%0ALink: https://your-app-url.streamlit.app"
+                            st.markdown(f"[Send WhatsApp Now](https://wa.me/?text={msg})", unsafe_allow_html=True)
+                    
                     with col3:
-                        st.caption("Final letter will be issued in 7 days if not complied")
+                        max_days = group['Days Pending'].max()
+                        st.error(f"{max_days} days overdue")
+
 
 
 
