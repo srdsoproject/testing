@@ -516,10 +516,8 @@ def generate_please_explain_pdf(officer_name, officer_post, pending_items):
 
     story.append(Paragraph("These deficiencies pertain to safety of train operations and their continued pendency is viewed seriously.", styles['Justify']))
     story.append(Paragraph("You are requested to explain in writing within 7 days why compliance has not been ensured despite repeated reminders.", styles['Justify']))
-    story.append(Paragraph("A copy is marked to PCPO for placing in your APAR folder.", styles['Justify']))
     story.append(Spacer(1, 70))
 
-    story.append(Paragraph("Yours faithfully,", styles['LeftNormal']))
     story.append(Spacer(1, 50))
     story.append(Paragraph("Sr.DSO/SUR", styles['RightSign']))
     story.append(Spacer(1, 40))
@@ -1415,6 +1413,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
