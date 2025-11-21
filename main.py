@@ -922,6 +922,7 @@ with tabs[0]:
                         "Pertains to COMMERCIAL": ("COMMERCIAL", "Sr.DCM"),
                         "Pertains to ELECT/G": ("ELECT/G", "Sr.DEE/G"),
                         "Pertains to ELECT/TRD": ("ELECT/TRD", "Sr.DEE/TRD"),
+                        "Pertaining to TRD dept": ("ELECT/TRD", "Sr.DEE/TRD"),
                         "Pertains to MECHANICAL": ("MECHANICAL", "Sr.DME"),
                         "Pertains to ELECT/TRO": ("ELECT/TRO", "Sr.DEE/TRO"),
                         "Pertains to Sr.DEN/S": ("ENGINEERING", "Sr.DEN/S"),
@@ -1419,6 +1420,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
