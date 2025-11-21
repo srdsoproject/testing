@@ -445,7 +445,8 @@ def generate_please_explain_pdf(officer_name, officer_post, pending_items):
     styles.add(ParagraphStyle(name='CenterBold', alignment=1, fontSize=12, fontName='Helvetica-Bold', leading=15))
     styles.add(ParagraphStyle(name='LeftNormal', alignment=0, fontSize=11, leading=13))
     styles.add(ParagraphStyle(name='Justify', alignment=4, fontSize=11, leading=13, spaceAfter=10))
-    styles.add(ParagraphStyle(name='Small', alignment=0, fontSize=10, leading=12))
+    styles.add(ParagraphStyle(name='Small', alignment=0, fontSize=9.5, leading=11))
+    styles.add(ParagraphStyle(name='RightSign', alignment=2, fontSize=11, fontName='Helvetica-Bold'))  # Right-aligned
     
     story = []
     
@@ -463,20 +464,17 @@ def generate_please_explain_pdf(officer_name, officer_post, pending_items):
     story.append(Spacer(1, 18))
     
     # Letter No & Date (side by side)
-    header_data = [
+    header = Table([
         [Paragraph(f"No. SUR/SAFETY/DEF/{datetime.now().strftime('%Y')}", styles['Normal']),
          Paragraph(f"Date: {datetime.now().strftime('%d %B %Y')}", styles['Normal'])]
-    ]
-    header_table = Table(header_data, colWidths=[320, 180])
-    header_table.setStyle(TableStyle([('ALIGN', (1,0), (1,0), 'RIGHT')]))
-    story.append(header_table)
+    ], colWidths=[320, 180])
+    header.setStyle(TableStyle([('ALIGN', (1,0), (1,0), 'RIGHT')]))
+    story.append(header)
     story.append(Spacer(1, 20))
     
-    # To address
     story.append(Paragraph(f"To,<br/>The {officer_post}<br/>Central Railway, Solapur", styles['LeftNormal']))
     story.append(Spacer(1, 18))
     
-    # Subject & Ref
     story.append(Paragraph("Sub: Non-compliance of Safety Deficiencies beyond stipulated period – Reg.", styles['CenterBold']))
     story.append(Paragraph("Ref: S.A.R.A.L entries pending for more than 45 days", styles['LeftNormal']))
     story.append(Spacer(1, 15))
@@ -512,25 +510,29 @@ def generate_please_explain_pdf(officer_name, officer_post, pending_items):
     story.append(table)
     story.append(Spacer(1, 12))
     
-    # Body paragraphs (tight spacing)
+    # Body
     story.append(Paragraph("These deficiencies pertain to safety of train operations and their continued pendency is viewed seriously.", styles['Justify']))
     story.append(Paragraph("You are requested to explain in writing within 7 days why compliance has not been ensured despite repeated reminders.", styles['Justify']))
     story.append(Paragraph("A copy is marked to PCPO for placing in your APAR folder.", styles['Justify']))
-    story.append(Spacer(1, 20))
+    story.append(Spacer(1, 30))
     
-    # Final signature block – forced to stay on same page
     story.append(Paragraph("Yours faithfully,", styles['LeftNormal']))
-    story.append(Spacer(1, 50))  # Fixed space for signature
+    story.append(Spacer(1, 60))  # Space for signature
     
-    sig_block = Paragraph(
-        "Sr. Divisional Safety Officer<br/>Solapur Division<br/><br/>"
-        "C/- DRM/SUR – for kind information and necessary action.",
-        styles['CenterBold']
-    )
-    story.append(sig_block)
+    # FINAL BLOCK: Left = C/- DRM   |   Right = Sr.DSO/SUR
+    footer_table = Table([
+        [Paragraph("C/- DRM/SUR – for kind information and necessary action.", styles['LeftNormal']),
+         Paragraph("Sr.DSO/SUR", styles['RightSign'])]
+    ], colWidths=[350, 150])
+    footer_table.setStyle(TableStyle([
+        ('ALIGN', (0,0), (0,0), 'LEFT'),
+        ('ALIGN', (1,0), (1,0), 'RIGHT'),
+        ('VALIGN', (0,0), (-1,-1), 'BOTTOM'),
+    ]))
+    story.append(footer_table)
     
-    # Final build – prevents page break
-    doc.build(story, onFirstPage=lambda canvas, doc: None, onLaterPages=lambda canvas, doc: None)
+    # Build without unwanted page breaks
+    doc.build(story)
     buffer.seek(0)
     return buffer
 
@@ -1417,6 +1419,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
