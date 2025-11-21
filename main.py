@@ -435,118 +435,102 @@ def generate_please_explain_pdf(officer_name, officer_post, pending_items):
     doc = SimpleDocTemplate(
         buffer,
         pagesize=A4,
-        rightMargin=72,
-        leftMargin=72,
-        topMargin=0.8*inch,
-        bottomMargin=0.8*inch
+        rightMargin=60,
+        leftMargin=60,
+        topMargin=0.6*inch,
+        bottomMargin=0.6*inch
     )
     
     styles = getSampleStyleSheet()
     styles.add(ParagraphStyle(name='CenterBold', alignment=1, fontSize=12, fontName='Helvetica-Bold', leading=15))
-    styles.add(ParagraphStyle(name='LeftNormal', alignment=0, fontSize=11, leading=14, spaceAfter=8))
-    styles.add(ParagraphStyle(name='Justify', alignment=4, fontSize=11, leading=14, spaceAfter=12))
-    styles.add(ParagraphStyle(name='Heading', alignment=1, fontSize=12, fontName='Helvetica-Bold', spaceAfter=20))
+    styles.add(ParagraphStyle(name='LeftNormal', alignment=0, fontSize=11, leading=13))
+    styles.add(ParagraphStyle(name='Justify', alignment=4, fontSize=11, leading=13, spaceAfter=10))
+    styles.add(ParagraphStyle(name='Small', alignment=0, fontSize=10, leading=12))
     
     story = []
     
-    # Logo (top-left)
+    # Logo + Header
     try:
-        logo = Image("https://raw.githubusercontent.com/srdsoproject/testing/main/Central%20Railway%20Logo.png", width=90, height=90)
+        logo = Image("https://raw.githubusercontent.com/srdsoproject/testing/main/Central%20Railway%20Logo.png", width=80, height=80)
         logo.hAlign = 'LEFT'
         story.append(logo)
     except:
         pass
-    story.append(Spacer(1, 10))
+    story.append(Spacer(1, 6))
     
-    # Header
     story.append(Paragraph("CENTRAL RAILWAY", styles['Title']))
     story.append(Paragraph("Office of the Senior Divisional Safety Officer<br/>Solapur Division", styles['CenterBold']))
-    story.append(Spacer(1, 30))
+    story.append(Spacer(1, 18))
     
-    # Letter No & Date (right-aligned)
-    header_table = Table([
-        [Paragraph(f"No. SUR/SAFETY/DEF/{datetime.now().strftime('%Y')}", styles['Normal']), 
+    # Letter No & Date (side by side)
+    header_data = [
+        [Paragraph(f"No. SUR/SAFETY/DEF/{datetime.now().strftime('%Y')}", styles['Normal']),
          Paragraph(f"Date: {datetime.now().strftime('%d %B %Y')}", styles['Normal'])]
-    ], colWidths=[300, 200])
-    header_table.setStyle(TableStyle([
-        ('ALIGN', (0,0), (0,0), 'LEFT'),
-        ('ALIGN', (1,0), (1,0), 'RIGHT'),
-        ('VALIGN', (0,0), (-1,-1), 'TOP'),
-    ]))
+    ]
+    header_table = Table(header_data, colWidths=[320, 180])
+    header_table.setStyle(TableStyle([('ALIGN', (1,0), (1,0), 'RIGHT')]))
     story.append(header_table)
-    story.append(Spacer(1, 30))
-    
-    # To Address
-    story.append(Paragraph(f"To,<br/>The {officer_post}<br/>Central Railway, Solapur", styles['LeftNormal']))
-    story.append(Spacer(1, 25))
-    
-    # Subject
-    story.append(Paragraph("Sub: Non-compliance of Safety Deficiencies beyond stipulated period – Reg.", styles['Heading']))
-    story.append(Paragraph("Ref: S.A.R.A.L entries pending for more than 45 days", styles['LeftNormal']))
     story.append(Spacer(1, 20))
+    
+    # To address
+    story.append(Paragraph(f"To,<br/>The {officer_post}<br/>Central Railway, Solapur", styles['LeftNormal']))
+    story.append(Spacer(1, 18))
+    
+    # Subject & Ref
+    story.append(Paragraph("Sub: Non-compliance of Safety Deficiencies beyond stipulated period – Reg.", styles['CenterBold']))
+    story.append(Paragraph("Ref: S.A.R.A.L entries pending for more than 45 days", styles['LeftNormal']))
+    story.append(Spacer(1, 15))
     
     story.append(Paragraph("Sir,", styles['LeftNormal']))
-    story.append(Paragraph(
-        "It has been observed that the following safety-related deficiencies logged in S.A.R.A.L are still pending for compliance for more than 45 days:",
-        styles['Justify']
-    ))
-    story.append(Spacer(1, 12))
+    story.append(Paragraph("The following safety-related deficiencies are pending for compliance for more than 45 days:", styles['Justify']))
+    story.append(Spacer(1, 8))
     
-    # Table with perfect wrapping
-    data = [["Sr.", "Location", "Date Logged", "Deficiency", "Days Pending"]]
+    # Compact table with perfect wrapping
+    data = [["Sr.", "Location", "Date", "Deficiency", "Days"]]
     for i, item in enumerate(pending_items, 1):
         days = (datetime.now().date() - item["Date"].date()).days
-        deficiency_text = item["Deficiency"]
-        # Wrap long deficiency text using Paragraph
         data.append([
-            Paragraph(str(i), styles['Normal']),
-            Paragraph(item["Location"], styles['Normal']),
-            Paragraph(item["Date"].strftime("%d-%m-%Y"), styles['Normal']),
-            Paragraph(deficiency_text, styles['Normal']),  # ← This wraps properly
-            Paragraph(str(days), styles['Normal'])
+            Paragraph(str(i), styles['Small']),
+            Paragraph(item["Location"], styles['Small']),
+            Paragraph(item["Date"].strftime("%d-%m-%Y"), styles['Small']),
+            Paragraph(item["Deficiency"], styles['Small']),
+            Paragraph(str(days), styles['Small'])
         ])
     
-    table = Table(data, colWidths=[35, 90, 75, 220, 70])
+    table = Table(data, colWidths=[35, 85, 70, 230, 55])
     table.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.black),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,-1), 9.5),
         ('ALIGN', (0,0), (-1,-1), 'CENTER'),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0,0), (-1,0), 10),
-        ('FONTSIZE', (0,1), (-1,-1), 9.5),
-        ('BOTTOMPADDING', (0,0), (-1,0), 12),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+        ('GRID', (0,0), (-1,-1), 0.4, colors.grey),
+        ('LEFTPADDING', (0,0), (-1,-1), 3),
+        ('RIGHTPADDING', (0,0), (-1,-1), 3),
         ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.whitesmoke]),
-        ('LEFTPADDING', (0,0), (-1,-1), 4),
-        ('RIGHTPADDING', (0,0), (-1,-1), 4),
     ]))
     story.append(table)
+    story.append(Spacer(1, 12))
+    
+    # Body paragraphs (tight spacing)
+    story.append(Paragraph("These deficiencies pertain to safety of train operations and their continued pendency is viewed seriously.", styles['Justify']))
+    story.append(Paragraph("You are requested to explain in writing within 7 days why compliance has not been ensured despite repeated reminders.", styles['Justify']))
+    story.append(Paragraph("A copy is marked to PCPO for placing in your APAR folder.", styles['Justify']))
     story.append(Spacer(1, 20))
     
-    # Body text
-    story.append(Paragraph(
-        "These deficiencies pertain to safety of train operations and their continued pendency is viewed seriously by the administration.",
-        styles['Justify']
-    ))
-    story.append(Paragraph(
-        "You are requested to kindly explain in writing within 7 days as to why compliance has not been ensured despite repeated reminders through S.A.R.A.L.",
-        styles['Justify']
-    ))
-    story.append(Paragraph(
-        "A copy of this letter is being marked to PCPO for placing in your APAR folder for necessary action.",
-        styles['Justify']
-    ))
-    story.append(Spacer(1, 40))
-    
+    # Final signature block – forced to stay on same page
     story.append(Paragraph("Yours faithfully,", styles['LeftNormal']))
-    story.append(Spacer(1, 60))
-    story.append(Paragraph("Sr. Divisional Safety Officer<br/>Solapur Division", styles['CenterBold']))
+    story.append(Spacer(1, 50))  # Fixed space for signature
     
-    story.append(Spacer(1, 30))
-    story.append(Paragraph("C/- DRM/SUR – for kind information and necessary action.", styles['LeftNormal']))
+    sig_block = Paragraph(
+        "Sr. Divisional Safety Officer<br/>Solapur Division<br/><br/>"
+        "C/- DRM/SUR – for kind information and necessary action.",
+        styles['CenterBold']
+    )
+    story.append(sig_block)
     
-    doc.build(story)
+    # Final build – prevents page break
+    doc.build(story, onFirstPage=lambda canvas, doc: None, onLaterPages=lambda canvas, doc: None)
     buffer.seek(0)
     return buffer
 
@@ -1433,6 +1417,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
