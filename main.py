@@ -429,7 +429,6 @@ from reportlab.lib.units import inch
 from datetime import datetime, timedelta
 import io
 import base64
-
 def generate_please_explain_pdf(officer_name, officer_post, pending_items):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -440,17 +439,17 @@ def generate_please_explain_pdf(officer_name, officer_post, pending_items):
         topMargin=0.6*inch,
         bottomMargin=0.6*inch
     )
-    
+   
     styles = getSampleStyleSheet()
     styles.add(ParagraphStyle(name='CenterBold', alignment=1, fontSize=12, fontName='Helvetica-Bold', leading=15))
     styles.add(ParagraphStyle(name='LeftNormal', alignment=0, fontSize=11, leading=13))
     styles.add(ParagraphStyle(name='Justify', alignment=4, fontSize=11, leading=13, spaceAfter=10))
     styles.add(ParagraphStyle(name='Small', alignment=0, fontSize=9.5, leading=11))
-    styles.add(ParagraphStyle(name='RightSign', alignment=2, fontSize=11, fontName='Helvetica-Bold'))  # Right-aligned
-    
+    styles.add(ParagraphStyle(name='RightSign', alignment=2, fontSize=11, fontName='Helvetica-Bold'))
+
     story = []
-    
-    # Logo + Header
+   
+    # Logo
     try:
         logo = Image("https://raw.githubusercontent.com/srdsoproject/testing/main/Central%20Railway%20Logo.png", width=80, height=80)
         logo.hAlign = 'LEFT'
@@ -458,12 +457,12 @@ def generate_please_explain_pdf(officer_name, officer_post, pending_items):
     except:
         pass
     story.append(Spacer(1, 6))
-    
+   
     story.append(Paragraph("CENTRAL RAILWAY", styles['Title']))
     story.append(Paragraph("Office of the Senior Divisional Safety Officer<br/>Solapur Division", styles['CenterBold']))
     story.append(Spacer(1, 18))
-    
-    # Letter No & Date (side by side)
+   
+    # Letter No & Date
     header = Table([
         [Paragraph(f"No. SUR/SAFETY/DEF/{datetime.now().strftime('%Y')}", styles['Normal']),
          Paragraph(f"Date: {datetime.now().strftime('%d %B %Y')}", styles['Normal'])]
@@ -471,19 +470,19 @@ def generate_please_explain_pdf(officer_name, officer_post, pending_items):
     header.setStyle(TableStyle([('ALIGN', (1,0), (1,0), 'RIGHT')]))
     story.append(header)
     story.append(Spacer(1, 20))
-    
+   
     story.append(Paragraph(f"To,<br/>The {officer_post}<br/>Central Railway, Solapur", styles['LeftNormal']))
     story.append(Spacer(1, 18))
-    
+   
     story.append(Paragraph("Sub: Non-compliance of Safety Deficiencies beyond stipulated period – Reg.", styles['CenterBold']))
     story.append(Paragraph("Ref: S.A.R.A.L entries pending for more than 45 days", styles['LeftNormal']))
     story.append(Spacer(1, 15))
-    
+   
     story.append(Paragraph("Sir,", styles['LeftNormal']))
     story.append(Paragraph("The following safety-related deficiencies are pending for compliance for more than 45 days:", styles['Justify']))
     story.append(Spacer(1, 8))
-    
-    # Compact table with perfect wrapping
+   
+    # Table of pending items
     data = [["Sr.", "Location", "Date", "Deficiency", "Days"]]
     for i, item in enumerate(pending_items, 1):
         days = (datetime.now().date() - item["Date"].date()).days
@@ -494,7 +493,7 @@ def generate_please_explain_pdf(officer_name, officer_post, pending_items):
             Paragraph(item["Deficiency"], styles['Small']),
             Paragraph(str(days), styles['Small'])
         ])
-    
+   
     table = Table(data, colWidths=[35, 85, 70, 230, 55])
     table.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
@@ -509,29 +508,25 @@ def generate_please_explain_pdf(officer_name, officer_post, pending_items):
     ]))
     story.append(table)
     story.append(Spacer(1, 12))
-    
-    # Body
+   
+    # Body text
     story.append(Paragraph("These deficiencies pertain to safety of train operations and their continued pendency is viewed seriously.", styles['Justify']))
     story.append(Paragraph("You are requested to explain in writing within 7 days why compliance has not been ensured despite repeated reminders.", styles['Justify']))
     story.append(Paragraph("A copy is marked to PCPO for placing in your APAR folder.", styles['Justify']))
-    story.append(Spacer(1, 30))
-    
+    story.append(Spacer(1, 70))  # Space for signature
+
+    # === CORRECTED SIGNATURE BLOCK ===
     story.append(Paragraph("Yours faithfully,", styles['LeftNormal']))
-    story.append(Spacer(1, 60))  # Space for signature
-    
-    # FINAL BLOCK: Left = C/- DRM   |   Right = Sr.DSO/SUR
-    footer_table = Table([
-        [Paragraph("C/- DRM/SUR – for kind information and necessary action.", styles['LeftNormal']),
-         Paragraph("Sr.DSO/SUR", styles['RightSign'])]
-    ], colWidths=[350, 150])
-    footer_table.setStyle(TableStyle([
-        ('ALIGN', (0,0), (0,0), 'LEFT'),
-        ('ALIGN', (1,0), (1,0), 'RIGHT'),
-        ('VALIGN', (0,0), (-1,-1), 'BOTTOM'),
-    ]))
-    story.append(footer_table)
-    
-    # Build without unwanted page breaks
+    story.append(Spacer(1, 50))
+
+    # Signing authority - Right aligned
+    story.append(Paragraph("Sr.DSO/SUR", styles['RightSign']))
+    story.append(Spacer(1, 40))
+
+    # C/- line - Left aligned, placed BELOW the signature
+    story.append(Paragraph("C/- DRM/SUR – for kind information and necessary action please.", styles['LeftNormal']))
+
+    # Build PDF
     doc.build(story)
     buffer.seek(0)
     return buffer
@@ -1420,6 +1415,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
