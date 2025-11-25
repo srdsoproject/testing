@@ -531,80 +531,95 @@ def generate_please_explain_pdf(officer_name, officer_post, pending_items):
     return buffer
 # ---------- MAIN TABS ----------
 tabs = st.tabs(["View Records", "Analytics", "Please Explain Letters"])
-# ─────────────────────────────────────────────────────────────────────
-# ADD THIS CODE JUST BEFORE AgGrid (inside the "View Records" tab)
-# ─────────────────────────────────────────────────────────────────────
-
-# ————————————————————————————————————————————————
-# REPLACE your current AgGrid block with this one
-# ————————————————————————————————————————————————
+# —————————————————————————————————————————————————————
+# SAFE ROW HIGHLIGHTING + BLANK FEEDBACK TO TOP (2025)
+# —————————————————————————————————————————————————————
 
 from st_aggrid import JsCode
 
-# 1. First, add a helper column to sort blank feedback to top
-editable_df["has_feedback"] = (
+# 1. Make sure required columns exist (critical!)
+required_cols = ["Date of Inspection", "Feedback", "User Feedback/Remark"]
+for col in required_cols:
+    if col not in editable_df.columns:
+        editable_df[col] = ""  # create if missing
+
+# 2. Create a temporary column to detect blank feedback
+editable_df["__has_feedback"] = (
     editable_df["Feedback"].fillna("").astype(str).str.strip() +
-    editable_df.get("User Feedback/Remark", "").fillna("").astype(str).str.strip()
+    editable_df.get("User Feedback/Remark", pd.Series([""] * len(editable_df))).fillna("").astype(str).str.strip()
 ).str.len() > 0
 
-# Sort: blank feedback first
-editable_df = editable_df.sort_values("has_feedback", ascending=True).drop(columns=["has_feedback"])
+# 3. Sort: items with NO feedback come to the TOP
+editable_df = editable_df.sort_values("__has_feedback", ascending=True)
 
-# 2. JavaScript code for row highlighting
-row_style_jscode = JsCode("""
-function(params) {
+# 4. JavaScript for beautiful red/orange/yellow rows
+highlight_js = JsCode("""
+function(params) => {
+    if (!params.data) return null;
+    
+    const inspDate = params.data['Date of Inspection'];
+    if (!inspDate) return null;
+    
     const today = new Date();
-    const inspDate = new Date(params.data['Date of Inspection']);
-    const daysOld = Math.floor((today - inspDate) / (1000 * 60 * 60 * 24));
-    const feedback = (params.data['Feedback'] || "").toString().trim();
-    const remark = (params.data['User Feedback/Remark'] || "").toString().trim();
-
-    if (feedback === "" && remark === "") {
+    const inspectionDate = new Date(inspDate);
+    const daysOld = Math.floor((today - inspectionDate) / (1000 * 60 * 60 * 24));
+    
+    const feedback = (params.data['Feedback'] || '').toString().trim();
+    const remark = (params.data['User Feedback/Remark'] || '').toString().trim();
+    
+    if (feedback === '' && remark === '') {
         if (daysOld > 45) {
-            return {'backgroundColor': '#ffebee', 'color': '#c62828', 'fontWeight': 'bold'};
+            return { 'backgroundColor': '#ffebee', 'color': '#b71c1c', 'fontWeight': 'bold' };
         } else if (daysOld > 30) {
-            return {'backgroundColor': '#fff3e0', 'color': '#ef6c00', 'fontWeight': 'bold'};
+            return { 'backgroundColor': '#fff3e0', 'color': '#e65100', 'fontWeight': 'bold' };
         } else if (daysOld > 15) {
-            return {'backgroundColor': '#fff8e1', 'color': '#d84315'};
+            return { 'backgroundColor': '#fff8e1', 'color': '#d84315' };
         }
     }
     return null;
 }
 """)
 
-# 3. Update GridOptionsBuilder
+# 5. Apply to grid
 gb = GridOptionsBuilder.from_dataframe(editable_df)
-gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True)
 
-# Make Feedback column editable
+gb.configure_default_column(
+    editable=False,
+    wrapText=True,
+    autoHeight=True,
+    resizable=True,
+    cellStyle={'whiteSpace': 'normal'}
+)
+
+# Make only User Feedback/Remark editable
 if "User Feedback/Remark" in editable_df.columns:
     gb.configure_column(
         "User Feedback/Remark",
         editable=True,
-        cellEditor="agLargeTextCellEditor",  # better for long text
+        cellEditor="agLargeTextCellEditor",
         cellEditorPopup=True,
         cellEditorParams={"maxLength": 4000}
     )
 
-# Apply the red/orange/yellow highlighting
-gb.configure_grid_options(rowStyle=row_style_jscode)
+# Apply RED/ORANGE highlighting
+gb.configure_grid_options(rowStyle=highlight_js)
 
-# Hide internal columns
+# Hide helper columns
+gb.configure_column("__has_feedback", hide=True)
 gb.configure_column("_original_sheet_index", hide=True)
 gb.configure_column("_sheet_row", hide=True)
 
 grid_options = gb.build()
 
-# 4. Render the grid (NO .style anymore!)
+# Render — NO .style anymore!
 grid_response = AgGrid(
-    editable_df,                     # ← plain DataFrame, not styled
+    editable_df,
     gridOptions=grid_options,
-    update_mode=GridUpdateMode.VALUE_CHANGED,
     height=650,
     fit_columns_on_grid_load=False,
-    theme="streamlit",
-    allow_unsafe_jscode=True,        # ← this is required for JsCode
-    reload_data=False
+    update_mode=GridUpdateMode.VALUE_CHANGED,
+    allow_unsafe_jscode=True,
+    theme="streamlit"
 )
 with tabs[0]:
     df = st.session_state.df
@@ -1488,6 +1503,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
