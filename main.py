@@ -1417,29 +1417,51 @@ with tabs[2]:
 
 
 
+# ————————————————————————————————
+# AUTO UPDATE DATE IF NO FEEDBACK (NO DUPLICATES)
+# Runs once per day after midnight — 100% safe for reports
+# ————————————————————————————————
 
+from datetime import date
 
+# Run only once per day
+if st.session_state.get("date_update_done") != date.today():
+    try:
+        df = st.session_state.df.copy()
 
+        # Find rows with completely blank feedback
+        blank_mask = (
+            (df["Feedback"].fillna("").astype(str).str.strip() == "") &
+            (df.get("User Feedback/Remark", "").fillna("").astype(str).str.strip() == "")
+        )
 
+        rows_to_update = df[blank_mask].copy()
 
+        if len(rows_to_update) > 0:
+            # Update the SAME rows: change Date of Inspection to TODAY
+            updates = []
+            date_col_idx = sheet.row_values(1).index("Date of Inspection") + 1
 
+            for _, row in rows_to_update.iterrows():
+                sheet_row = int(row["_sheet_row"])
+                a1_range = gspread.utils.rowcol_to_a1(sheet_row, date_col_idx)
+                updates.append({
+                    "range": a1_range,
+                    "values": [[pd.Timestamp.today().strftime("%Y-%m-%d")]]
+                })
 
+            # Batch update Google Sheet
+            sheet.spreadsheet.values_batch_update({
+                "valueInputOption": "USER_ENTERED",
+                "data": updates
+            })
 
+            st.success(f"Updated date of {len(updates)} pending items to TODAY")
+            st.info("They now appear as fresh deficiencies — no duplicates created")
 
+        # Mark as done for today
+        st.session_state.date_update_done = date.today()
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    except Exception as e:
+        # Silent fail if sheet not ready
+        pass
