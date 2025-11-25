@@ -209,7 +209,7 @@ def classify_feedback(feedback, user_remark=""):
             "counselling", "hubli", "working normal", "met", "discussion held", "report sent",
             "notified", "explained", "nil", "na", "tlc", "work completed", "acknowledged", "visited",
             "briefed", "guided", "handover", "working properly", "checked found working", "supply restored",
-            "updated by", "adv to", "counselled the staff", "complied", "checked and found",
+            "updated by", "adv to", "counselled the staff", "complied", "checked and found", 'Proposal to be initiated by user department'
             "maintained", "for needful action", "provided at", "in working condition", "is working", 'user dept.', 'user dept', 'user department', 'no demand', 'HQ', 'proposal sent', 
             "found working", "equipment is working", "item is working", "as per plan", "putright", "put right", 'attend dt','attend dt.', 
             "operational feasibility", "will be provided", "will be supplied shortly", "advised to ubl", "updated"
@@ -1413,6 +1413,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
