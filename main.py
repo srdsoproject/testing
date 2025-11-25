@@ -531,30 +531,41 @@ def generate_please_explain_pdf(officer_name, officer_post, pending_items):
     return buffer
 # ---------- MAIN TABS ----------
 tabs = st.tabs(["View Records", "Analytics", "Please Explain Letters"])
-# —————————————————————————————————————————————————————
-# SAFE ROW HIGHLIGHTING + BLANK FEEDBACK TO TOP (2025)
-# —————————————————————————————————————————————————————
+# ———————————————————————————————————————
+# FINAL BULLET-PROOF AGGRID WITH RED HIGHLIGHT
+# Works even if df is empty or columns are missing
+# ———————————————————————————————————————
 
-from st_aggrid import JsCode
+from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode, JsCode
+import pandas as pd
 
-# 1. Make sure required columns exist (critical!)
-required_cols = ["Date of Inspection", "Feedback", "User Feedback/Remark"]
-for col in required_cols:
+# ── 1. Safety net – make sure we have a DataFrame ─────────────────────
+if 'editable_df' not in locals() or editable_df is None or editable_df.empty:
+    st.info("No records to display after filtering.")
+    st.stop()
+
+# Force required columns to exist (prevents KeyError forever)
+for col in ["Date of Inspection", "Feedback", "User Feedback/Remark", "Location"]:
     if col not in editable_df.columns:
-        editable_df[col] = ""  # create if missing
+        editable_df[col] = ""
 
-# 2. Create a temporary column to detect blank feedback
-editable_df["__has_feedback"] = (
-    editable_df["Feedback"].fillna("").astype(str).str.strip() +
-    editable_df.get("User Feedback/Remark", pd.Series([""] * len(editable_df))).fillna("").astype(str).str.strip()
-).str.len() > 0
+# Convert date once (safe)
+try:
+    editable_df["Date of Inspection"] = pd.to_datetime(editable_df["Date of Inspection"], errors="coerce")
+except:
+    pass
 
-# 3. Sort: items with NO feedback come to the TOP
-editable_df = editable_df.sort_values("__has_feedback", ascending=True)
+# ── 2. Sort: blank feedback items jump to the very top ───────────────
+feedback_combined = (
+    editable_df["Feedback"].fillna("").astype(str).str.strip() + " " +
+    editable_df.get("User Feedback/Remark", "").fillna("").astype(str).str.strip()
+)
+editable_df["__blank_feedback"] = (feedback_combined.str.len() == 0)
+editable_df = editable_df.sort_values("__blank_feedback", ascending=False).copy()
 
-# 4. JavaScript for beautiful red/orange/yellow rows
+# ── 3. JavaScript – beautiful red/orange/yellow rows ─────────────────
 highlight_js = JsCode("""
-function(params) => {
+function(params) {
     if (!params.data) return null;
     
     const inspDate = params.data['Date of Inspection'];
@@ -562,65 +573,69 @@ function(params) => {
     
     const today = new Date();
     const inspectionDate = new Date(inspDate);
-    const daysOld = Math.floor((today - inspectionDate) / (1000 * 60 * 60 * 24));
+    const daysOld = Math.floor((today - inspectionDate) / 86400000);
     
-    const feedback = (params.data['Feedback'] || '').toString().trim();
-    const remark = (params.data['User Feedback/Remark'] || '').toString().trim();
+    const fb = ((params.data['Feedback'] || '') + (params.data['User Feedback/Remark'] || '')).trim();
     
-    if (feedback === '' && remark === '') {
+    if (fb === '') {
         if (daysOld > 45) {
-            return { 'backgroundColor': '#ffebee', 'color': '#b71c1c', 'fontWeight': 'bold' };
-        } else if (daysOld > 30) {
-            return { 'backgroundColor': '#fff3e0', 'color': '#e65100', 'fontWeight': 'bold' };
-        } else if (daysOld > 15) {
-            return { 'backgroundColor': '#fff8e1', 'color': '#d84315' };
+            return {backgroundColor: '#ffebee', color: '#b71c1c', fontWeight: 'bold'};
+        }
+        if (daysOld > 30) {
+            return {backgroundColor: '#fff3e0', color: '#e65100', fontWeight: 'bold'};
+        }
+        if (daysOld > 15) {
+            return {backgroundColor: '#fff8e1', color: '#d84315'};
         }
     }
     return null;
 }
 """)
 
-# 5. Apply to grid
+# ── 4. Build grid options ─────────────────────────────────────────────
 gb = GridOptionsBuilder.from_dataframe(editable_df)
 
 gb.configure_default_column(
-    editable=False,
     wrapText=True,
     autoHeight=True,
     resizable=True,
-    cellStyle={'whiteSpace': 'normal'}
+    filterable=True,
+    sortable=True,
+    editable=False
 )
 
-# Make only User Feedback/Remark editable
-if "User Feedback/Remark" in editable_df.columns:
-    gb.configure_column(
-        "User Feedback/Remark",
-        editable=True,
-        cellEditor="agLargeTextCellEditor",
-        cellEditorPopup=True,
-        cellEditorParams={"maxLength": 4000}
-    )
+# Make only the remark column editable
+gb.configure_column("User Feedback/Remark",
+    editable=True,
+    cellEditor="agLargeTextCellEditor",
+    cellEditorPopup=True,
+    cellEditorParams={"maxLength": 4000}
+)
 
-# Apply RED/ORANGE highlighting
+# Apply red highlighting
 gb.configure_grid_options(rowStyle=highlight_js)
 
 # Hide helper columns
-gb.configure_column("__has_feedback", hide=True)
-gb.configure_column("_original_sheet_index", hide=True)
-gb.configure_column("_sheet_row", hide=True)
+for col in ["__blank_feedback", "_original_sheet_index", "_sheet_row"]:
+    if col in editable_df.columns:
+        gb.configure_column(col, hide=True)
 
 grid_options = gb.build()
 
-# Render — NO .style anymore!
+# ── 5. Render the grid ───────────────────────────────────────────────
 grid_response = AgGrid(
     editable_df,
     gridOptions=grid_options,
-    height=650,
-    fit_columns_on_grid_load=False,
+    height=700,
     update_mode=GridUpdateMode.VALUE_CHANGED,
     allow_unsafe_jscode=True,
-    theme="streamlit"
+    theme="streamlit",
+    fit_columns_on_grid_load=False
 )
+
+# Optional: clean up helper column after display
+if "__blank_feedback" in editable_df.columns:
+    editable_df.drop(columns=["__blank_feedback"], inplace=True)
 with tabs[0]:
     df = st.session_state.df
     if df is None or df.empty:
@@ -1503,6 +1518,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
