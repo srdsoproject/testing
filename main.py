@@ -531,6 +531,37 @@ def generate_please_explain_pdf(officer_name, officer_post, pending_items):
     return buffer
 # ---------- MAIN TABS ----------
 tabs = st.tabs(["View Records", "Analytics", "Please Explain Letters"])
+# ─────────────────────────────────────────────────────────────────────
+# ADD THIS CODE JUST BEFORE AgGrid (inside the "View Records" tab)
+# ─────────────────────────────────────────────────────────────────────
+
+def highlight_overdue_rows(row):
+    days_old = (pd.Timestamp.today().date() - pd.to_datetime(row["Date of Inspection"]).date()).days
+    feedback = str(row["Feedback"] or "").strip()
+    user_remark = str(row.get("User Feedback/Remark", "") or "").strip()
+
+    # If no feedback at all AND old → RED
+    if (feedback == "" and user_remark == ""):
+        if days_old > 45:
+            return ['background-color: #ffebee; color: #c62828; font-weight: bold'] * len(row)   # Deep red
+        elif days_old > 30:
+            return ['background-color: #fff3e0; color: #ef6c00; font-weight: bold'] * len(row)   # Orange
+        elif days_old > 15:
+            return ['background-color: #fff8e1; color: #f57f17'] * len(row)                     # Light yellow
+    return [''] * len(row)
+
+# Apply the style
+styled_df = editable_df.style.apply(highlight_overdue_rows, axis=1)
+
+# Then use styled_df instead of editable_df in AgGrid
+grid_response = AgGrid(
+    styled_df,                     # ← changed here
+    gridOptions=grid_options,
+    update_mode=GridUpdateMode.VALUE_CHANGED,
+    height=600,
+    allow_unsafe_jscode=True,
+    theme="streamlit"
+)
 with tabs[0]:
     df = st.session_state.df
     if df is None or df.empty:
@@ -1413,6 +1444,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
