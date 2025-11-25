@@ -535,32 +535,76 @@ tabs = st.tabs(["View Records", "Analytics", "Please Explain Letters"])
 # ADD THIS CODE JUST BEFORE AgGrid (inside the "View Records" tab)
 # ─────────────────────────────────────────────────────────────────────
 
-def highlight_overdue_rows(row):
-    days_old = (pd.Timestamp.today().date() - pd.to_datetime(row["Date of Inspection"]).date()).days
-    feedback = str(row["Feedback"] or "").strip()
-    user_remark = str(row.get("User Feedback/Remark", "") or "").strip()
+# ————————————————————————————————————————————————
+# REPLACE your current AgGrid block with this one
+# ————————————————————————————————————————————————
 
-    # If no feedback at all AND old → RED
-    if (feedback == "" and user_remark == ""):
-        if days_old > 45:
-            return ['background-color: #ffebee; color: #c62828; font-weight: bold'] * len(row)   # Deep red
-        elif days_old > 30:
-            return ['background-color: #fff3e0; color: #ef6c00; font-weight: bold'] * len(row)   # Orange
-        elif days_old > 15:
-            return ['background-color: #fff8e1; color: #f57f17'] * len(row)                     # Light yellow
-    return [''] * len(row)
+from st_aggrid import JsCode
 
-# Apply the style
-styled_df = editable_df.style.apply(highlight_overdue_rows, axis=1)
+# 1. First, add a helper column to sort blank feedback to top
+editable_df["has_feedback"] = (
+    editable_df["Feedback"].fillna("").astype(str).str.strip() +
+    editable_df.get("User Feedback/Remark", "").fillna("").astype(str).str.strip()
+).str.len() > 0
 
-# Then use styled_df instead of editable_df in AgGrid
+# Sort: blank feedback first
+editable_df = editable_df.sort_values("has_feedback", ascending=True).drop(columns=["has_feedback"])
+
+# 2. JavaScript code for row highlighting
+row_style_jscode = JsCode("""
+function(params) {
+    const today = new Date();
+    const inspDate = new Date(params.data['Date of Inspection']);
+    const daysOld = Math.floor((today - inspDate) / (1000 * 60 * 60 * 24));
+    const feedback = (params.data['Feedback'] || "").toString().trim();
+    const remark = (params.data['User Feedback/Remark'] || "").toString().trim();
+
+    if (feedback === "" && remark === "") {
+        if (daysOld > 45) {
+            return {'backgroundColor': '#ffebee', 'color': '#c62828', 'fontWeight': 'bold'};
+        } else if (daysOld > 30) {
+            return {'backgroundColor': '#fff3e0', 'color': '#ef6c00', 'fontWeight': 'bold'};
+        } else if (daysOld > 15) {
+            return {'backgroundColor': '#fff8e1', 'color': '#d84315'};
+        }
+    }
+    return null;
+}
+""")
+
+# 3. Update GridOptionsBuilder
+gb = GridOptionsBuilder.from_dataframe(editable_df)
+gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True)
+
+# Make Feedback column editable
+if "User Feedback/Remark" in editable_df.columns:
+    gb.configure_column(
+        "User Feedback/Remark",
+        editable=True,
+        cellEditor="agLargeTextCellEditor",  # better for long text
+        cellEditorPopup=True,
+        cellEditorParams={"maxLength": 4000}
+    )
+
+# Apply the red/orange/yellow highlighting
+gb.configure_grid_options(rowStyle=row_style_jscode)
+
+# Hide internal columns
+gb.configure_column("_original_sheet_index", hide=True)
+gb.configure_column("_sheet_row", hide=True)
+
+grid_options = gb.build()
+
+# 4. Render the grid (NO .style anymore!)
 grid_response = AgGrid(
-    styled_df,                     # ← changed here
+    editable_df,                     # ← plain DataFrame, not styled
     gridOptions=grid_options,
     update_mode=GridUpdateMode.VALUE_CHANGED,
-    height=600,
-    allow_unsafe_jscode=True,
-    theme="streamlit"
+    height=650,
+    fit_columns_on_grid_load=False,
+    theme="streamlit",
+    allow_unsafe_jscode=True,        # ← this is required for JsCode
+    reload_data=False
 )
 with tabs[0]:
     df = st.session_state.df
@@ -1444,6 +1488,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
