@@ -618,8 +618,8 @@ with tabs[0]:
     resolved_count = (filtered["Status"] == "Resolved").sum()
 
     filtered_with_days = filtered.copy()
-    filtered_with_days["Days Pending"] = (pd.Timestamp.today() - pd.to_datetime(filtered_with_days["Date of Inspection"])).dt.days
-    longest_pending = filtered_with_days[filtered_with_days["Status"] == "Pending"]["Days Pending"].max()
+    filtered_with_days["Days Pending Raw"] = (pd.Timestamp.today() - pd.to_datetime(filtered_with_days["Date of Inspection"])).dt.days
+    longest_pending = filtered_with_days[filtered_with_days["Status"] == "Pending"]["Days Pending Raw"].max()
     longest_pending = longest_pending if pd.notna(longest_pending) else 0
 
     col_a.metric("🟨 Pending", pending_count)
@@ -628,7 +628,8 @@ with tabs[0]:
     col_d.metric("📊 Total Records", len(filtered))
     col_e.metric("🔴 Longest Pending", f"{longest_pending} days")
 
-    # Department-wise (Head) Breakdown when Location is selected
+    # Department-wise and Sub Head Breakdown (your full code unchanged)
+
     if st.session_state.view_location_filter and not filtered.empty:
         st.markdown("### 📊 Department-wise Distribution")
         head_summary = (
@@ -680,7 +681,6 @@ with tabs[0]:
             st.download_button("📥 Download Department-wise Distribution (PNG)", data=buf,
                                file_name="head_distribution.png", mime="image/png")
 
-    # Sub Head Breakdown when Head is selected
     if st.session_state.view_head_filter and not filtered.empty:
         st.markdown("### 📊 Sub Head Distribution")
         subhead_summary = (
@@ -827,10 +827,19 @@ with tabs[0]:
             )
             editable_df["Status"] = editable_df["Status"].apply(color_text_status)
 
-        # Days Pending for styling - only calculate numeric for Pending
+        # Days Pending - numeric for logic, display "-" for Resolved
         editable_df["Days Pending Raw"] = (pd.Timestamp.today() - pd.to_datetime(editable_df["Date of Inspection"])).dt.days
         editable_df["Days Pending"] = editable_df["Days Pending Raw"]
         editable_df.loc[editable_df["Status"].str.contains("Resolved"), "Days Pending"] = "-"
+
+        # Row class for flashing
+        def get_row_class(row):
+            if "Resolved" in row["Status"]:
+                return "resolved-row"
+            if "Pending" in row["Status"] and row["Days Pending Raw"] > 1:
+                return "flash-row"
+            return ""
+        editable_df["row_class"] = editable_df.apply(get_row_class, axis=1)
 
         st.markdown("#### 🔍 Search and Filter")
         search_text = st.text_input("Search All Columns (case-insensitive)", "").strip().lower()
@@ -849,7 +858,7 @@ with tabs[0]:
             editable_df = filter_dataframe(editable_df)
             st.info(f"Applied filters to {len(editable_df)} rows.")
 
-        # AgGrid with FLASHING for Pending >1 day
+        # AgGrid with rowClass
         gb = GridOptionsBuilder.from_dataframe(editable_df)
         gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True, filter=True, sortable=True)
         if "User Feedback/Remark" in editable_df.columns:
@@ -865,6 +874,7 @@ with tabs[0]:
         gb.configure_column("_original_sheet_index", hide=True)
         gb.configure_column("_sheet_row", hide=True)
         gb.configure_column("Days Pending Raw", hide=True)
+        gb.configure_column("row_class", hide=True)
         gb.configure_grid_options(singleClickEdit=True)
 
         auto_size_js = JsCode("""
@@ -878,43 +888,8 @@ with tabs[0]:
         """)
         gb.configure_grid_options(onFirstDataRendered=auto_size_js)
 
-        row_style_jscode = JsCode("""
-        function(params) {
-            const status = params.data['Status'] || '';
-            const days = params.data['Days Pending Raw'] || 0;
-            let style = {};
-
-            if (status.includes('Resolved')) {
-                style.backgroundColor = '#e8f5e9';
-                style.color = '#2e7d32';
-                return style;
-            }
-            if (status.includes('Pending') && days > 1) {
-                style.backgroundColor = '#ffcdd2';
-                style.color = '#c62828';
-                style.fontWeight = 'bold';
-                style.animation = 'flash 1.5s infinite';
-                return style;
-            }
-            return null;
-        }
-        """)
-
-        grid_ready_jscode = JsCode("""
-        function(params) {
-            const style = document.createElement('style');
-            style.innerHTML = `
-                @keyframes flash {
-                    0%   { background-color: #ffcdd2; }
-                    50%  { background-color: #e57373; }
-                    100% { background-color: #ffcdd2; }
-                }
-            `;
-            document.head.appendChild(style);
-        }
-        """)
-
-        gb.configure_grid_options(rowStyle=row_style_jscode, onGridReady=grid_ready_jscode)
+        # Use rowClass from data
+        gb.configure_grid_options(getRowClass=params => params.data.row_class || "")
 
         grid_options = gb.build()
 
@@ -929,6 +904,7 @@ with tabs[0]:
         )
         edited_df = pd.DataFrame(grid_response["data"])
 
+        # Export and submit logic unchanged
         export_cols = [col for col in valid_cols if col not in ["_original_sheet_index", "_sheet_row"]] + ["Status"]
         export_edited_df = edited_df[export_cols].copy()
         export_edited_df["Date of Inspection"] = pd.to_datetime(export_edited_df["Date of Inspection"]).dt.date
@@ -1502,6 +1478,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
