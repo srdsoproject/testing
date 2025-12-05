@@ -575,6 +575,15 @@ st.markdown("""
     50%  { background-color: #e57373; }
     100% { background-color: #ffcdd2; }
 }
+.ag-row.flash-row {
+    animation: flash 1.5s infinite !important;
+    font-weight: bold !important;
+    color: #c62828 !important;
+}
+.ag-row.resolved-row {
+    background-color: #e8f5e9 !important;
+    color: #2e7d32 !important;
+}
 </style>
 """, unsafe_allow_html=True)
 with tabs[0]:
@@ -803,6 +812,7 @@ with tabs[0]:
     )
 
     # ---------- EDITOR ----------
+        # ---------- EDITOR ----------
     if not filtered.empty:
         display_cols = [
             "Date of Inspection", "Type of Inspection", "Head", "Sub Head","Location",
@@ -827,6 +837,7 @@ with tabs[0]:
         if "Date of Inspection" in editable_df.columns:
             editable_df["Date of Inspection"] = pd.to_datetime(editable_df["Date of Inspection"], errors="coerce").dt.date
 
+        # Add Status
         if "Feedback" in editable_df.columns and "User Feedback/Remark" in editable_df.columns:
             editable_df.insert(
                 editable_df.columns.get_loc("User Feedback/Remark") + 1,
@@ -835,22 +846,21 @@ with tabs[0]:
             )
             editable_df["Status"] = editable_df["Status"].apply(color_text_status)
 
-        # Days Pending - numeric for logic, display "—" for Resolved
+        # Days Pending
         editable_df["Days Pending Raw"] = (pd.Timestamp.today() - pd.to_datetime(editable_df["Date of Inspection"])).dt.days
         editable_df["Days Pending"] = editable_df["Days Pending Raw"]
         editable_df.loc[editable_df["Status"].str.contains("Resolved"), "Days Pending"] = "—"
 
-        # Row styling for flashing
-        def style_rows(row):
-            days = row["Days Pending Raw"]
+        # Add row class for flashing
+        def get_row_class(row):
             if "Resolved" in row["Status"]:
-                return pd.Series("background-color: #e8f5e9; color: #2e7d32;", index=row.index)
-            if "Pending" in row["Status"] and days > 1:
-                return pd.Series("background-color: #ffcdd2; color: #c62828; animation: flash 1.5s infinite; font-weight: bold;", index=row.index)
-            return pd.Series("", index=row.index)
+                return "resolved-row"
+            if "Pending" in row["Status"] and row["Days Pending Raw"] > 1:
+                return "flash-row"
+            return ""
+        editable_df["row_class"] = editable_df.apply(get_row_class, axis=1)
 
-        styled_df = editable_df.style.apply(style_rows, axis=1)
-
+        # Global Search
         st.markdown("#### 🔍 Search and Filter")
         search_text = st.text_input("Search All Columns (case-insensitive)", "").strip().lower()
         if search_text:
@@ -860,6 +870,7 @@ with tabs[0]:
             editable_df = editable_df[mask].copy()
             st.info(f"Found {len(editable_df)} matching rows after search.")
 
+        # Column Filtering
         max_cols = st.slider("Max columns to filter on", 1, len(valid_cols), min(10, len(valid_cols)), key="max_cols_filter")
         candidate_columns = valid_cols[:max_cols]
         global column_selection
@@ -868,28 +879,75 @@ with tabs[0]:
             editable_df = filter_dataframe(editable_df)
             st.info(f"Applied filters to {len(editable_df)} rows.")
 
-        st.markdown("#### 🚈 Inspection Details")
-        st.caption("Click any cell in 'User Feedback/Remark' column to edit. Press Enter to save.")
-
-        edited_df = st.data_editor(
-            styled_df,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "User Feedback/Remark": st.column_config.TextColumn(
-                    "User Feedback/Remark",
-                    width="large",
-                    required=False
-                ),
-                "Date of Inspection": st.column_config.DateColumn("Date of Inspection"),
-                "_original_sheet_index": None,
-                "_sheet_row": None,
-                "Days Pending Raw": None
-            },
-            disabled=["Date of Inspection", "Type of Inspection", "Head", "Sub Head", "Location",
-                      "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "Status", "Days Pending"]
+        # AgGrid with text wrapping + reliable flashing
+        gb = GridOptionsBuilder.from_dataframe(editable_df)
+        gb.configure_default_column(
+            editable=False,
+            wrapText=True,      # ← Full text wrapping
+            autoHeight=True,    # ← Rows expand to show all text
+            resizable=True,
+            filter=True,
+            sortable=True,
+            flex=1
         )
 
+        # Make deficiencies wrap nicely
+        gb.configure_column("Deficiencies Noted", wrapText=True, autoHeight=True, flex=3)
+        gb.configure_column("User Feedback/Remark", wrapText=True, autoHeight=True, flex=2)
+
+        if "User Feedback/Remark" in editable_df.columns:
+            gb.configure_column(
+                "User Feedback/Remark",
+                editable=True,
+                wrapText=True,
+                autoHeight=True,
+                cellEditor="agTextCellEditor",
+                cellEditorParams={"maxLength": 4000}
+            )
+
+        gb.configure_column("_original_sheet_index", hide=True)
+        gb.configure_column("_sheet_row", hide=True)
+        gb.configure_column("Days Pending Raw", hide=True)
+        gb.configure_column("row_class", hide=True)
+
+        gb.configure_grid_options(singleClickEdit=True)
+
+        # Auto-size columns
+        auto_size_js = JsCode("""
+        function(params) {
+            let allColumnIds = [];
+            params.columnApi.getAllColumns().forEach(function(column) {
+                allColumnIds.push(column.getColId());
+            });
+            params.columnApi.autoSizeAllColumns();
+        }
+        """)
+        gb.configure_grid_options(onFirstDataRendered=auto_size_js)
+
+        # Apply row class for flashing
+        gb.configure_grid_options(getRowClass=JsCode("""
+        function(params) {
+            return params.data.row_class || '';
+        }
+        """))
+
+        grid_options = gb.build()
+
+        st.markdown("#### 🚈 Inspection Details")
+        st.caption("Long text wraps automatically. Edit 'User Feedback/Remark' by clicking the cell.")
+
+        grid_response = AgGrid(
+            editable_df,
+            gridOptions=grid_options,
+            update_mode=GridUpdateMode.VALUE_CHANGED,
+            height=700,
+            allow_unsafe_jscode=True,
+            theme="streamlit"  # Clean look
+        )
+
+        edited_df = pd.DataFrame(grid_response["data"])
+
+        # Export & Submit logic (unchanged)
         export_cols = [col for col in valid_cols if col not in ["_original_sheet_index", "_sheet_row"]] + ["Status", "Days Pending"]
         export_edited_df = edited_df[export_cols].copy()
         export_edited_df["Date of Inspection"] = pd.to_datetime(export_edited_df["Date of Inspection"]).dt.date
@@ -1462,6 +1520,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
