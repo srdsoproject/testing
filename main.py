@@ -568,7 +568,15 @@ def generate_please_explain_pdf(officer_name, officer_post, pending_items):
     return buffer
 # ---------- MAIN TABS ----------
 tabs = st.tabs(["View Records", "Analytics", "Please Explain Letters"])
-
+st.markdown("""
+<style>
+@keyframes flash {
+    0%   { background-color: #ffcdd2; }
+    50%  { background-color: #e57373; }
+    100% { background-color: #ffcdd2; }
+}
+</style>
+""", unsafe_allow_html=True)
 with tabs[0]:
     df = st.session_state.df
     if df is None or df.empty:
@@ -628,8 +636,7 @@ with tabs[0]:
     col_d.metric("📊 Total Records", len(filtered))
     col_e.metric("🔴 Longest Pending", f"{longest_pending} days")
 
-    # Department-wise and Sub Head Breakdown (your full code unchanged)
-
+    # Department-wise (Head) Breakdown when Location is selected
     if st.session_state.view_location_filter and not filtered.empty:
         st.markdown("### 📊 Department-wise Distribution")
         head_summary = (
@@ -681,6 +688,7 @@ with tabs[0]:
             st.download_button("📥 Download Department-wise Distribution (PNG)", data=buf,
                                file_name="head_distribution.png", mime="image/png")
 
+    # Sub Head Breakdown when Head is selected
     if st.session_state.view_head_filter and not filtered.empty:
         st.markdown("### 📊 Sub Head Distribution")
         subhead_summary = (
@@ -808,16 +816,16 @@ with tabs[0]:
         if "Deficiencies Noted" not in valid_cols:
             st.error("⚠️ 'Deficiencies Noted' column is required for search functionality.")
             st.stop()
+
         editable_filtered = filtered.copy()
         if "_original_sheet_index" not in editable_filtered.columns:
             editable_filtered["_original_sheet_index"] = editable_filtered.index
         if "_sheet_row" not in editable_filtered.columns:
             editable_filtered["_sheet_row"] = editable_filtered.index + 2
+
         editable_df = editable_filtered[valid_cols + ["_original_sheet_index", "_sheet_row"]].copy()
         if "Date of Inspection" in editable_df.columns:
-            editable_df["Date of Inspection"] = pd.to_datetime(
-                editable_df["Date of Inspection"], errors="coerce"
-            ).dt.date
+            editable_df["Date of Inspection"] = pd.to_datetime(editable_df["Date of Inspection"], errors="coerce").dt.date
 
         if "Feedback" in editable_df.columns and "User Feedback/Remark" in editable_df.columns:
             editable_df.insert(
@@ -827,19 +835,21 @@ with tabs[0]:
             )
             editable_df["Status"] = editable_df["Status"].apply(color_text_status)
 
-        # Days Pending - numeric for logic, display "-" for Resolved
+        # Days Pending - numeric for logic, display "—" for Resolved
         editable_df["Days Pending Raw"] = (pd.Timestamp.today() - pd.to_datetime(editable_df["Date of Inspection"])).dt.days
         editable_df["Days Pending"] = editable_df["Days Pending Raw"]
-        editable_df.loc[editable_df["Status"].str.contains("Resolved"), "Days Pending"] = "-"
+        editable_df.loc[editable_df["Status"].str.contains("Resolved"), "Days Pending"] = "—"
 
-        # Row class for flashing
-        def get_row_class(row):
+        # Row styling for flashing
+        def style_rows(row):
+            days = row["Days Pending Raw"]
             if "Resolved" in row["Status"]:
-                return "resolved-row"
-            if "Pending" in row["Status"] and row["Days Pending Raw"] > 1:
-                return "flash-row"
-            return ""
-        editable_df["row_class"] = editable_df.apply(get_row_class, axis=1)
+                return pd.Series("background-color: #e8f5e9; color: #2e7d32;", index=row.index)
+            if "Pending" in row["Status"] and days > 1:
+                return pd.Series("background-color: #ffcdd2; color: #c62828; animation: flash 1.5s infinite; font-weight: bold;", index=row.index)
+            return pd.Series("", index=row.index)
+
+        styled_df = editable_df.style.apply(style_rows, axis=1)
 
         st.markdown("#### 🔍 Search and Filter")
         search_text = st.text_input("Search All Columns (case-insensitive)", "").strip().lower()
@@ -858,54 +868,29 @@ with tabs[0]:
             editable_df = filter_dataframe(editable_df)
             st.info(f"Applied filters to {len(editable_df)} rows.")
 
-        # AgGrid with rowClass
-        gb = GridOptionsBuilder.from_dataframe(editable_df)
-        gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True, filter=True, sortable=True)
-        if "User Feedback/Remark" in editable_df.columns:
-            gb.configure_column(
-                "User Feedback/Remark",
-                editable=True,
-                wrapText=True,
-                autoHeight=True,
-                cellEditor="agTextCellEditor",
-                cellEditorPopup=False,
-                cellEditorParams={"maxLength": 4000}
-            )
-        gb.configure_column("_original_sheet_index", hide=True)
-        gb.configure_column("_sheet_row", hide=True)
-        gb.configure_column("Days Pending Raw", hide=True)
-        gb.configure_column("row_class", hide=True)
-        gb.configure_grid_options(singleClickEdit=True)
-
-        auto_size_js = JsCode("""
-        function(params) {
-            let allColumnIds = [];
-            params.columnApi.getAllColumns().forEach(function(column) {
-                allColumnIds.push(column.getColId());
-            });
-            params.columnApi.autoSizeColumns(allColumnIds);
-        }
-        """)
-        gb.configure_grid_options(onFirstDataRendered=auto_size_js)
-
-        # Use rowClass from data
-        gb.configure_grid_options(getRowClass=JsCode("function(params) { return params.data.row_class || ''; }"))
-
-        grid_options = gb.build()
-
         st.markdown("#### 🚈 Inspection Details")
-        st.caption("Type your compliance in 'User Feedback/Remark' column. Use column headers to sort.")
-        grid_response = AgGrid(
-            editable_df,
-            gridOptions=grid_options,
-            update_mode=GridUpdateMode.VALUE_CHANGED,
-            height=600,
-            allow_unsafe_jscode=True
-        )
-        edited_df = pd.DataFrame(grid_response["data"])
+        st.caption("Click any cell in 'User Feedback/Remark' column to edit. Press Enter to save.")
 
-        # Export and submit logic unchanged
-        export_cols = [col for col in valid_cols if col not in ["_original_sheet_index", "_sheet_row"]] + ["Status"]
+        edited_df = st.data_editor(
+            styled_df,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "User Feedback/Remark": st.column_config.TextColumn(
+                    "User Feedback/Remark",
+                    width="large",
+                    required=False
+                ),
+                "Date of Inspection": st.column_config.DateColumn("Date of Inspection"),
+                "_original_sheet_index": None,
+                "_sheet_row": None,
+                "Days Pending Raw": None
+            },
+            disabled=["Date of Inspection", "Type of Inspection", "Head", "Sub Head", "Location",
+                      "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "Status", "Days Pending"]
+        )
+
+        export_cols = [col for col in valid_cols if col not in ["_original_sheet_index", "_sheet_row"]] + ["Status", "Days Pending"]
         export_edited_df = edited_df[export_cols].copy()
         export_edited_df["Date of Inspection"] = pd.to_datetime(export_edited_df["Date of Inspection"]).dt.date
         towb_edited = BytesIO()
@@ -931,14 +916,13 @@ with tabs[0]:
                         pass
                 adjusted_width = (max_length + 2) if max_length < 50 else 50
                 ws.column_dimensions[col_letter].width = adjusted_width
-            thin_border = Border(left=Side(style='thin'),
-                                 right=Side(style='thin'),
-                                 top=Side(style='thin'),
-                                 bottom=Side(style='thin'))
+            thin_border = Border(left=Side(style='thin'), right=Side(style='thin'),
+                                 top=Side(style='thin'), bottom=Side(style='thin'))
             for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
                 for cell in row:
                     cell.border = thin_border
             status_col_idx = export_edited_df.columns.get_loc("Status") + 1
+            days_col_idx = export_edited_df.columns.get_loc("Days Pending") + 1
             for row in ws.iter_rows(min_row=2, min_col=status_col_idx, max_col=status_col_idx, max_row=len(export_edited_df) + 1):
                 for cell in row:
                     if str(cell.value).strip().lower() == "pending":
@@ -1009,7 +993,7 @@ with tabs[0]:
                                 deficiency = orig.loc[oid, "Deficiencies Noted"]
                                 forwarded_by = orig.loc[oid, "Head"]
                                 alert_msg = (
-                                    f"📌 **{head} Department Alert**\n"
+                                    f"**{head} Department Alert**\n"
                                     f"- Date: {date_str}\n"
                                     f"- Deficiency: {deficiency}\n"
                                     f"- Forwarded By: {forwarded_by}\n"
@@ -1478,6 +1462,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
