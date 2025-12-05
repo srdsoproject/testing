@@ -610,19 +610,19 @@ with tabs[0]:
     c4.multiselect("Sub Head", sub_opts, key="view_sub_filter")
     selected_status = st.selectbox("🔘 Status", ["All", "Pending", "Resolved"], key="view_status_filter")
 
-    # === SUBTLE DYNAMIC BACKGROUND THEME (Only for single department) ===
+    # === SUBTLE BUT VISIBLE DYNAMIC BACKGROUND THEME (Only for single department) ===
     selected_heads = st.session_state.get("view_head_filter", [])
 
     DEPT_BACKGROUND_COLORS = {
-        "ELECT/TRD": "#fffafa",     # Extremely light red (snow)
-        "ELECT/G": "#fafffa",       # Extremely light green
-        "SIGNAL & TELECOM": "#fffdf9",  # Extremely light orange
-        "ENGINEERING": "#f9fbff",   # Extremely light blue
-        "OPTG": "#fdfaff",          # Extremely light purple
-        "MECHANICAL": "#fffef9",    # Extremely light yellow
-        "COMMERCIAL": "#f9ffff",    # Extremely light cyan
-        "C&W": "#fefffa",           # Extremely light lime
-        # Add more with ultra-light tints
+        "ELECT/TRD": "#fff0f0",     # Soft visible light red
+        "ELECT/G": "#f0fff0",       # Soft visible light green
+        "SIGNAL & TELECOM": "#fff8f0",  # Soft visible light orange
+        "ENGINEERING": "#f0f5ff",   # Soft visible light blue
+        "OPTG": "#f8f0ff",          # Soft visible light purple
+        "MECHANICAL": "#fffdf0",    # Soft visible light yellow
+        "COMMERCIAL": "#f0ffff",    # Soft visible light cyan
+        "C&W": "#fdfff0",           # Soft visible light lime
+        # Add more as needed
     }
 
     # Build CSS string
@@ -1509,6 +1509,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
