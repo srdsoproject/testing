@@ -610,7 +610,7 @@ with tabs[0]:
     c4.multiselect("Sub Head", sub_opts, key="view_sub_filter")
     selected_status = st.selectbox("🔘 Status", ["All", "Pending", "Resolved"], key="view_status_filter")
 
-    # === SUBTLE BUT VISIBLE DYNAMIC BACKGROUND THEME (Only for single department) ===
+    # === VISIBLE BUT FRIENDLY DYNAMIC BACKGROUND THEME (Only for single department) ===
     selected_heads = st.session_state.get("view_head_filter", [])
 
     DEPT_BACKGROUND_COLORS = {
@@ -631,6 +631,11 @@ with tabs[0]:
     .stApp, section[data-testid="stSidebar"] > div {
         transition: background-color 0.8s ease !important;
     }
+    /* Ensure text is readable on light tints */
+    .stApp, .stMarkdown, .stText, h1, h2, h3, h4, h5, h6, p, div, span {
+        color: #333333 !important;
+    }
+    </style>
     """
 
     if len(selected_heads) == 1:
@@ -1509,6 +1514,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
