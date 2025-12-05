@@ -827,8 +827,10 @@ with tabs[0]:
             )
             editable_df["Status"] = editable_df["Status"].apply(color_text_status)
 
-        # Days Pending for styling
-        editable_df["Days Pending"] = (pd.Timestamp.today() - pd.to_datetime(editable_df["Date of Inspection"])).dt.days
+        # Days Pending for styling - only calculate numeric for Pending
+        editable_df["Days Pending Raw"] = (pd.Timestamp.today() - pd.to_datetime(editable_df["Date of Inspection"])).dt.days
+        editable_df["Days Pending"] = editable_df["Days Pending Raw"]
+        editable_df.loc[editable_df["Status"].str.contains("Resolved"), "Days Pending"] = "-"
 
         st.markdown("#### 🔍 Search and Filter")
         search_text = st.text_input("Search All Columns (case-insensitive)", "").strip().lower()
@@ -847,7 +849,7 @@ with tabs[0]:
             editable_df = filter_dataframe(editable_df)
             st.info(f"Applied filters to {len(editable_df)} rows.")
 
-        # AgGrid with FLASHING for ANY Pending >1 day
+        # AgGrid with FLASHING for Pending >1 day
         gb = GridOptionsBuilder.from_dataframe(editable_df)
         gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True, filter=True, sortable=True)
         if "User Feedback/Remark" in editable_df.columns:
@@ -862,6 +864,7 @@ with tabs[0]:
             )
         gb.configure_column("_original_sheet_index", hide=True)
         gb.configure_column("_sheet_row", hide=True)
+        gb.configure_column("Days Pending Raw", hide=True)
         gb.configure_grid_options(singleClickEdit=True)
 
         auto_size_js = JsCode("""
@@ -878,7 +881,7 @@ with tabs[0]:
         row_style_jscode = JsCode("""
         function(params) {
             const status = params.data['Status'] || '';
-            const days = params.data['Days Pending'] || 0;
+            const days = params.data['Days Pending Raw'] || 0;
             let style = {};
 
             if (status.includes('Resolved')) {
@@ -1499,6 +1502,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
