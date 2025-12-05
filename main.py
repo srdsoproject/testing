@@ -610,25 +610,33 @@ with tabs[0]:
     c4.multiselect("Sub Head", sub_opts, key="view_sub_filter")
     selected_status = st.selectbox("🔘 Status", ["All", "Pending", "Resolved"], key="view_status_filter")
 
-    # === DYNAMIC BACKGROUND THEME BASED ON SELECTED DEPARTMENT ===
+    # === FRIENDLY DYNAMIC BACKGROUND THEME (Only for single department) ===
     selected_heads = st.session_state.get("view_head_filter", [])
+
     DEPT_BACKGROUND_COLORS = {
-        "ELECT/TRD": "#ffebee",     # Light red
-        "ELECT/G": "#e8f5e9",       # Light green
-        "SIGNAL & TELECOM": "#fff3e0",  # Light orange
-        "ENGINEERING": "#e3f2fd",   # Light blue
-        "OPTG": "#f3e5f5",          # Light purple
-        "MECHANICAL": "#fffde7",    # Light yellow
-        "COMMERCIAL": "#e1f5fe",    # Light cyan
-        "C&W": "#f9fbe7",           # Light lime
-        # Add more departments as needed
+        "ELECT/TRD": "#fff5f5",     # Very light red
+        "ELECT/G": "#f5fff5",       # Very light green
+        "SIGNAL & TELECOM": "#fffcf5",  # Very light orange
+        "ENGINEERING": "#f5f8ff",   # Very light blue
+        "OPTG": "#fcf5ff",          # Very light purple
+        "MECHANICAL": "#fffdf5",    # Very light yellow
+        "COMMERCIAL": "#f5ffff",    # Very light cyan
+        "C&W": "#fdfff5",           # Very light lime
+        # Add more departments with soft tints as needed
     }
 
-    background_css = ""
+    background_css = """
+    <style>
+    .stApp, section[data-testid="stSidebar"] > div {
+        transition: background-color 0.6s ease !important;
+    }
+    </style>
+    """
+
     if len(selected_heads) == 1:
         dept = selected_heads[0]
-        bg_color = DEPT_BACKGROUND_COLORS.get(dept, "#f5f5f5")  # Fallback neutral
-        background_css = f"""
+        bg_color = DEPT_BACKGROUND_COLORS.get(dept, "transparent")
+        background_css += f"""
         <style>
         .stApp {{
             background-color: {bg_color} !important;
@@ -638,15 +646,7 @@ with tabs[0]:
         }}
         </style>
         """
-    else:
-        # Neutral default when no or multiple departments selected
-        background_css = """
-        <style>
-        .stApp {
-            background-color: #ffffff !important;
-        }
-        </style>
-        """
+    # No extra style when no or multiple departments → respects system theme (light/dark)
 
     st.markdown(background_css, unsafe_allow_html=True)
 
@@ -666,7 +666,6 @@ with tabs[0]:
         filtered = filtered[filtered["Sub Head"].isin(st.session_state.view_sub_filter)]
     if selected_status != "All":
         filtered = filtered[filtered["Status"] == selected_status]
-
     filtered = apply_common_filters(filtered, prefix="view_")
     filtered = filtered.apply(lambda x: x.str.replace("\n", " ") if x.dtype == "object" else x)
     filtered = filtered.sort_values("Date of Inspection")
@@ -688,8 +687,7 @@ with tabs[0]:
     col_d.metric("📊 Total Records", len(filtered))
     col_e.metric("🔴 Longest Pending", f"{longest_pending} days")
 
-    # Department-wise and Sub Head Breakdown (your existing code - unchanged)
-
+    # Department-wise (Head) Breakdown when Location is selected
     if st.session_state.view_location_filter and not filtered.empty:
         st.markdown("### 📊 Department-wise Distribution")
         head_summary = (
@@ -741,6 +739,7 @@ with tabs[0]:
             st.download_button("📥 Download Department-wise Distribution (PNG)", data=buf,
                                file_name="head_distribution.png", mime="image/png")
 
+    # Sub Head Breakdown when Head is selected
     if st.session_state.view_head_filter and not filtered.empty:
         st.markdown("### 📊 Sub Head Distribution")
         subhead_summary = (
@@ -1027,7 +1026,7 @@ with tabs[0]:
                     }
                     for oid in changed_ids:
                         user_remark = new.loc[oid, "User Feedback/Remark"].strip()
-                        if not user_remark:
+                        if notユーザー_remark:
                             continue
                         for key, (head, action_by) in routing.items():
                             if key in user_remark:
@@ -1510,6 +1509,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
