@@ -571,16 +571,16 @@ tabs = st.tabs(["View Records", "Analytics", "Please Explain Letters"])
 st.markdown("""
 <style>
 @keyframes flash {
-    0%   { background-color: #ffcdd2; }
-    50%  { background-color: #e57373; }
-    100% { background-color: #ffcdd2; }
+    0%   { background-color: #ffcdd2 !important; }
+    50%  { background-color: #e57373 !important; }
+    100% { background-color: #ffcdd2 !important; }
 }
-.ag-row.flash-row {
+div.ag-theme-streamlit .ag-row.flash-row {
     animation: flash 1.5s infinite !important;
     font-weight: bold !important;
     color: #c62828 !important;
 }
-.ag-row.resolved-row {
+div.ag-theme-streamlit .ag-row.resolved-row {
     background-color: #e8f5e9 !important;
     color: #2e7d32 !important;
 }
@@ -815,7 +815,7 @@ with tabs[0]:
         # ---------- EDITOR ----------
     if not filtered.empty:
         display_cols = [
-            "Date of Inspection", "Type of Inspection", "Head", "Sub Head","Location",
+            "Date of Inspection", "Type of Inspection", "Head", "Sub Head", "Location",
             "Deficiencies Noted", "Inspection By", "Action By", "Feedback",
             "User Feedback/Remark"
         ]
@@ -883,8 +883,8 @@ with tabs[0]:
         gb = GridOptionsBuilder.from_dataframe(editable_df)
         gb.configure_default_column(
             editable=False,
-            wrapText=True,      # ← Full text wrapping
-            autoHeight=True,    # ← Rows expand to show all text
+            wrapText=True,      # Full text wrapping
+            autoHeight=True,    # Rows expand to show all text
             resizable=True,
             filter=True,
             sortable=True,
@@ -931,6 +931,17 @@ with tabs[0]:
         }
         """))
 
+        # Force animation after render
+        force_animation_js = JsCode("""
+        function(params) {
+            const rows = document.querySelectorAll('.ag-row.flash-row');
+            rows.forEach(row => {
+                row.style.animation = 'flash 1.5s infinite';
+            });
+        }
+        """)
+        gb.configure_grid_options(onGridReady=force_animation_js)
+
         grid_options = gb.build()
 
         st.markdown("#### 🚈 Inspection Details")
@@ -942,12 +953,12 @@ with tabs[0]:
             update_mode=GridUpdateMode.VALUE_CHANGED,
             height=700,
             allow_unsafe_jscode=True,
-            theme="streamlit"  # Clean look
+            theme="streamlit"
         )
 
         edited_df = pd.DataFrame(grid_response["data"])
 
-        # Export & Submit logic (unchanged)
+        # Export & Submit logic
         export_cols = [col for col in valid_cols if col not in ["_original_sheet_index", "_sheet_row"]] + ["Status", "Days Pending"]
         export_edited_df = edited_df[export_cols].copy()
         export_edited_df["Date of Inspection"] = pd.to_datetime(export_edited_df["Date of Inspection"]).dt.date
@@ -1028,7 +1039,7 @@ with tabs[0]:
                         "Pertains to MECHANICAL": ("MECHANICAL", "Sr.DME"),
                         "Pertains to ELECT/TRO": ("ELECT/TRO", "Sr.DEE/TRO"),
                         "Pertains to Sr.DEN/S": ("ENGINEERING", "Sr.DEN/S"),
-                        "Pertains to Sr. DEN(South)" : ("ENGINEERING", "Sr.DEN/S"),
+                        "Pertains to Sr. DEN(South)": ("ENGINEERING", "Sr.DEN/S"),
                         "Pertains to Sr.DEN/C": ("ENGINEERING", "Sr.DEN/C"),
                         "Pertains to Sr.DEN/Co": ("ENGINEERING", "Sr.DEN/Co"),
                         "Pertains to FINAINCE": ("FINANCE", "Sr.DFM"),
@@ -1520,6 +1531,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
