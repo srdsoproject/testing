@@ -610,26 +610,26 @@ with tabs[0]:
     c4.multiselect("Sub Head", sub_opts, key="view_sub_filter")
     selected_status = st.selectbox("🔘 Status", ["All", "Pending", "Resolved"], key="view_status_filter")
 
-    # === FRIENDLY DYNAMIC BACKGROUND THEME (Only for single department) ===
+    # === SUBTLE DYNAMIC BACKGROUND THEME (Only for single department) ===
     selected_heads = st.session_state.get("view_head_filter", [])
 
     DEPT_BACKGROUND_COLORS = {
-        "ELECT/TRD": "#fff5f5",     # Very light red
-        "ELECT/G": "#f5fff5",       # Very light green
-        "SIGNAL & TELECOM": "#fffcf5",  # Very light orange
-        "ENGINEERING": "#f5f8ff",   # Very light blue
-        "OPTG": "#fcf5ff",          # Very light purple
-        "MECHANICAL": "#fffdf5",    # Very light yellow
-        "COMMERCIAL": "#f5ffff",    # Very light cyan
-        "C&W": "#fdfff5",           # Very light lime
-        # Add more departments with soft tints as needed
+        "ELECT/TRD": "#fffafa",     # Extremely light red (snow)
+        "ELECT/G": "#fafffa",       # Extremely light green
+        "SIGNAL & TELECOM": "#fffdf9",  # Extremely light orange
+        "ENGINEERING": "#f9fbff",   # Extremely light blue
+        "OPTG": "#fdfaff",          # Extremely light purple
+        "MECHANICAL": "#fffef9",    # Extremely light yellow
+        "COMMERCIAL": "#f9ffff",    # Extremely light cyan
+        "C&W": "#fefffa",           # Extremely light lime
+        # Add more with ultra-light tints
     }
 
     # Build CSS string
     css = """
     <style>
     .stApp, section[data-testid="stSidebar"] > div {
-        transition: background-color 0.6s ease !important;
+        transition: background-color 0.8s ease !important;
     }
     """
 
@@ -647,7 +647,7 @@ with tabs[0]:
 
     css += "</style>"
 
-    # ONLY ONE CALL — this applies the style silently
+    # ONLY ONE CALL — applies the style silently
     st.markdown(css, unsafe_allow_html=True)
 
     filtered = df[(df["Date of Inspection"] >= start_date) & (df["Date of Inspection"] <= end_date)]
@@ -1509,6 +1509,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
