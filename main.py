@@ -595,7 +595,6 @@ with tabs[0]:
     if st.session_state.view_type_filter:
         filtered = filtered[filtered["Type of Inspection"].isin(st.session_state.view_type_filter)]
     if st.session_state.view_location_filter:
-        # Include main routes and their subsections
         selected_locations = st.session_state.view_location_filter
         all_selected_locations = set(selected_locations)
         for loc in selected_locations:
@@ -612,13 +611,12 @@ with tabs[0]:
     filtered = filtered.apply(lambda x: x.str.replace("\n", " ") if x.dtype == "object" else x)
     filtered = filtered.sort_values("Date of Inspection")
 
-    # === ENHANCED METRICS (including Longest Pending) ===
+    # === ENHANCED METRICS ===
     col_a, col_b, col_c, col_d, col_e = st.columns(5)
     pending_count = (filtered["Status"] == "Pending").sum()
     no_response_count = filtered["Feedback"].isna().sum() + (filtered["Feedback"].astype(str).str.strip() == "").sum()
     resolved_count = (filtered["Status"] == "Resolved").sum()
 
-    # Calculate Days Pending for metrics and styling
     filtered_with_days = filtered.copy()
     filtered_with_days["Days Pending"] = (pd.Timestamp.today() - pd.to_datetime(filtered_with_days["Date of Inspection"])).dt.days
     longest_pending = filtered_with_days[filtered_with_days["Status"] == "Pending"]["Days Pending"].max()
@@ -642,7 +640,7 @@ with tabs[0]:
         if not head_summary.empty:
             total_heads = head_summary["Count"].sum()
             display_data = head_summary.copy()
-            thresh = 0.02  # 2% threshold for "Others" category
+            thresh = 0.02
             display_data["Percent"] = display_data["Count"] / total_heads
             major = display_data[display_data["Percent"] >= thresh][["Head", "Count"]]
             minor = display_data[display_data["Percent"] < thresh]
@@ -785,9 +783,9 @@ with tabs[0]:
         for row in ws.iter_rows(min_row=2, min_col=status_col_idx, max_col=status_col_idx, max_row=len(export_df) + 1):
             for cell in row:
                 if str(cell.value).strip().lower() == "pending":
-                    cell.font = Font(color="FF0000")  # Red
+                    cell.font = Font(color="FF0000")
                 elif str(cell.value).strip().lower() == "resolved":
-                    cell.font = Font(color="008000")  # Green
+                    cell.font = Font(color="008000")
     towb.seek(0)
     st.download_button(
         "📥 Export Filtered Records to Excel",
@@ -798,7 +796,6 @@ with tabs[0]:
 
     # ---------- EDITOR ----------
     if not filtered.empty:
-        # Validate and select columns to avoid KeyError
         display_cols = [
             "Date of Inspection", "Type of Inspection", "Head", "Sub Head","Location",
             "Deficiencies Noted", "Inspection By", "Action By", "Feedback",
@@ -812,19 +809,16 @@ with tabs[0]:
             st.error("⚠️ 'Deficiencies Noted' column is required for search functionality.")
             st.stop()
         editable_filtered = filtered.copy()
-        # Ensure stable ID columns
         if "_original_sheet_index" not in editable_filtered.columns:
             editable_filtered["_original_sheet_index"] = editable_filtered.index
         if "_sheet_row" not in editable_filtered.columns:
             editable_filtered["_sheet_row"] = editable_filtered.index + 2
-        # Create editable DataFrame
         editable_df = editable_filtered[valid_cols + ["_original_sheet_index", "_sheet_row"]].copy()
-        # Format Date of Inspection
         if "Date of Inspection" in editable_df.columns:
             editable_df["Date of Inspection"] = pd.to_datetime(
                 editable_df["Date of Inspection"], errors="coerce"
-            ).dt.date  # Changed to .dt.date for Excel compatibility
-        # Add Status column
+            ).dt.date
+
         if "Feedback" in editable_df.columns and "User Feedback/Remark" in editable_df.columns:
             editable_df.insert(
                 editable_df.columns.get_loc("User Feedback/Remark") + 1,
@@ -833,10 +827,9 @@ with tabs[0]:
             )
             editable_df["Status"] = editable_df["Status"].apply(color_text_status)
 
-        # === ADD DAYS PENDING COLUMN FOR STYLING ===
+        # Days Pending for styling
         editable_df["Days Pending"] = (pd.Timestamp.today() - pd.to_datetime(editable_df["Date of Inspection"])).dt.days
 
-        # Global Search (inbuilt search across all columns)
         st.markdown("#### 🔍 Search and Filter")
         search_text = st.text_input("Search All Columns (case-insensitive)", "").strip().lower()
         if search_text:
@@ -845,7 +838,7 @@ with tabs[0]:
             ).any(axis=1)
             editable_df = editable_df[mask].copy()
             st.info(f"Found {len(editable_df)} matching rows after search.")
-        # Excel-like Column Filtering
+
         max_cols = st.slider("Max columns to filter on", 1, len(valid_cols), min(10, len(valid_cols)), key="max_cols_filter")
         candidate_columns = valid_cols[:max_cols]
         global column_selection
@@ -854,7 +847,7 @@ with tabs[0]:
             editable_df = filter_dataframe(editable_df)
             st.info(f"Applied filters to {len(editable_df)} rows.")
 
-        # === AgGrid Configuration with Color-Coding + Flashing ===
+        # AgGrid with FLASHING for ANY Pending >1 day
         gb = GridOptionsBuilder.from_dataframe(editable_df)
         gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True, filter=True, sortable=True)
         if "User Feedback/Remark" in editable_df.columns:
@@ -871,7 +864,6 @@ with tabs[0]:
         gb.configure_column("_sheet_row", hide=True)
         gb.configure_grid_options(singleClickEdit=True)
 
-        # Auto-size columns on first render
         auto_size_js = JsCode("""
         function(params) {
             let allColumnIds = [];
@@ -883,7 +875,6 @@ with tabs[0]:
         """)
         gb.configure_grid_options(onFirstDataRendered=auto_size_js)
 
-        # Row styling with flashing for >45 days pending
         row_style_jscode = JsCode("""
         function(params) {
             const status = params.data['Status'] || '';
@@ -895,33 +886,17 @@ with tabs[0]:
                 style.color = '#2e7d32';
                 return style;
             }
-            if (status.includes('Pending')) {
-                if (days > 45) {
-                    style.backgroundColor = '#ffcdd2';
-                    style.color = '#c62828';
-                    style.fontWeight = 'bold';
-                    style.animation = 'flash 1.5s infinite';
-                    return style;
-                }
-                if (days > 30) {
-                    style.backgroundColor = '#fff3e0';
-                    style.color = '#ef6c00';
-                    return style;
-                }
-                if (days > 15) {
-                    style.backgroundColor = '#fff8e1';
-                    style.color = '#f9a825';
-                    return style;
-                }
-                style.backgroundColor = '#e3f2fd';
-                style.color = '#1565c0';
+            if (status.includes('Pending') && days > 1) {
+                style.backgroundColor = '#ffcdd2';
+                style.color = '#c62828';
+                style.fontWeight = 'bold';
+                style.animation = 'flash 1.5s infinite';
                 return style;
             }
             return null;
         }
         """)
 
-        # Inject flashing animation keyframes
         grid_ready_jscode = JsCode("""
         function(params) {
             const style = document.createElement('style');
@@ -940,7 +915,6 @@ with tabs[0]:
 
         grid_options = gb.build()
 
-        # Render AgGrid
         st.markdown("#### 🚈 Inspection Details")
         st.caption("Type your compliance in 'User Feedback/Remark' column. Use column headers to sort.")
         grid_response = AgGrid(
@@ -952,7 +926,6 @@ with tabs[0]:
         )
         edited_df = pd.DataFrame(grid_response["data"])
 
-        # Download button for filtered/edited results as Excel
         export_cols = [col for col in valid_cols if col not in ["_original_sheet_index", "_sheet_row"]] + ["Status"]
         export_edited_df = edited_df[export_cols].copy()
         export_edited_df["Date of Inspection"] = pd.to_datetime(export_edited_df["Date of Inspection"]).dt.date
@@ -990,9 +963,9 @@ with tabs[0]:
             for row in ws.iter_rows(min_row=2, min_col=status_col_idx, max_col=status_col_idx, max_row=len(export_edited_df) + 1):
                 for cell in row:
                     if str(cell.value).strip().lower() == "pending":
-                        cell.font = Font(color="FF0000")  # Red
+                        cell.font = Font(color="FF0000")
                     elif str(cell.value).strip().lower() == "resolved":
-                        cell.font = Font(color="008000")  # Green
+                        cell.font = Font(color="008000")
         towb_edited.seek(0)
         st.download_button(
             label="📥 Export Edited Records to Excel",
@@ -1001,7 +974,6 @@ with tabs[0]:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
-        # Buttons
         c1, c2, _ = st.columns([1, 1, 1])
         submitted = c1.button("✅ Submit Feedback")
         if c2.button("🔄 Refresh Data"):
@@ -1009,7 +981,6 @@ with tabs[0]:
             st.success("✅ Data refreshed successfully!")
             st.rerun()
 
-        # Submit logic
         if submitted:
             need_cols = {"_original_sheet_index", "User Feedback/Remark"}
             if not need_cols.issubset(edited_df.columns) or "Feedback" not in editable_filtered.columns:
@@ -1528,6 +1499,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
