@@ -889,7 +889,7 @@ with tabs[0]:
         gb.configure_grid_options(onFirstDataRendered=auto_size_js)
 
         # Use rowClass from data
-        gb.configure_grid_options(getRowClass=params => params.data.row_class || "")
+        gb.configure_grid_options(getRowClass=JsCode("function(params) { return params.data.row_class || ''; }"))
 
         grid_options = gb.build()
 
@@ -1478,6 +1478,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
