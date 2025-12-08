@@ -568,15 +568,7 @@ def generate_please_explain_pdf(officer_name, officer_post, pending_items):
     return buffer
 # ---------- MAIN TABS ----------
 tabs = st.tabs(["View Records", "Analytics", "Please Explain Letters"])
-st.markdown("""
-<style>
-@keyframes flash {
-    0%   { background-color: #ffcdd2; }
-    50%  { background-color: #e57373; }
-    100% { background-color: #ffcdd2; }
-}
-</style>
-""", unsafe_allow_html=True)
+
 with tabs[0]:
     df = st.session_state.df
     if df is None or df.empty:
@@ -595,7 +587,7 @@ with tabs[0]:
     c1.multiselect("Type of Inspection", VALID_INSPECTIONS, key="view_type_filter")
     c2.multiselect("Location", ALL_LOCATIONS, key="view_location_filter")
     c3, c4 = st.columns(2)
-    c3.multiselect("Head", HEAD_LIST[1:], key="view_head_filter")
+    c3.multiselect("Head", HEAD_LIST[1:], key="view_head_filter")  # Fixed typo: removed erroneous c3 = c3.multiselect
     sub_opts = sorted({s for h in st.session_state.view_head_filter for s in SUBHEAD_LIST.get(h, [])})
     c4.multiselect("Sub Head", sub_opts, key="view_sub_filter")
     selected_status = st.selectbox("🔘 Status", ["All", "Pending", "Resolved"], key="view_status_filter")
@@ -603,6 +595,7 @@ with tabs[0]:
     if st.session_state.view_type_filter:
         filtered = filtered[filtered["Type of Inspection"].isin(st.session_state.view_type_filter)]
     if st.session_state.view_location_filter:
+        # Include main routes and their subsections
         selected_locations = st.session_state.view_location_filter
         all_selected_locations = set(selected_locations)
         for loc in selected_locations:
@@ -618,24 +611,16 @@ with tabs[0]:
     filtered = apply_common_filters(filtered, prefix="view_")
     filtered = filtered.apply(lambda x: x.str.replace("\n", " ") if x.dtype == "object" else x)
     filtered = filtered.sort_values("Date of Inspection")
-
-    # === ENHANCED METRICS ===
-    col_a, col_b, col_c, col_d, col_e = st.columns(5)
+    #st.write(f"🔹 Showing {len(filtered)} record(s) from **{start_date.strftime('%d.%m.%Y')}** "
+             #f"to **{end_date.strftime('%d.%m.%Y')}**")
+    col_a, col_b, col_c, col_d = st.columns(4)
     pending_count = (filtered["Status"] == "Pending").sum()
     no_response_count = filtered["Feedback"].isna().sum() + (filtered["Feedback"].astype(str).str.strip() == "").sum()
     resolved_count = (filtered["Status"] == "Resolved").sum()
-
-    filtered_with_days = filtered.copy()
-    filtered_with_days["Days Pending Raw"] = (pd.Timestamp.today() - pd.to_datetime(filtered_with_days["Date of Inspection"])).dt.days
-    longest_pending = filtered_with_days[filtered_with_days["Status"] == "Pending"]["Days Pending Raw"].max()
-    longest_pending = longest_pending if pd.notna(longest_pending) else 0
-
     col_a.metric("🟨 Pending", pending_count)
     col_b.metric("⚠️ No Response", no_response_count)
     col_c.metric("🟩 Resolved", resolved_count)
     col_d.metric("📊 Total Records", len(filtered))
-    col_e.metric("🔴 Longest Pending", f"{longest_pending} days")
-
     # Department-wise (Head) Breakdown when Location is selected
     if st.session_state.view_location_filter and not filtered.empty:
         st.markdown("### 📊 Department-wise Distribution")
@@ -648,7 +633,7 @@ with tabs[0]:
         if not head_summary.empty:
             total_heads = head_summary["Count"].sum()
             display_data = head_summary.copy()
-            thresh = 0.02
+            thresh = 0.02  # 2% threshold for "Others" category
             display_data["Percent"] = display_data["Count"] / total_heads
             major = display_data[display_data["Percent"] >= thresh][["Head", "Count"]]
             minor = display_data[display_data["Percent"] < thresh]
@@ -687,7 +672,6 @@ with tabs[0]:
             st.image(buf, use_column_width=True)
             st.download_button("📥 Download Department-wise Distribution (PNG)", data=buf,
                                file_name="head_distribution.png", mime="image/png")
-
     # Sub Head Breakdown when Head is selected
     if st.session_state.view_head_filter and not filtered.empty:
         st.markdown("### 📊 Sub Head Distribution")
@@ -750,7 +734,6 @@ with tabs[0]:
             st.image(buf, use_column_width=True)
             st.download_button("📥 Download Sub Head Distribution (PNG)", data=buf,
                                file_name="subhead_distribution.png", mime="image/png")
-
     export_df = filtered[[
         "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
         "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "User Feedback/Remark",
@@ -791,9 +774,9 @@ with tabs[0]:
         for row in ws.iter_rows(min_row=2, min_col=status_col_idx, max_col=status_col_idx, max_row=len(export_df) + 1):
             for cell in row:
                 if str(cell.value).strip().lower() == "pending":
-                    cell.font = Font(color="FF0000")
+                    cell.font = Font(color="FF0000")  # Red
                 elif str(cell.value).strip().lower() == "resolved":
-                    cell.font = Font(color="008000")
+                    cell.font = Font(color="008000")  # Green
     towb.seek(0)
     st.download_button(
         "📥 Export Filtered Records to Excel",
@@ -801,11 +784,11 @@ with tabs[0]:
         file_name="filtered_records.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-
     # ---------- EDITOR ----------
     if not filtered.empty:
+        # Validate and select columns to avoid KeyError
         display_cols = [
-            "Date of Inspection", "Type of Inspection", "Head", "Sub Head","Location",
+            "Date of Inspection", "Type of Inspection",  "Head", "Sub Head","Location",
             "Deficiencies Noted", "Inspection By", "Action By", "Feedback",
             "User Feedback/Remark"
         ]
@@ -816,17 +799,20 @@ with tabs[0]:
         if "Deficiencies Noted" not in valid_cols:
             st.error("⚠️ 'Deficiencies Noted' column is required for search functionality.")
             st.stop()
-
         editable_filtered = filtered.copy()
+        # Ensure stable ID columns
         if "_original_sheet_index" not in editable_filtered.columns:
             editable_filtered["_original_sheet_index"] = editable_filtered.index
         if "_sheet_row" not in editable_filtered.columns:
             editable_filtered["_sheet_row"] = editable_filtered.index + 2
-
+        # Create editable DataFrame
         editable_df = editable_filtered[valid_cols + ["_original_sheet_index", "_sheet_row"]].copy()
+        # Format Date of Inspection
         if "Date of Inspection" in editable_df.columns:
-            editable_df["Date of Inspection"] = pd.to_datetime(editable_df["Date of Inspection"], errors="coerce").dt.date
-
+            editable_df["Date of Inspection"] = pd.to_datetime(
+                editable_df["Date of Inspection"], errors="coerce"
+            ).dt.date  # Changed to .dt.date for Excel compatibility
+        # Add Status column
         if "Feedback" in editable_df.columns and "User Feedback/Remark" in editable_df.columns:
             editable_df.insert(
                 editable_df.columns.get_loc("User Feedback/Remark") + 1,
@@ -834,23 +820,7 @@ with tabs[0]:
                 [get_status(r["Feedback"], r["User Feedback/Remark"]) for _, r in editable_df.iterrows()]
             )
             editable_df["Status"] = editable_df["Status"].apply(color_text_status)
-
-        # Days Pending - numeric for logic, display "—" for Resolved
-        editable_df["Days Pending Raw"] = (pd.Timestamp.today() - pd.to_datetime(editable_df["Date of Inspection"])).dt.days
-        editable_df["Days Pending"] = editable_df["Days Pending Raw"]
-        editable_df.loc[editable_df["Status"].str.contains("Resolved"), "Days Pending"] = "—"
-
-        # Row styling for flashing
-        def style_rows(row):
-            days = row["Days Pending Raw"]
-            if "Resolved" in row["Status"]:
-                return pd.Series("background-color: #e8f5e9; color: #2e7d32;", index=row.index)
-            if "Pending" in row["Status"] and days > 1:
-                return pd.Series("background-color: #ffcdd2; color: #c62828; animation: flash 1.5s infinite; font-weight: bold;", index=row.index)
-            return pd.Series("", index=row.index)
-
-        styled_df = editable_df.style.apply(style_rows, axis=1)
-
+        # Global Search (inbuilt search across all columns)
         st.markdown("#### 🔍 Search and Filter")
         search_text = st.text_input("Search All Columns (case-insensitive)", "").strip().lower()
         if search_text:
@@ -859,7 +829,7 @@ with tabs[0]:
             ).any(axis=1)
             editable_df = editable_df[mask].copy()
             st.info(f"Found {len(editable_df)} matching rows after search.")
-
+        # Excel-like Column Filtering
         max_cols = st.slider("Max columns to filter on", 1, len(valid_cols), min(10, len(valid_cols)), key="max_cols_filter")
         candidate_columns = valid_cols[:max_cols]
         global column_selection
@@ -867,30 +837,46 @@ with tabs[0]:
         if column_selection:
             editable_df = filter_dataframe(editable_df)
             st.info(f"Applied filters to {len(editable_df)} rows.")
-
+        # AgGrid Configuration
+        gb = GridOptionsBuilder.from_dataframe(editable_df)
+        gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True)
+        if "User Feedback/Remark" in editable_df.columns:
+            gb.configure_column(
+                "User Feedback/Remark",
+                editable=True,
+                wrapText=True,
+                autoHeight=True,
+                cellEditor="agTextCellEditor",
+                cellEditorPopup=False,
+                cellEditorParams={"maxLength": 4000}
+            )
+        gb.configure_column("_original_sheet_index", hide=True)
+        gb.configure_column("_sheet_row", hide=True)
+        gb.configure_grid_options(singleClickEdit=True)
+        auto_size_js = JsCode("""
+        function(params) {
+            let allColumnIds = [];
+            params.columnApi.getAllColumns().forEach(function(column) {
+                allColumnIds.push(column.getColId());
+            });
+            params.columnApi.autoSizeColumns(allColumnIds);
+        }
+        """)
+        gb.configure_grid_options(onFirstDataRendered=auto_size_js)
+        grid_options = gb.build()
+        # Render AgGrid
         st.markdown("#### 🚈 Inspection Details")
-        st.caption("Click any cell in 'User Feedback/Remark' column to edit. Press Enter to save.")
-
-        edited_df = st.data_editor(
-            styled_df,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "User Feedback/Remark": st.column_config.TextColumn(
-                    "User Feedback/Remark",
-                    width="large",
-                    required=False
-                ),
-                "Date of Inspection": st.column_config.DateColumn("Date of Inspection"),
-                "_original_sheet_index": None,
-                "_sheet_row": None,
-                "Days Pending Raw": None
-            },
-            disabled=["Date of Inspection", "Type of Inspection", "Head", "Sub Head", "Location",
-                      "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "Status", "Days Pending"]
+        st.caption("Type your compliance in 'User Feedback/Remark' column. Use column headers to sort.")
+        grid_response = AgGrid(
+            editable_df,
+            gridOptions=grid_options,
+            update_mode=GridUpdateMode.VALUE_CHANGED,
+            height=600,
+            allow_unsafe_jscode=True
         )
-
-        export_cols = [col for col in valid_cols if col not in ["_original_sheet_index", "_sheet_row"]] + ["Status", "Days Pending"]
+        edited_df = pd.DataFrame(grid_response["data"])
+        # Download button for filtered/edited results as Excel
+        export_cols = [col for col in valid_cols if col not in ["_original_sheet_index", "_sheet_row"]] + ["Status"]
         export_edited_df = edited_df[export_cols].copy()
         export_edited_df["Date of Inspection"] = pd.to_datetime(export_edited_df["Date of Inspection"]).dt.date
         towb_edited = BytesIO()
@@ -916,19 +902,20 @@ with tabs[0]:
                         pass
                 adjusted_width = (max_length + 2) if max_length < 50 else 50
                 ws.column_dimensions[col_letter].width = adjusted_width
-            thin_border = Border(left=Side(style='thin'), right=Side(style='thin'),
-                                 top=Side(style='thin'), bottom=Side(style='thin'))
+            thin_border = Border(left=Side(style='thin'),
+                                 right=Side(style='thin'),
+                                 top=Side(style='thin'),
+                                 bottom=Side(style='thin'))
             for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
                 for cell in row:
                     cell.border = thin_border
             status_col_idx = export_edited_df.columns.get_loc("Status") + 1
-            days_col_idx = export_edited_df.columns.get_loc("Days Pending") + 1
             for row in ws.iter_rows(min_row=2, min_col=status_col_idx, max_col=status_col_idx, max_row=len(export_edited_df) + 1):
                 for cell in row:
                     if str(cell.value).strip().lower() == "pending":
-                        cell.font = Font(color="FF0000")
+                        cell.font = Font(color="FF0000")  # Red
                     elif str(cell.value).strip().lower() == "resolved":
-                        cell.font = Font(color="008000")
+                        cell.font = Font(color="008000")  # Green
         towb_edited.seek(0)
         st.download_button(
             label="📥 Export Edited Records to Excel",
@@ -936,14 +923,14 @@ with tabs[0]:
             file_name=f"edited_records_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-
+        # Buttons
         c1, c2, _ = st.columns([1, 1, 1])
         submitted = c1.button("✅ Submit Feedback")
         if c2.button("🔄 Refresh Data"):
             st.session_state.df = load_data()
             st.success("✅ Data refreshed successfully!")
             st.rerun()
-
+        # Submit logic
         if submitted:
             need_cols = {"_original_sheet_index", "User Feedback/Remark"}
             if not need_cols.issubset(edited_df.columns) or "Feedback" not in editable_filtered.columns:
@@ -976,6 +963,7 @@ with tabs[0]:
                         "Pertains to FINAINCE": ("FINANCE", "Sr.DFM"),
                         "Pertains to STORE": ("STORE", "Sr.DMM"),
                         "Pertains to MEDICAL": ("MEDICAL", "CMS"),
+                        
                     }
                     for oid in changed_ids:
                         user_remark = new.loc[oid, "User Feedback/Remark"].strip()
@@ -993,7 +981,7 @@ with tabs[0]:
                                 deficiency = orig.loc[oid, "Deficiencies Noted"]
                                 forwarded_by = orig.loc[oid, "Head"]
                                 alert_msg = (
-                                    f"**{head} Department Alert**\n"
+                                    f"📌 **{head} Department Alert**\n"
                                     f"- Date: {date_str}\n"
                                     f"- Deficiency: {deficiency}\n"
                                     f"- Forwarded By: {forwarded_by}\n"
@@ -1012,6 +1000,7 @@ with tabs[0]:
                     st.info("ℹ️ No changes detected to save.")
     else:
         st.info("Deficiencies will be updated soon!")
+
 # ---------------- ALERT LOG SECTION ----------------
 st.markdown("## 📋 Alerts Log")
 if st.session_state.alerts_log:
@@ -1462,3 +1451,6 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
+
+
