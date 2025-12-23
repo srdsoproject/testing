@@ -657,7 +657,7 @@ with tabs[0]:
                         bbox=dict(facecolor="white", edgecolor="gray", alpha=0.7, pad=1))
                 ax.annotate("", xy=(0.9*x, 0.9*y), xytext=(lx, ly),
                             arrowprops=dict(arrowstyle="-", lw=0.8, color="black"))
-            fig.suptitle("📊 Department-wise Breakdown", fontsize=14, fontweight="bold")
+            fig.suptitle("Department-wise Breakdown", fontsize=14, fontweight="bold")
             dr = f"{start_date.strftime('%d-%m-%Y')} to {end_date.strftime('%d-%m-%Y')}"
             locations = ", ".join(st.session_state.view_location_filter)
             type_display = ", ".join(st.session_state.view_type_filter) if st.session_state.view_type_filter else "All Types"
@@ -714,7 +714,7 @@ with tabs[0]:
             tbl.auto_set_font_size(False)
             tbl.set_fontsize(10)
             tbl.scale(1, 1.5)
-            fig.suptitle("📊 Sub Head Breakdown", fontsize=14, fontweight="bold")
+            fig.suptitle("Sub Head Breakdown", fontsize=14, fontweight="bold")
             dr = f"{start_date.strftime('%d-%m-%Y')} to {end_date.strftime('%d-%m-%Y')}"
             heads = ", ".join(st.session_state.view_head_filter)
             type_display = ", ".join(st.session_state.view_type_filter) if st.session_state.view_type_filter else "All Types"
@@ -1450,6 +1450,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
