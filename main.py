@@ -346,63 +346,62 @@ def apply_common_filters(df, prefix=""):
     # Default date range: today and the previous 2 days (last 3 days total)
     default_to_date = date.today()
     default_from_date = default_to_date - timedelta(days=2)
-
+    
     with st.expander("🔍 Apply Additional Filters", expanded=True):
         c1, c2 = st.columns(2)
         c1.multiselect(
             "Inspection By", INSPECTION_BY_LIST[1:],
-            default=st.session_state.get(prefix + "insp", []), 
-            key=prefix + "insp"
+            default=st.session_state.get(prefix + "insp", []),
+            key=prefix + "insp"          # ← FIXED: Now uses prefix
         )
         c2.multiselect(
             "Action By", ACTION_BY_LIST[1:],
-            default=st.session_state.get(prefix + "action", []), 
-            key=prefix + "action"
+            default=st.session_state.get(prefix + "action", []),
+            key=prefix + "action"        # ← FIXED: Now uses prefix
         )
-        
+       
         d1, d2 = st.columns(2)
         d1.date_input(
             "📅 From Date",
             value=st.session_state.get(prefix + "from_date", default_from_date),
-            key=prefix + "from_date"
+            key=prefix + "from_date"     # ← FIXED: Now uses prefix
         )
         d2.date_input(
             "📅 To Date",
             value=st.session_state.get(prefix + "to_date", default_to_date),
-            key=prefix + "to_date"
+            key=prefix + "to_date"       # ← FIXED: Now uses prefix
         )
-
+    
     out = df.copy()
-
+    
     # Apply Inspection By filter
     if st.session_state.get(prefix + "insp"):
         sel = st.session_state[prefix + "insp"]
         out = out[out["Inspection By"].apply(
             lambda x: any(s.strip() in str(x).split(",") for s in sel)
         )]
-
+    
     # Apply Action By filter
     if st.session_state.get(prefix + "action"):
         sel = st.session_state[prefix + "action"]
         out = out[out["Action By"].apply(
             lambda x: any(s.strip() in str(x).split(",") for s in sel)
         )]
-
-    # Apply date filter only if both dates are set
+    
+    # Apply date filter
     if st.session_state.get(prefix + "from_date") and st.session_state.get(prefix + "to_date"):
         from_date = st.session_state[prefix + "from_date"]
         to_date = st.session_state[prefix + "to_date"]
-        
-        # Ensure from_date is not after to_date (optional safety)
+       
         if from_date > to_date:
             st.warning("From Date cannot be after To Date. Adjusting filter.")
-            from_date = to_date
-        
+            from_date, to_date = to_date, from_date
+       
         out = out[
             (out["Date of Inspection"] >= pd.to_datetime(from_date)) &
             (out["Date of Inspection"] <= pd.to_datetime(to_date))
         ]
-
+    
     return out
 
 # ---------- HEADER ----------
@@ -1451,6 +1450,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
