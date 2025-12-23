@@ -405,112 +405,105 @@ def apply_common_filters(df, prefix=""):
     return out
 
 # ---------- HEADER ----------
-st.markdown(
-    """
-    <div class="header-card">
-        <img src="https://raw.githubusercontent.com/srdsoproject/testing/main/Central%20Railway%20Logo.png"
-             class="logo-img">
-        <div class="header-text">
-            <h2 class="initiative-title">An Initiative by <span class="highlight">Safety Department</span>, Solapur Division</h2>
-            <h1 class="app-title">📋 S.A.R.A.L</h1>
-            <h3 class="app-subtitle">(Safety Abnormality Report & Action List – Version 1.3)</h3>
-        </div>
-    </div>
-    <style>
-        .header-card {
-            display: flex;
-            align-items: center;
-            border-radius: 18px;
-            padding: 24px;
-            margin: 20px 0;
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
-            transition: all 0.4s ease;
-            backdrop-filter: blur(10px);
-        }
-        .header-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
-        }
-        .logo-img {
-            height: 75px;
-            border-radius: 12px;
-            margin-right: 24px;
-            object-fit: contain;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            transition: transform 0.3s ease;
-        }
-        .header-card:hover .logo-img {
-            transform: scale(1.05);
-        }
-        .header-text {
-            flex: 1;
-        }
-        .initiative-title {
-            margin: 0;
-            font-size: 1.25em;
-            font-weight: 500;
-            letter-spacing: 0.5px;
-        }
-        .highlight {
-            font-weight: bold;
-        }
-        .app-title {
-            margin: 8px 0 0;
-            font-size: 2.8em;
-            font-weight: bold;
-            letter-spacing: 1px;
-        }
-        .app-subtitle {
-            margin: -8px 0 0;
-            font-size: 1.15em;
-            font-weight: normal;
-            opacity: 0.9;
-        }
+st.markdown("""
+<div style="text-align: center; margin: 50px 0 30px 0;">
+  <div class="adaptive-credit">
+    <p>
+      <strong>Designed & Developed by</strong>
+      <span class="highlight">Safety Department</span>,
+      <em>Solapur Division</em>
+    </p>
+  </div>
+</div>
 
-        /* Light Mode */
-        @media (prefers-color-scheme: light) {
-            .header-card {
-                background: linear-gradient(135deg, #ffffff 0%, #e6f0fa 100%);
-                border: 1px solid #d0e4ff;
-            }
-            .initiative-title { color: #2c3e50; }
-            .highlight { color: #0066cc; }
-            .app-title { color: #004080; }
-            .app-subtitle { color: #555; }
-        }
+<style>
+/* Root variables for easy theming */
+@media (prefers-color-scheme: light) {
+  :root {
+    --credit-bg: rgba(255, 255, 255, 0.85);
+    --credit-border: #a0d8ff;
+    --credit-shadow: rgba(100, 180, 255, 0.25);
+    --credit-shadow-hover: rgba(80, 160, 255, 0.4);
+    --credit-glow: rgba(100, 200, 255, 0.7);
+    --text-main: #1e3a8a;
+    --text-highlight: #2563eb;
+    --text-sub: #3b82f6;
+  }
+}
 
-        /* Dark Mode */
-        @media (prefers-color-scheme: dark) {
-            .header-card {
-                background: linear-gradient(135deg, #1a1f2e 0%, #2c3448 100%);
-                border: 1px solid #3a445d;
-            }
-            .initiative-title { color: #e0e6ff; }
-            .highlight { color: #4da6ff; } /* Brighter blue for visibility */
-            .app-title { color: #66b0ff; } /* Glowy blue */
-            .app-subtitle { color: #a0aec0; }
-        }
+@media (prefers-color-scheme: dark) {
+  :root {
+    --credit-bg: rgba(20, 30, 60, 0.75);
+    --credit-border: #4c9eff;
+    --credit-shadow: rgba(76, 158, 255, 0.2);
+    --credit-shadow-hover: rgba(76, 158, 255, 0.5);
+    --credit-glow: rgba(100, 180, 255, 0.9);
+    --text-main: #e0f0ff;
+    --text-highlight: #7bb3ff;
+    --text-sub: #a0cfff;
+  }
+}
 
-        /* Mobile Responsiveness */
-        @media (max-width: 768px) {
-            .header-card {
-                flex-direction: column;
-                text-align: center;
-                padding: 20px;
-            }
-            .logo-img {
-                margin-right: 0;
-                margin-bottom: 16px;
-                height: 65px;
-            }
-            .app-title {
-                font-size: 2.4em;
-            }
-        }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+/* Credit Card Style */
+.adaptive-credit {
+  display: inline-block;
+  padding: 18px 40px;
+  background: var(--credit-bg);
+  border: 2px solid var(--credit-border);
+  border-radius: 20px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 10px 30px var(--credit-shadow);
+  transition: all 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
+  font-family: 'Segoe UI', 'Roboto', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  max-width: 90%;
+}
+
+.adaptive-credit p {
+  margin: 0;
+  color: var(--text-main);
+  font-weight: 500;
+  letter-spacing: 0.8px;
+}
+
+.adaptive-credit p span.highlight {
+  color: var(--text-highlight);
+  font-weight: 700;
+  text-shadow: 0 0 8px var(--credit-glow);
+}
+
+.adaptive-credit p em {
+  font-style: normal;
+  color: var(--text-sub);
+  font-weight: 600;
+}
+
+/* Hover Effects */
+.adaptive-credit:hover {
+  transform: translateY(-6px);
+  box-shadow: 
+    0 16px 40px var(--credit-shadow-hover),
+    0 0 50px var(--credit-glow),
+    0 0 0 1px var(--credit-border);
+}
+
+.adaptive-credit:hover p span.highlight {
+  text-shadow: 
+    0 0 12px var(--credit-glow),
+    0 0 24px var(--credit-glow);
+}
+
+/* Mobile Adjustments */
+@media (max-width: 640px) {
+  .adaptive-credit {
+    padding: 16px 30px;
+    font-size: 15px;
+  }
+}
+</style>
+""", unsafe_allow_html=True)
 # ---------- LOAD DATA ----------
 @st.cache_data(ttl=0)
 def load_data():
@@ -1638,6 +1631,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
