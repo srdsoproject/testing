@@ -785,9 +785,8 @@ with tabs[0]:
     )
     # ---------- EDITOR ----------
     if not filtered.empty:
-        # Validate and select columns to avoid KeyError
         display_cols = [
-            "Date of Inspection", "Type of Inspection",  "Head", "Sub Head","Location",
+            "Date of Inspection", "Type of Inspection", "Head", "Sub Head", "Location",
             "Deficiencies Noted", "Inspection By", "Action By", "Feedback",
             "User Feedback/Remark"
         ]
@@ -798,19 +797,24 @@ with tabs[0]:
         if "Deficiencies Noted" not in valid_cols:
             st.error("⚠️ 'Deficiencies Noted' column is required for search functionality.")
             st.stop()
+
         editable_filtered = filtered.copy()
+
         # Ensure stable ID columns
         if "_original_sheet_index" not in editable_filtered.columns:
             editable_filtered["_original_sheet_index"] = editable_filtered.index
         if "_sheet_row" not in editable_filtered.columns:
             editable_filtered["_sheet_row"] = editable_filtered.index + 2
+
         # Create editable DataFrame
         editable_df = editable_filtered[valid_cols + ["_original_sheet_index", "_sheet_row"]].copy()
+
         # Format Date of Inspection
         if "Date of Inspection" in editable_df.columns:
             editable_df["Date of Inspection"] = pd.to_datetime(
                 editable_df["Date of Inspection"], errors="coerce"
-            ).dt.date  # Changed to .dt.date for Excel compatibility
+            ).dt.date
+
         # Add Status column
         if "Feedback" in editable_df.columns and "User Feedback/Remark" in editable_df.columns:
             editable_df.insert(
@@ -819,7 +823,8 @@ with tabs[0]:
                 [get_status(r["Feedback"], r["User Feedback/Remark"]) for _, r in editable_df.iterrows()]
             )
             editable_df["Status"] = editable_df["Status"].apply(color_text_status)
-        # Global Search (inbuilt search across all columns)
+
+        # Global Search
         st.markdown("#### 🔍 Search and Filter")
         search_text = st.text_input("Search All Columns (case-insensitive)", "").strip().lower()
         if search_text:
@@ -828,14 +833,76 @@ with tabs[0]:
             ).any(axis=1)
             editable_df = editable_df[mask].copy()
             st.info(f"Found {len(editable_df)} matching rows after search.")
-        # Excel-like Column Filtering
-        max_cols = st.slider("Max columns to filter on", 1, len(valid_cols), min(10, len(valid_cols)), key="max_cols_filter")
+
+        # Excel-like Column Filtering (FIXED: No more global variable)
+        max_cols = st.slider(
+            "Max columns to filter on",
+            1, len(valid_cols), min(10, len(valid_cols)),
+            key="max_cols_filter"
+        )
         candidate_columns = valid_cols[:max_cols]
-        global column_selection
-        column_selection = st.multiselect("Select columns to filter", candidate_columns, key="column_select_filter")
-        if column_selection:
-            editable_df = filter_dataframe(editable_df)
-            st.info(f"Applied filters to {len(editable_df)} rows.")
+        selected_columns = st.multiselect(
+            "Select columns to filter",
+            options=candidate_columns,
+            key="column_select_filter"
+        )
+
+        if selected_columns:
+            # Apply column-specific filters
+            df_filtered = editable_df.copy()
+            for column in selected_columns:
+                if is_categorical_dtype(editable_df[column]) or editable_df[column].dtype == "object":
+                    unique_vals = sorted(editable_df[column].dropna().unique())
+                    selected_vals = st.multiselect(
+                        f"Filter {column}",
+                        unique_vals,
+                        key=f"filter_{column}"
+                    )
+                    if selected_vals:
+                        df_filtered = df_filtered[df_filtered[column].isin(selected_vals)]
+                elif is_numeric_dtype(editable_df[column]):
+                    _min = float(editable_df[column].min())
+                    _max = float(editable_df[column].max())
+                    step = (_max - _min) / 100 if _max != _min else 1
+                    selected_range = st.slider(
+                        f"Filter {column}",
+                        _min, _max, (_min, _max), step=step,
+                        key=f"range_{column}"
+                    )
+                    df_filtered = df_filtered[df_filtered[column].between(selected_range[0], selected_range[1])]
+                elif is_datetime64_any_dtype(editable_df[column]):
+                    _min = editable_df[column].min()
+                    _max = editable_df[column].max()
+                    selected_dates = st.date_input(
+                        f"Filter {column}",
+                        [_min, _max],
+                        min_value=_min,
+                        max_value=_max,
+                        key=f"date_{column}"
+                    )
+                    if len(selected_dates) == 2:
+                        df_filtered = df_filtered[df_filtered[column].between(
+                            pd.to_datetime(selected_dates[0]),
+                            pd.to_datetime(selected_dates[1])
+                        )]
+                else:
+                    case = st.selectbox(
+                        f"Case sensitive for {column}?",
+                        ["both", "upper", "lower"],
+                        key=f"case_{column}"
+                    )
+                    search_term = st.text_input(f"Filter {column}", key=f"search_{column}")
+                    if search_term:
+                        if case == "upper":
+                            df_filtered = df_filtered[df_filtered[column].str.upper().str.contains(search_term.upper(), na=False)]
+                        elif case == "lower":
+                            df_filtered = df_filtered[df_filtered[column].str.lower().str.contains(search_term.lower(), na=False)]
+                        else:
+                            df_filtered = df_filtered[df_filtered[column].str.contains(search_term, case=False, na=False)]
+
+            editable_df = df_filtered
+            st.info(f"Applied column filters → {len(editable_df)} rows remaining.")
+
         # AgGrid Configuration
         gb = GridOptionsBuilder.from_dataframe(editable_df)
         gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True)
@@ -852,6 +919,7 @@ with tabs[0]:
         gb.configure_column("_original_sheet_index", hide=True)
         gb.configure_column("_sheet_row", hide=True)
         gb.configure_grid_options(singleClickEdit=True)
+
         auto_size_js = JsCode("""
         function(params) {
             let allColumnIds = [];
@@ -1483,6 +1551,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
