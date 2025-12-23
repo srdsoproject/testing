@@ -673,7 +673,7 @@ with tabs[0]:
                                file_name="head_distribution.png", mime="image/png")
     # Sub Head Breakdown when Head is selected
     if st.session_state.view_head_filter and not filtered.empty:
-        st.markdown("### 📊 Sub Head Distribution")
+        st.markdown("### Sub Head Distribution")
         subhead_summary = (
             filtered.groupby("Sub Head")["Sub Head"]
             .count()
@@ -1142,7 +1142,7 @@ st.markdown("""
 - For ELECT/TRO: Pertains to **ELECT/TRO**
 - For Engineering South: Pertains to **Sr.DEN/S**
 - For Engineering North: Pertains to **Sr.DEN/C**
-- For Finance Department: Pertains to **FINAINCE**
+- For Finance Department: Pertains to **FINANCE**
 - For Store Department: Pertains to **STORE**
 - For Medical Department: Pertains to **MEDICAL**
 - For Security Department: Pertains to **SECURITY**
@@ -1551,6 +1551,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
