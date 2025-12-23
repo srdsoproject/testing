@@ -1248,7 +1248,7 @@ with tabs[1]:
         # ------------------------------------------------------------------ #
         # 6. Trend chart (total deficiencies)
         # ------------------------------------------------------------------ #
-        trend = df.groupby(pd.Grouper(key="Date of Inspection", freq="M")).size().reset_index(name="TotalCount")
+        trend = df.groupby(pd.Grouper(key="Date of Inspection", freq="MS")).size().reset_index(name="TotalCount")
         if not trend.empty:
             trend = trend.sort_values("Date of Inspection")
             trend["Month"] = trend["Date of Inspection"].dt.strftime("%b-%Y")
@@ -1450,6 +1450,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
