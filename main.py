@@ -420,64 +420,97 @@ st.markdown(
         .header-card {
             display: flex;
             align-items: center;
-            background: linear-gradient(135deg, #ffffff 0%, #f0f4f8 100%);
-            border-radius: 16px;
-            padding: 20px;
+            border-radius: 18px;
+            padding: 24px;
             margin: 20px 0;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            transition: box-shadow 0.3s ease;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+            transition: all 0.4s ease;
+            backdrop-filter: blur(10px);
         }
         .header-card:hover {
-            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+            transform: translateY(-4px);
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
         }
         .logo-img {
-            height: 70px;
-            border-radius: 8px;
-            margin-right: 20px;
+            height: 75px;
+            border-radius: 12px;
+            margin-right: 24px;
             object-fit: contain;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transition: transform 0.3s ease;
+        }
+        .header-card:hover .logo-img {
+            transform: scale(1.05);
         }
         .header-text {
             flex: 1;
         }
         .initiative-title {
             margin: 0;
-            font-size: 1.2em;
-            color: #333;
+            font-size: 1.25em;
             font-weight: 500;
+            letter-spacing: 0.5px;
         }
         .highlight {
-            color: #0073e6;  /* Blue accent for Safety Department */
             font-weight: bold;
         }
         .app-title {
-            margin: 5px 0 0;
-            font-size: 2.5em;
-            color: #0056b3;  /* Deeper blue for main title */
+            margin: 8px 0 0;
+            font-size: 2.8em;
+            font-weight: bold;
+            letter-spacing: 1px;
         }
         .app-subtitle {
-            margin: -5px 0 0;
-            font-size: 1.1em;
-            color: #666;
+            margin: -8px 0 0;
+            font-size: 1.15em;
             font-weight: normal;
+            opacity: 0.9;
         }
-        /* Mobile responsiveness */
+
+        /* Light Mode */
+        @media (prefers-color-scheme: light) {
+            .header-card {
+                background: linear-gradient(135deg, #ffffff 0%, #e6f0fa 100%);
+                border: 1px solid #d0e4ff;
+            }
+            .initiative-title { color: #2c3e50; }
+            .highlight { color: #0066cc; }
+            .app-title { color: #004080; }
+            .app-subtitle { color: #555; }
+        }
+
+        /* Dark Mode */
+        @media (prefers-color-scheme: dark) {
+            .header-card {
+                background: linear-gradient(135deg, #1a1f2e 0%, #2c3448 100%);
+                border: 1px solid #3a445d;
+            }
+            .initiative-title { color: #e0e6ff; }
+            .highlight { color: #4da6ff; } /* Brighter blue for visibility */
+            .app-title { color: #66b0ff; } /* Glowy blue */
+            .app-subtitle { color: #a0aec0; }
+        }
+
+        /* Mobile Responsiveness */
         @media (max-width: 768px) {
             .header-card {
                 flex-direction: column;
                 text-align: center;
+                padding: 20px;
             }
             .logo-img {
                 margin-right: 0;
-                margin-bottom: 15px;
-                height: 60px;
+                margin-bottom: 16px;
+                height: 65px;
+            }
+            .app-title {
+                font-size: 2.4em;
             }
         }
     </style>
     """,
     unsafe_allow_html=True
 )
-
 # ---------- LOAD DATA ----------
 @st.cache_data(ttl=0)
 def load_data():
@@ -1605,6 +1638,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
