@@ -418,31 +418,31 @@ st.markdown(
     </div>
 
     <style>
-        /* Unified Theme Variables – Light Orange Focus */
+        /* Theme Variables – Very Light Red Focus */
         @media (prefers-color-scheme: light) {
             :root {
-                --saral-bg: linear-gradient(135deg, #ffffff 0%, #ffe8cc 100%); /* White to light orange */
-                --saral-border: #ffcc80;
-                --saral-shadow: rgba(255, 193, 7, 0.25); /* Orange shadow */
-                --saral-shadow-hover: rgba(255, 193, 7, 0.4);
-                --saral-glow: rgba(255, 193, 7, 0.7); /* Orange glow */
-                --text-main: #1e3a8a;
-                --text-highlight: #ff9800; /* Orange highlight */
-                --text-title: #ef6c00; /* Deeper orange title */
+                --saral-bg: linear-gradient(135deg, #ffffff 0%, #fff0f0 100%); /* White to very light red/pink */
+                --saral-border: #ffcdd2;
+                --saral-shadow: rgba(244, 67, 54, 0.15); /* Soft red shadow */
+                --saral-shadow-hover: rgba(244, 67, 54, 0.3);
+                --saral-glow: rgba(244, 67, 54, 0.6); /* Gentle red glow */
+                --text-main: #b71c1c;
+                --text-highlight: #d32f2f;
+                --text-title: #c62828;
                 --text-subtitle: #555;
             }
         }
         @media (prefers-color-scheme: dark) {
             :root {
-                --saral-bg: linear-gradient(135deg, #2c1a00 0%, #3d2600 100%); /* Dark brown-orange */
-                --saral-border: #ffcc80;
-                --saral-shadow: rgba(255, 193, 7, 0.2);
-                --saral-shadow-hover: rgba(255, 193, 7, 0.5);
-                --saral-glow: rgba(255, 193, 7, 0.9); /* Bright orange glow */
-                --text-main: #ffe8cc;
-                --text-highlight: #ffd180;
-                --text-title: #ffab40;
-                --text-subtitle: #ffcc80;
+                --saral-bg: linear-gradient(135deg, #2a1a1a 0%, #3d2a2a 100%); /* Dark subtle red base */
+                --saral-border: #ef9a9a;
+                --saral-shadow: rgba(244, 67, 54, 0.2);
+                --saral-shadow-hover: rgba(244, 67, 54, 0.45);
+                --saral-glow: rgba(244, 67, 54, 0.85); /* Bright but soft red glow */
+                --text-main: #ffebee;
+                --text-highlight: #ffcccc;
+                --text-title: #ff8a80;
+                --text-subtitle: #ffcccb;
             }
         }
 
@@ -1667,6 +1667,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
