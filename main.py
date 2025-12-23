@@ -923,82 +923,115 @@ with tabs[0]:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
         # Buttons
-        c1, c2, _ = st.columns([1, 1, 1])
-        submitted = c1.button("✅ Submit Feedback")
-        if c2.button("🔄 Refresh Data"):
-            st.session_state.df = load_data()
+        c1, c2, c3 = st.columns([1, 1, 2])  # Extra space column for better alignment
+        submitted = c1.button("✅ Submit Feedback", use_container_width=True)
+        refresh_clicked = c2.button("🔄 Refresh Data", use_container_width=True)
+
+        if refresh_clicked:
+            with st.spinner("🔄 Refreshing data from Google Sheets..."):
+                st.session_state.df = load_data()
             st.success("✅ Data refreshed successfully!")
             st.rerun()
-        # Submit logic
+
+        # Submit Feedback logic with protection against double submission
         if submitted:
-            need_cols = {"_original_sheet_index", "User Feedback/Remark"}
-            if not need_cols.issubset(edited_df.columns) or "Feedback" not in editable_filtered.columns:
-                st.error("⚠️ Required columns are missing from the data.")
+            if st.session_state.get("feedback_submitting", False):
+                st.warning("⏳ Submission already in progress. Please wait...")
             else:
-                orig = editable_filtered.set_index("_original_sheet_index")
-                new = edited_df.set_index("_original_sheet_index")
-                old_remarks = orig["User Feedback/Remark"].fillna("").astype(str)
-                new_remarks = new["User Feedback/Remark"].fillna("").astype(str)
-                common_ids = new_remarks.index.intersection(old_remarks.index)
-                diff_mask = new_remarks.loc[common_ids] != old_remarks.loc[common_ids]
-                changed_ids = diff_mask[diff_mask].index.tolist()
-                if changed_ids:
-                    diffs = new.loc[changed_ids].copy()
-                    diffs["_sheet_row"] = orig.loc[changed_ids, "_sheet_row"].values
-                    routing = {
-                        "Pertains to S&T": ("SIGNAL & TELECOM", "Sr.DSTE"),
-                        "Pertains to SECURITY": ("SECURITY", "DSC"),
-                        "Pertains to OPTG": ("OPTG", "Sr.DOM"),
-                        "Pertains to COMMERCIAL": ("COMMERCIAL", "Sr.DCM"),
-                        "Pertains to ELECT/G": ("ELECT/G", "Sr.DEE/G"),
-                        "Pertains to ELECT/TRD": ("ELECT/TRD", "Sr.DEE/TRD"),
-                        "Pertaining to TRD dept": ("ELECT/TRD", "Sr.DEE/TRD"),
-                        "Pertains to MECHANICAL": ("MECHANICAL", "Sr.DME"),
-                        "Pertains to ELECT/TRO": ("ELECT/TRO", "Sr.DEE/TRO"),
-                        "Pertains to Sr.DEN/S": ("ENGINEERING", "Sr.DEN/S"),
-                        "Pertains to Sr. DEN(South)" : ("ENGINEERING", "Sr.DEN/S"),
-                        "Pertains to Sr.DEN/C": ("ENGINEERING", "Sr.DEN/C"),
-                        "Pertains to Sr.DEN/Co": ("ENGINEERING", "Sr.DEN/Co"),
-                        "Pertains to FINAINCE": ("FINANCE", "Sr.DFM"),
-                        "Pertains to STORE": ("STORE", "Sr.DMM"),
-                        "Pertains to MEDICAL": ("MEDICAL", "CMS"),
-                        
-                    }
-                    for oid in changed_ids:
-                        user_remark = new.loc[oid, "User Feedback/Remark"].strip()
-                        if not user_remark:
-                            continue
-                        for key, (head, action_by) in routing.items():
-                            if key in user_remark:
-                                st.session_state.df.at[oid, "Head"] = head
-                                st.session_state.df.at[oid, "Action By"] = action_by
-                                st.session_state.df.at[oid, "Sub Head"] = ""
-                                diffs.at[oid, "Head"] = head
-                                diffs.at[oid, "Action By"] = action_by
-                                diffs.at[oid, "Sub Head"] = ""
-                                date_str = orig.loc[oid, "Date of Inspection"]
-                                deficiency = orig.loc[oid, "Deficiencies Noted"]
-                                forwarded_by = orig.loc[oid, "Head"]
-                                alert_msg = (
-                                    f"📌 **{head} Department Alert**\n"
-                                    f"- Date: {date_str}\n"
-                                    f"- Deficiency: {deficiency}\n"
-                                    f"- Forwarded By: {forwarded_by}\n"
-                                    f"- Forwarded Remark: {user_remark}"
+                st.session_state.feedback_submitting = True
+                try:
+                    with st.spinner("💾 Saving feedback to Google Sheet... Please do not refresh or close the page."):
+                        need_cols = {"_original_sheet_index", "User Feedback/Remark"}
+                        if not need_cols.issubset(edited_df.columns) or "Feedback" not in editable_filtered.columns:
+                            st.error("⚠️ Required columns are missing from the data.")
+                        else:
+                            # Ensure indexes are properly set for comparison
+                            orig = editable_filtered.set_index("_original_sheet_index")
+                            new_df = edited_df.set_index("_original_sheet_index")
+
+                            old_remarks = orig["User Feedback/Remark"].fillna("").astype(str)
+                            new_remarks = new_df["User Feedback/Remark"].fillna("").astype(str)
+
+                            common_ids = new_remarks.index.intersection(old_remarks.index)
+                            diff_mask = new_remarks.loc[common_ids] != old_remarks.loc[common_ids]
+                            changed_ids = diff_mask[diff_mask].index.tolist()
+
+                            if changed_ids:
+                                diffs = new_df.loc[changed_ids].copy()
+                                diffs["_sheet_row"] = orig.loc[changed_ids, "_sheet_row"].values
+
+                                # Updated routing dictionary with fixed typo
+                                routing = {
+                                    "Pertains to S&T": ("SIGNAL & TELECOM", "Sr.DSTE"),
+                                    "Pertains to SECURITY": ("SECURITY", "DSC"),
+                                    "Pertains to OPTG": ("OPTG", "Sr.DOM"),
+                                    "Pertains to COMMERCIAL": ("COMMERCIAL", "Sr.DCM"),
+                                    "Pertains to ELECT/G": ("ELECT/G", "Sr.DEE/G"),
+                                    "Pertains to ELECT/TRD": ("ELECT/TRD", "Sr.DEE/TRD"),
+                                    "Pertaining to TRD dept": ("ELECT/TRD", "Sr.DEE/TRD"),
+                                    "Pertains to MECHANICAL": ("MECHANICAL", "Sr.DME"),
+                                    "Pertains to ELECT/TRO": ("ELECT/TRO", "Sr.DEE/TRO"),
+                                    "Pertains to Sr.DEN/S": ("ENGINEERING", "Sr.DEN/S"),
+                                    "Pertains to Sr. DEN(South)": ("ENGINEERING", "Sr.DEN/S"),
+                                    "Pertains to Sr.DEN/C": ("ENGINEERING", "Sr.DEN/C"),
+                                    "Pertains to Sr.DEN/Co": ("ENGINEERING", "Sr.DEN/Co"),
+                                    "Pertains to FINANCE": ("FINANCE", "Sr.DFM"),        # ← FIXED: was "FINAINCE"
+                                    "Pertains to STORE": ("STORE", "Sr.DMM"),
+                                    "Pertains to MEDICAL": ("MEDICAL", "CMS"),
+                                }
+
+                                for oid in changed_ids:
+                                    user_remark = new_df.loc[oid, "User Feedback/Remark"].strip()
+                                    if not user_remark:
+                                        continue
+
+                                    # Auto-routing based on keywords
+                                    routed = False
+                                    for key, (head, action_by) in routing.items():
+                                        if key.lower() in user_remark.lower():  # Case-insensitive match
+                                            st.session_state.df.at[oid, "Head"] = head
+                                            st.session_state.df.at[oid, "Action By"] = action_by
+                                            st.session_state.df.at[oid, "Sub Head"] = ""
+                                            diffs.at[oid, "Head"] = head
+                                            diffs.at[oid, "Action By"] = action_by
+                                            diffs.at[oid, "Sub Head"] = ""
+
+                                            date_str = orig.loc[oid, "Date of Inspection"]
+                                            deficiency = orig.loc[oid, "Deficiencies Noted"]
+                                            forwarded_by = orig.loc[oid, "Head"]  # Original head (if any)
+
+                                            alert_msg = (
+                                                f"📌 **{head} Department Alert**\n"
+                                                f"- Date: {date_str}\n"
+                                                f"- Deficiency: {deficiency}\n"
+                                                f"- Forwarded By: {forwarded_by}\n"
+                                                f"- Remark: {user_remark}"
+                                            )
+                                            st.session_state.alerts_log.insert(0, alert_msg)
+                                            routed = True
+
+                                    # Always copy the remark to Feedback column
+                                    diffs.at[oid, "Feedback"] = user_remark
+                                    diffs.at[oid, "User Feedback/Remark"] = ""
+                                    st.session_state.df.at[oid, "Feedback"] = user_remark
+                                    st.session_state.df.at[oid, "User Feedback/Remark"] = ""
+
+                                # Save to Google Sheet
+                                update_feedback_column(
+                                    diffs.reset_index().rename(columns={"_original_sheet_index": "_original_sheet_index"})
                                 )
-                                st.session_state.alerts_log.insert(0, alert_msg)
-                        diffs.at[oid, "Feedback"] = user_remark
-                        diffs.at[oid, "User Feedback/Remark"] = ""
-                        st.session_state.df.at[oid, "Feedback"] = user_remark
-                        st.session_state.df.at[oid, "User Feedback/Remark"] = ""
-                    update_feedback_column(
-                        diffs.reset_index().rename(columns={"index": "_original_sheet_index"})
-                    )
-                    st.success(f"✅ Updated {len(changed_ids)} Feedback row(s) with new remarks.")
-                else:
-                    st.info("ℹ️ No changes detected to save.")
+
+                                st.success(f"✅ Successfully updated {len(changed_ids)} record(s)!")
+                            else:
+                                st.info("ℹ️ No changes detected in the feedback.")
+                except Exception as e:
+                    st.error(f"❌ Error during submission: {str(e)}")
+                finally:
+                    st.session_state.feedback_submitting = False
+                    st.rerun()  # Refresh view to show updated Status and clean grid
+
     else:
-        st.info("Deficiencies will be updated soon!")
+        st.info("No deficiencies available to update at the moment.")
 
 # ---------------- ALERT LOG SECTION ----------------
 st.markdown("## 📋 Alerts Log")
@@ -1450,6 +1483,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
