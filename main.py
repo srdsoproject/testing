@@ -84,38 +84,11 @@ if not user_ack_done:
     st.stop()
 
 # ---------- DISPLAY ALL RESPONSES ----------
-# --- Responses Received with Live Clock ---
+# --- Responses Received with Reliable Live Clock ---
 col_title, col_clock = st.columns([4, 1])
 
 with col_title:
     st.markdown("### 📝 Responses Received")
-
-with col_clock:
-    st.markdown(
-        """
-        <div style='text-align: right; color: var(--text-color); opacity: 0.85; font-size: 0.92em; margin-top: 10px; font-family: "Segoe UI", sans-serif;'>
-            Last updated: <strong id="live-clock">--</strong>
-        </div>
-        <script>
-            const clockElement = parent.document.getElementById("live-clock");
-            if (clockElement) {
-                function updateClock() {
-                    const now = new Date();
-                    const day = String(now.getDate()).padStart(2, '0');
-                    const month = now.toLocaleString('en-GB', { month: 'short' });
-                    const year = now.getFullYear();
-                    const hours = String(now.getHours()).padStart(2, '0');
-                    const minutes = String(now.getMinutes()).padStart(2, '0');
-                    const seconds = String(now.getSeconds()).padStart(2, '0');
-                    clockElement.innerText = `${day} ${month} ${year}, ${hours}:${minutes}:${seconds}`;
-                }
-                updateClock();
-                setInterval(updateClock, 1000);
-            }
-        </script>
-        """,
-        unsafe_allow_html=True
-    )
 
 # Display the acknowledgments table
 try:
@@ -126,6 +99,36 @@ try:
         st.info("No responses submitted yet.")
 except FileNotFoundError:
     st.info("No responses submitted yet.")
+
+# Reliable Live Clock using components.html (guaranteed to work)
+import streamlit.components.v1 as components
+
+clock_html = """
+<div style="text-align: right; color: var(--text-color); opacity: 0.85; font-size: 0.92em; margin-top: 10px; font-family: 'Segoe UI', sans-serif;">
+    Last updated: <strong id="live-clock">--</strong>
+</div>
+<script>
+    function updateClock() {
+        const now = new Date();
+        const day = String(now.getDate()).padStart(2, '0');
+        const month = now.toLocaleString('default', { month: 'short' });
+        const year = now.getFullYear();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        const formatted = `${day} ${month} ${year}, ${hours}:${minutes}:${seconds}`;
+        const clock = document.getElementById("live-clock");
+        if (clock) {
+            clock.innerText = formatted;
+        }
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
+</script>
+"""
+
+with col_clock:
+    components.html(clock_html, height=60)
 
 if st.button("🗑️ Clear All Responses", key="clear_responses_btn"):
     df = pd.DataFrame(columns=["UserID", "Name"])
@@ -1700,6 +1703,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
