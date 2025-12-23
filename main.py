@@ -405,105 +405,141 @@ def apply_common_filters(df, prefix=""):
     return out
 
 # ---------- HEADER ----------
-st.markdown("""
-<div style="text-align: center; margin: 50px 0 30px 0;">
-  <div class="adaptive-credit">
-    <p>
-      <strong>Designed & Developed by</strong>
-      <span class="highlight">Safety Department</span>,
-      <em>Solapur Division</em>
-    </p>
-  </div>
-</div>
+st.markdown(
+    """
+    <div class="saral-header-card">
+        <img src="https://raw.githubusercontent.com/srdsoproject/testing/main/Central%20Railway%20Logo.png"
+             class="saral-logo">
+        <div class="saral-header-text">
+            <h2 class="saral-initiative">An Initiative by <span class="saral-highlight">Safety Department</span>, Solapur Division</h2>
+            <h1 class="saral-title">📋 S.A.R.A.L</h1>
+            <h3 class="saral-subtitle">(Safety Abnormality Report & Action List – Version 1.3)</h3>
+        </div>
+    </div>
 
-<style>
-/* Root variables for easy theming */
-@media (prefers-color-scheme: light) {
-  :root {
-    --credit-bg: rgba(255, 255, 255, 0.85);
-    --credit-border: #a0d8ff;
-    --credit-shadow: rgba(100, 180, 255, 0.25);
-    --credit-shadow-hover: rgba(80, 160, 255, 0.4);
-    --credit-glow: rgba(100, 200, 255, 0.7);
-    --text-main: #1e3a8a;
-    --text-highlight: #2563eb;
-    --text-sub: #3b82f6;
-  }
-}
+    <style>
+        /* Unified Theme Variables – same as footer */
+        @media (prefers-color-scheme: light) {
+            :root {
+                --saral-bg: rgba(255, 255, 255, 0.85);
+                --saral-border: #a0d8ff;
+                --saral-shadow: rgba(100, 180, 255, 0.25);
+                --saral-shadow-hover: rgba(80, 160, 255, 0.4);
+                --saral-glow: rgba(100, 200, 255, 0.7);
+                --text-main: #1e3a8a;
+                --text-highlight: #2563eb;
+                --text-title: #004080;
+                --text-subtitle: #555;
+            }
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --saral-bg: rgba(20, 30, 60, 0.75);
+                --saral-border: #4c9eff;
+                --saral-shadow: rgba(76, 158, 255, 0.2);
+                --saral-shadow-hover: rgba(76, 158, 255, 0.5);
+                --saral-glow: rgba(100, 180, 255, 0.9);
+                --text-main: #e0f0ff;
+                --text-highlight: #7bb3ff;
+                --text-title: #66b0ff;
+                --text-subtitle: #a0cfff;
+            }
+        }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --credit-bg: rgba(20, 30, 60, 0.75);
-    --credit-border: #4c9eff;
-    --credit-shadow: rgba(76, 158, 255, 0.2);
-    --credit-shadow-hover: rgba(76, 158, 255, 0.5);
-    --credit-glow: rgba(100, 180, 255, 0.9);
-    --text-main: #e0f0ff;
-    --text-highlight: #7bb3ff;
-    --text-sub: #a0cfff;
-  }
-}
+        /* Header Card – Same glassmorphic style as footer */
+        .saral-header-card {
+            display: flex;
+            align-items: center;
+            background: var(--saral-bg);
+            border: 2px solid var(--saral-border);
+            border-radius: 20px;
+            padding: 28px 32px;
+            margin: 20px 0 40px 0;
+            box-shadow: 0 10px 30px var(--saral-shadow);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            transition: all 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
 
-/* Credit Card Style */
-.adaptive-credit {
-  display: inline-block;
-  padding: 18px 40px;
-  background: var(--credit-bg);
-  border: 2px solid var(--credit-border);
-  border-radius: 20px;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 10px 30px var(--credit-shadow);
-  transition: all 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
-  font-family: 'Segoe UI', 'Roboto', Tahoma, Geneva, Verdana, sans-serif;
-  font-size: 16px;
-  line-height: 1.6;
-  max-width: 90%;
-}
+        .saral-header-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 
+                0 16px 40px var(--saral-shadow-hover),
+                0 0 50px var(--saral-glow),
+                0 0 0 1px var(--saral-border);
+        }
 
-.adaptive-credit p {
-  margin: 0;
-  color: var(--text-main);
-  font-weight: 500;
-  letter-spacing: 0.8px;
-}
+        .saral-logo {
+            height: 80px;
+            border-radius: 14px;
+            margin-right: 28px;
+            object-fit: contain;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+            transition: transform 0.4s ease;
+        }
 
-.adaptive-credit p span.highlight {
-  color: var(--text-highlight);
-  font-weight: 700;
-  text-shadow: 0 0 8px var(--credit-glow);
-}
+        .saral-header-card:hover .saral-logo {
+            transform: scale(1.08);
+        }
 
-.adaptive-credit p em {
-  font-style: normal;
-  color: var(--text-sub);
-  font-weight: 600;
-}
+        .saral-header-text {
+            flex: 1;
+        }
 
-/* Hover Effects */
-.adaptive-credit:hover {
-  transform: translateY(-6px);
-  box-shadow: 
-    0 16px 40px var(--credit-shadow-hover),
-    0 0 50px var(--credit-glow),
-    0 0 0 1px var(--credit-border);
-}
+        .saral-initiative {
+            margin: 0;
+            font-size: 1.3em;
+            font-weight: 500;
+            color: var(--text-main);
+            letter-spacing: 0.6px;
+        }
 
-.adaptive-credit:hover p span.highlight {
-  text-shadow: 
-    0 0 12px var(--credit-glow),
-    0 0 24px var(--credit-glow);
-}
+        .saral-highlight {
+            color: var(--text-highlight);
+            font-weight: 700;
+            text-shadow: 0 0 10px var(--saral-glow);
+        }
 
-/* Mobile Adjustments */
-@media (max-width: 640px) {
-  .adaptive-credit {
-    padding: 16px 30px;
-    font-size: 15px;
-  }
-}
-</style>
-""", unsafe_allow_html=True)
+        .saral-title {
+            margin: 10px 0 0;
+            font-size: 3em;
+            font-weight: bold;
+            color: var(--text-title);
+            letter-spacing: 1.5px;
+            text-shadow: 0 0 15px var(--saral-glow);
+        }
+
+        .saral-subtitle {
+            margin: -10px 0 0;
+            font-size: 1.2em;
+            color: var(--text-subtitle);
+            font-weight: normal;
+            opacity: 0.95;
+        }
+
+        /* Mobile Responsiveness */
+        @media (max-width: 768px) {
+            .saral-header-card {
+                flex-direction: column;
+                text-align: center;
+                padding: 24px;
+            }
+            .saral-logo {
+                margin-right: 0;
+                margin-bottom: 20px;
+                height: 70px;
+            }
+            .saral-title {
+                font-size: 2.5em;
+            }
+            .saral-subtitle {
+                font-size: 1.1em;
+            }
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 # ---------- LOAD DATA ----------
 @st.cache_data(ttl=0)
 def load_data():
@@ -1631,6 +1667,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
