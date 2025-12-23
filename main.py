@@ -418,35 +418,35 @@ st.markdown(
     </div>
 
     <style>
-        /* Unified Theme Variables – same as footer */
+        /* Unified Theme Variables – Light Orange Focus */
         @media (prefers-color-scheme: light) {
             :root {
-                --saral-bg: rgba(255, 255, 255, 0.85);
-                --saral-border: #a0d8ff;
-                --saral-shadow: rgba(100, 180, 255, 0.25);
-                --saral-shadow-hover: rgba(80, 160, 255, 0.4);
-                --saral-glow: rgba(100, 200, 255, 0.7);
+                --saral-bg: linear-gradient(135deg, #ffffff 0%, #ffe8cc 100%); /* White to light orange */
+                --saral-border: #ffcc80;
+                --saral-shadow: rgba(255, 193, 7, 0.25); /* Orange shadow */
+                --saral-shadow-hover: rgba(255, 193, 7, 0.4);
+                --saral-glow: rgba(255, 193, 7, 0.7); /* Orange glow */
                 --text-main: #1e3a8a;
-                --text-highlight: #2563eb;
-                --text-title: #004080;
+                --text-highlight: #ff9800; /* Orange highlight */
+                --text-title: #ef6c00; /* Deeper orange title */
                 --text-subtitle: #555;
             }
         }
         @media (prefers-color-scheme: dark) {
             :root {
-                --saral-bg: rgba(20, 30, 60, 0.75);
-                --saral-border: #4c9eff;
-                --saral-shadow: rgba(76, 158, 255, 0.2);
-                --saral-shadow-hover: rgba(76, 158, 255, 0.5);
-                --saral-glow: rgba(100, 180, 255, 0.9);
-                --text-main: #e0f0ff;
-                --text-highlight: #7bb3ff;
-                --text-title: #66b0ff;
-                --text-subtitle: #a0cfff;
+                --saral-bg: linear-gradient(135deg, #2c1a00 0%, #3d2600 100%); /* Dark brown-orange */
+                --saral-border: #ffcc80;
+                --saral-shadow: rgba(255, 193, 7, 0.2);
+                --saral-shadow-hover: rgba(255, 193, 7, 0.5);
+                --saral-glow: rgba(255, 193, 7, 0.9); /* Bright orange glow */
+                --text-main: #ffe8cc;
+                --text-highlight: #ffd180;
+                --text-title: #ffab40;
+                --text-subtitle: #ffcc80;
             }
         }
 
-        /* Header Card – Same glassmorphic style as footer */
+        /* Header Card – Glassmorphic style */
         .saral-header-card {
             display: flex;
             align-items: center;
@@ -1667,6 +1667,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
