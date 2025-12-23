@@ -407,19 +407,73 @@ def apply_common_filters(df, prefix=""):
 # ---------- HEADER ----------
 st.markdown(
     """
-    <div style="display:flex;align-items:center;margin-top:10px;margin-bottom:20px;">
+    <div class="header-card">
         <img src="https://raw.githubusercontent.com/srdsoproject/testing/main/Central%20Railway%20Logo.png"
-             height="55" style="margin-right:15px;object-fit:contain;">
-        <div>
-            <h3 style="margin:0;font-weight:bold;color:var(--text-color);">
-                An initiative by <b>Safety Department</b>, Solapur Division
-            </h3>
+             class="logo-img">
+        <div class="header-text">
+            <h2 class="initiative-title">An Initiative by <span class="highlight">Safety Department</span>, Solapur Division</h2>
+            <h1 class="app-title">📋 S.A.R.A.L</h1>
+            <h3 class="app-subtitle">(Safety Abnormality Report & Action List – Version 1.3)</h3>
         </div>
     </div>
-    <h1 style="margin-top:0;color:var(--text-color);">📋 S.A.R.A.L</h1>
-    <h3 style="margin-top:-10px;font-weight:normal;color:var(--text-color);">
-        (Safety Abnormality Report & Action List – Version 1.2.2)
-    </h3>
+    <style>
+        .header-card {
+            display: flex;
+            align-items: center;
+            background: linear-gradient(135deg, #ffffff 0%, #f0f4f8 100%);
+            border-radius: 16px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transition: box-shadow 0.3s ease;
+        }
+        .header-card:hover {
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+        }
+        .logo-img {
+            height: 70px;
+            border-radius: 8px;
+            margin-right: 20px;
+            object-fit: contain;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        .header-text {
+            flex: 1;
+        }
+        .initiative-title {
+            margin: 0;
+            font-size: 1.2em;
+            color: #333;
+            font-weight: 500;
+        }
+        .highlight {
+            color: #0073e6;  /* Blue accent for Safety Department */
+            font-weight: bold;
+        }
+        .app-title {
+            margin: 5px 0 0;
+            font-size: 2.5em;
+            color: #0056b3;  /* Deeper blue for main title */
+        }
+        .app-subtitle {
+            margin: -5px 0 0;
+            font-size: 1.1em;
+            color: #666;
+            font-weight: normal;
+        }
+        /* Mobile responsiveness */
+        @media (max-width: 768px) {
+            .header-card {
+                flex-direction: column;
+                text-align: center;
+            }
+            .logo-img {
+                margin-right: 0;
+                margin-bottom: 15px;
+                height: 60px;
+            }
+        }
+    </style>
     """,
     unsafe_allow_html=True
 )
@@ -1551,6 +1605,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
