@@ -418,35 +418,35 @@ st.markdown(
     </div>
 
     <style>
-        /* Theme Variables – Very Light Red Focus */
+        /* Teal Blue Theme – Works perfectly in light & dark */
         @media (prefers-color-scheme: light) {
             :root {
-                --saral-bg: linear-gradient(135deg, #ffffff 0%, #fff0f0 100%); /* White to very light red/pink */
-                --saral-border: #ffcdd2;
-                --saral-shadow: rgba(244, 67, 54, 0.15); /* Soft red shadow */
-                --saral-shadow-hover: rgba(244, 67, 54, 0.3);
-                --saral-glow: rgba(244, 67, 54, 0.6); /* Gentle red glow */
-                --text-main: #b71c1c;
-                --text-highlight: #d32f2f;
-                --text-title: #c62828;
+                --saral-bg: linear-gradient(135deg, #ffffff 0%, #e0f2f1 100%); /* White to light teal */
+                --saral-border: #80cbc4;
+                --saral-shadow: rgba(77, 182, 172, 0.25);
+                --saral-shadow-hover: rgba(77, 182, 172, 0.4);
+                --saral-glow: rgba(77, 182, 172, 0.7);
+                --text-main: #004d40;
+                --text-highlight: #00695c;
+                --text-title: #004d40;
                 --text-subtitle: #555;
             }
         }
         @media (prefers-color-scheme: dark) {
             :root {
-                --saral-bg: linear-gradient(135deg, #2a1a1a 0%, #3d2a2a 100%); /* Dark subtle red base */
-                --saral-border: #ef9a9a;
-                --saral-shadow: rgba(244, 67, 54, 0.2);
-                --saral-shadow-hover: rgba(244, 67, 54, 0.45);
-                --saral-glow: rgba(244, 67, 54, 0.85); /* Bright but soft red glow */
-                --text-main: #ffebee;
-                --text-highlight: #ffcccc;
-                --text-title: #ff8a80;
-                --text-subtitle: #ffcccb;
+                --saral-bg: linear-gradient(135deg, #1a2a2a 0%, #263534 100%); /* Dark teal base */
+                --saral-border: #80cbc4;
+                --saral-shadow: rgba(77, 182, 172, 0.2);
+                --saral-shadow-hover: rgba(77, 182, 172, 0.5);
+                --saral-glow: rgba(77, 182, 172, 0.9);
+                --text-main: #e0f2f1;
+                --text-highlight: #80cbc4;
+                --text-title: #a7ffeb;
+                --text-subtitle: #b2dfdb;
             }
         }
 
-        /* Header Card – Glassmorphic style */
+        /* Header Card – Premium Glassmorphic Style */
         .saral-header-card {
             display: flex;
             align-items: center;
@@ -1667,6 +1667,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
