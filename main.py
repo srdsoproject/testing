@@ -237,7 +237,7 @@ def classify_feedback(feedback, user_remark=""):
         if not text_normalized:
             return None
         date_found = bool(re.search(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', text_normalized))
-         resolved_kw = [
+        resolved_kw = [
             "attended", "solved", "done", "completed", "confirmed by", "message given",
             "tdc work completed", "replaced", "msg given", "msg sent", "counseled", "info shared",
             "communicated", "sent successfully", "counselled", "gate will be closed soon",
@@ -1648,3 +1648,4 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
