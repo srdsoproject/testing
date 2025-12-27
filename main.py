@@ -553,117 +553,9 @@ def load_data():
 if st.session_state.df is None:
     st.session_state.df = load_data()
 
-# ---------- PLEASE EXPLAIN LETTER FEATURE ----------
-import io
-from datetime import datetime
-from reportlab.lib.pagesizes import A4
-from reportlab.lib import colors
-from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle, Frame, PageTemplate
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
-
-def generate_please_explain_pdf(officer_name, officer_post, pending_items):
-    buffer = io.BytesIO()
-
-    # Reduced top margin to minimum and place letterhead exactly at top
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=A4,
-        rightMargin=60,
-        leftMargin=60,
-        topMargin=10,        # Almost zero top margin
-        bottomMargin=0.7*inch
-    )
-
-    # ------------------------------------------------------------------
-    # Letterhead - placed at absolute top
-    # ------------------------------------------------------------------
-    letterhead_url = "https://raw.githubusercontent.com/srdsoproject/testing/main/image.png"
-    letterhead = Image(letterhead_url, width=520, height=115)
-    letterhead.hAlign = 'CENTER'
-
-    story = [
-        letterhead,                    # Letterhead right at the top
-        Spacer(1, 15)                  # Only 15pt natural gap below letterhead
-    ]
-
-    # ------------------------------------------------------------------
-    # Styles
-    # ------------------------------------------------------------------
-    styles = getSampleStyleSheet()
-    styles.add(ParagraphStyle(name='CenterBold', alignment=1, fontSize=12, fontName='Helvetica-Bold', leading=15))
-    styles.add(ParagraphStyle(name='LeftNormal', alignment=0, fontSize=11, leading=13))
-    styles.add(ParagraphStyle(name='Justify', alignment=4, fontSize=11, leading=13, spaceAfter=10))
-    styles.add(ParagraphStyle(name='Small', alignment=0, fontSize=9.5, leading=11))
-    styles.add(ParagraphStyle(name='RightSign', alignment=2, fontSize=11, fontName='Helvetica-Bold'))
-
-    # ------------------------------------------------------------------
-    # Content
-    # ------------------------------------------------------------------
-    header = Table([
-        [Paragraph(f"No. SUR/SAFETY/DEF/{datetime.now().strftime('%Y')}", styles['Normal']),
-         Paragraph(f"Date: {datetime.now().strftime('%d %B %Y')}", styles['Normal'])]
-    ], colWidths=[320, 180])
-    header.setStyle(TableStyle([('ALIGN', (1,0), (1,0), 'RIGHT')]))
-    story.append(header)
-    story.append(Spacer(1, 18))
-
-    story.append(Paragraph(f"To,<br/>The {officer_post}<br/>Central Railway, Solapur", styles['LeftNormal']))
-    story.append(Spacer(1, 18))
-
-    story.append(Paragraph("Sub: Non-compliance of Safety Deficiencies beyond stipulated period – Reg.", styles['CenterBold']))
-    story.append(Paragraph("Ref: S.A.R.A.L entries pending for more than 45 days", styles['LeftNormal']))
-    story.append(Spacer(1, 15))
-
-    story.append(Paragraph("Sir,", styles['LeftNormal']))
-    story.append(Paragraph("The following safety-related deficiencies are pending for compliance for more than 45 days:", styles['Justify']))
-    story.append(Spacer(1, 8))
-
-    # Table
-    data = [["Sr.", "Location", "Date", "Deficiency", "Days"]]
-    for i, item in enumerate(pending_items, 1):
-        days = (datetime.now().date() - item["Date"].date()).days
-        data.append([
-            Paragraph(str(i), styles['Small']),
-            Paragraph(item["Location"], styles['Small']),
-            Paragraph(item["Date"].strftime("%d-%m-%Y"), styles['Small']),
-            Paragraph(item["Deficiency"], styles['Small']),
-            Paragraph(str(days), styles['Small'])
-        ])
-
-    table = Table(data, colWidths=[35, 85, 70, 230, 55])
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0,0), (-1,-1), 9.5),
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('GRID', (0,0), (-1,-1), 0.4, colors.grey),
-        ('LEFTPADDING', (0,0), (-1,-1), 3),
-        ('RIGHTPADDING', (0,0), (-1,-1), 3),
-        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.whitesmoke]),
-    ]))
-    story.append(table)
-    story.append(Spacer(1, 12))
-
-    story.append(Paragraph("These deficiencies pertain to safety of train operations and their continued pendency is viewed seriously.", styles['Justify']))
-    story.append(Paragraph("You are requested to explain in writing within 7 days why compliance has not been ensured despite repeated reminders.", styles['Justify']))
-    story.append(Spacer(1, 70))
-
-    story.append(Spacer(1, 50))
-    story.append(Paragraph("Sr.DSO/SUR", styles['RightSign']))
-    story.append(Spacer(1, 40))
-    story.append(Paragraph("C/- DRM/SUR – for kind information and necessary action please.", styles['LeftNormal']))
-
-    # ------------------------------------------------------------------
-    # Build PDF
-    # ------------------------------------------------------------------
-    doc.build(story)
-    buffer.seek(0)
-    return buffer
 # ---------- MAIN TABS ----------
-tabs = st.tabs(["View Records", "Analytics", "Please Explain Letters"])
+tabs = st.tabs(["📝 View Records", "📊 Analytics"])
 
 with tabs[0]:
     df = st.session_state.df
@@ -1648,4 +1540,5 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
