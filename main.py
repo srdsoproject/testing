@@ -237,16 +237,16 @@ def classify_feedback(feedback, user_remark=""):
         if not text_normalized:
             return None
         date_found = bool(re.search(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', text_normalized))
-        resolved_kw = [
+         resolved_kw = [
             "attended", "solved", "done", "completed", "confirmed by", "message given",
             "tdc work completed", "replaced", "msg given", "msg sent", "counseled", "info shared",
             "communicated", "sent successfully", "counselled", "gate will be closed soon",
             "attending at the time", "handled", "resolved", "action taken", "spoken to", "warned",
             "counselling", "hubli", "working normal", "met", "discussion held", "report sent",
             "notified", "explained", "nil", "na", "tlc", "work completed", "acknowledged", "visited",
-            "briefed", "guided", "handover", "working properly", "checked found working", "supply restored",
-            "updated by", "adv to", "counselled the staff", "complied", "checked and found", 'Proposal to be initiated by user department',
-            "maintained", "for needful action", "provided at", "in working condition", "is working", 'user dept.', 'user dept', 'user department', 'no demand', 'HQ', 'proposal sent', 
+            "briefed", "guided", "handover", "working properly", "checked found working", "supply restored", "This is not a deficiency.", "This is not a deficiency", "not a deficiency", "this is observation", "It is observation",
+            "updated by", "adv to", "counselled the staff", "complied", "checked and found",
+            "maintained", "for needful action", "provided at", "in working condition", "is working",
             "found working", "equipment is working", "item is working", "as per plan", "putright", "put right", 'attend dt','attend dt.', 
             "operational feasibility", "will be provided", "will be supplied shortly", "advised to ubl", "updated"
         ]
@@ -1648,6 +1648,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
