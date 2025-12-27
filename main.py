@@ -103,10 +103,10 @@ except FileNotFoundError:
 # Reliable Live Clock using components.html (guaranteed to work)
 import streamlit.components.v1 as components
 
-clock_html = """
-<div style="text-align: right; color: var(--text-color); opacity: 0.85; font-size: 0.92em; margin-top: 10px; font-family: 'Segoe UI', sans-serif;">
-    Last updated: <strong id="live-clock">--</strong>
+<div style="text-align: right; opacity: 0.9; font-size: 0.92em; margin-top: 10px; font-family: 'Segoe UI', sans-serif;">
+    Last updated: <strong id="live-clock" style="color: #3b82f6; font-weight: 600;">--</strong>
 </div>
+
 <script>
     function updateClock() {
         const now = new Date();
@@ -125,7 +125,6 @@ clock_html = """
     updateClock();
     setInterval(updateClock, 1000);
 </script>
-"""
 
 with col_clock:
     components.html(clock_html, height=60)
@@ -1648,6 +1647,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
