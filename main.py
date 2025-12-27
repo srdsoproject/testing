@@ -443,79 +443,29 @@ def apply_common_filters(df, prefix=""):
 # ---------- HEADER ----------
 st.markdown(
     """
-    <div class="saral-header-card">
+    <div class="saral-header">
         <img src="https://raw.githubusercontent.com/srdsoproject/testing/main/Central%20Railway%20Logo.png"
              class="saral-logo">
         <div class="saral-header-text">
-            <h2 class="saral-initiative">An Initiative by <span class="saral-highlight">Safety Department</span>, Solapur Division</h2>
+            <h2 class="saral-initiative">An Initiative by <span class="saral-safety">Safety Department</span>, Solapur Division</h2>
             <h1 class="saral-title">📋 S.A.R.A.L</h1>
             <h3 class="saral-subtitle">(Safety Abnormality Report & Action List – Version 1.3)</h3>
         </div>
     </div>
 
     <style>
-        /* Teal Blue Theme – Works perfectly in light & dark */
-        @media (prefers-color-scheme: light) {
-            :root {
-                --saral-bg: linear-gradient(135deg, #ffffff 0%, #e0f2f1 100%); /* White to light teal */
-                --saral-border: #80cbc4;
-                --saral-shadow: rgba(77, 182, 172, 0.25);
-                --saral-shadow-hover: rgba(77, 182, 172, 0.4);
-                --saral-glow: rgba(77, 182, 172, 0.7);
-                --text-main: #004d40;
-                --text-highlight: #00695c;
-                --text-title: #004d40;
-                --text-subtitle: #555;
-            }
-        }
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --saral-bg: linear-gradient(135deg, #1a2a2a 0%, #263534 100%); /* Dark teal base */
-                --saral-border: #80cbc4;
-                --saral-shadow: rgba(77, 182, 172, 0.2);
-                --saral-shadow-hover: rgba(77, 182, 172, 0.5);
-                --saral-glow: rgba(77, 182, 172, 0.9);
-                --text-main: #e0f2f1;
-                --text-highlight: #80cbc4;
-                --text-title: #a7ffeb;
-                --text-subtitle: #b2dfdb;
-            }
-        }
-
-        /* Header Card – Premium Glassmorphic Style */
-        .saral-header-card {
+        .saral-header {
             display: flex;
             align-items: center;
-            background: var(--saral-bg);
-            border: 2px solid var(--saral-border);
-            border-radius: 20px;
-            padding: 28px 32px;
-            margin: 20px 0 40px 0;
-            box-shadow: 0 10px 30px var(--saral-shadow);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            transition: all 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
-        }
-
-        .saral-header-card:hover {
-            transform: translateY(-6px);
-            box-shadow: 
-                0 16px 40px var(--saral-shadow-hover),
-                0 0 50px var(--saral-glow),
-                0 0 0 1px var(--saral-border);
+            padding: 20px 0;
+            margin-bottom: 30px;
         }
 
         .saral-logo {
             height: 80px;
-            border-radius: 14px;
-            margin-right: 28px;
+            border-radius: 12px;
+            margin-right: 25px;
             object-fit: contain;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-            transition: transform 0.4s ease;
-        }
-
-        .saral-header-card:hover .saral-logo {
-            transform: scale(1.08);
         }
 
         .saral-header-text {
@@ -524,52 +474,47 @@ st.markdown(
 
         .saral-initiative {
             margin: 0;
-            font-size: 1.3em;
+            font-size: 1.35em;
             font-weight: 500;
-            color: var(--text-main);
-            letter-spacing: 0.6px;
+            color: #4fc3f7;           /* Light sky blue */
         }
 
-        .saral-highlight {
-            color: var(--text-highlight);
+        .saral-safety {
+            color: #4fc3f7;           /* Same light sky blue for emphasis */
             font-weight: 700;
-            text-shadow: 0 0 10px var(--saral-glow);
         }
 
         .saral-title {
-            margin: 10px 0 0;
-            font-size: 3em;
+            margin: 8px 0 0;
+            font-size: 2.8em;
             font-weight: bold;
-            color: var(--text-title);
-            letter-spacing: 1.5px;
-            text-shadow: 0 0 15px var(--saral-glow);
+            color: inherit;           /* Default text color */
         }
 
         .saral-subtitle {
-            margin: -10px 0 0;
-            font-size: 1.2em;
-            color: var(--text-subtitle);
+            margin: -6px 0 0;
+            font-size: 1.15em;
+            color: #666;              /* Slightly muted default */
             font-weight: normal;
-            opacity: 0.95;
         }
 
-        /* Mobile Responsiveness */
+        /* Mobile responsiveness */
         @media (max-width: 768px) {
-            .saral-header-card {
+            .saral-header {
                 flex-direction: column;
                 text-align: center;
-                padding: 24px;
+                padding: 16px 0;
             }
             .saral-logo {
                 margin-right: 0;
-                margin-bottom: 20px;
+                margin-bottom: 16px;
                 height: 70px;
             }
             .saral-title {
-                font-size: 2.5em;
+                font-size: 2.4em;
             }
             .saral-subtitle {
-                font-size: 1.1em;
+                font-size: 1.05em;
             }
         }
     </style>
@@ -1703,6 +1648,7 @@ with tabs[2]:
                     with col3:
                         max_days = group['Days Pending'].max()
                         st.error(f"{max_days} days overdue")
+
 
 
 
