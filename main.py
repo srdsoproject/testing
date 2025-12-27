@@ -379,7 +379,6 @@ import pandas as pd
 from datetime import date, timedelta
 
 def apply_common_filters(df, prefix=""):
-    # Default date range: today and the previous 2 days (last 3 days total)
     default_to_date = date.today()
     default_from_date = default_to_date - timedelta(days=2)
     
@@ -552,8 +551,6 @@ def load_data():
 # Initialize df if None
 if st.session_state.df is None:
     st.session_state.df = load_data()
-
-
 # ---------- MAIN TABS ----------
 tabs = st.tabs(["📝 View Records", "📊 Analytics"])
 
@@ -1118,8 +1115,6 @@ else:
     st.info("✅ No pending alerts.")
 
 # -------------------- FOOTER --------------------
-# -------------------- CONTACT BUTTON --------------------
-
 st.markdown("""
 **Use the following syntax or copy to forward attention to other department:**
 - For Operating: Pertains to **OPTG**
@@ -1483,62 +1478,5 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
-
-
-with tabs[2]:
-    st.markdown("### “Please Explain” Letters (45+ Days Pending)")
-    
-    if st.session_state.df is None or st.session_state.df.empty:
-        st.info("No data loaded.")
-    else:
-        df = st.session_state.df.copy()
-        df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors='coerce')
-        today = datetime.now()
-        df["Days Pending"] = (today - df["Date of Inspection"]).dt.days
-        
-        overdue = df[(df["Status"] == "Pending") & (df["Days Pending"] > 45)]
-        
-        if overdue.empty:
-            st.success("Congratulations! No deficiency pending for more than 45 days.")
-            st.balloons()
-        else:
-            officer_groups = overdue.groupby("Action By")
-            
-            for officer, group in officer_groups:
-                with st.expander(f"{officer} → {len(group)} items pending ({group['Days Pending'].min()}–{group['Days Pending'].max()} days)", expanded=True):
-                    st.warning(f"Overdue by {group['Days Pending'].max()} days")
-                    
-                    items = group[["Location", "Date of Inspection", "Deficiencies Noted"]].to_dict('records')
-                    items_list = []
-                    for item in items:
-                        items_list.append({
-                            "Location": item["Location"],
-                            "Date": item["Date of Inspection"],
-                            "Deficiency": item["Deficiencies Noted"]
-                        })
-                    
-                    # Generate PDF
-                    # Generate PDF
-                    pdf_buffer = generate_please_explain_pdf(officer, officer, items_list)
-                    
-                    col1, col2, col3 = st.columns([2, 2, 2])
-                    with col1:
-                        pdf_buffer.seek(0)
-                        st.download_button(
-                            label="Download Draft Letter (PDF)",
-                            data=pdf_buffer.read(),
-                            file_name=f"Please_Explain_{officer.replace('/', '_').replace(' ', '_')}_{datetime.now().strftime('%d%b%Y')}.pdf",
-                            mime="application/pdf",
-                            key=f"dl_{officer}_{datetime.now().microsecond}"
-                        )
-                    
-                    with col2:
-                        if st.button(f"WhatsApp Reminder → {officer}", key=f"wa_{officer}"):
-                            msg = f"Respected {officer}%0A%0A{len(group)} safety deficiencies pending >45 days.%0A%0ADraft 'Please Explain' letter ready.%0A%0APlease comply TODAY to avoid final letter.%0A%0ALink: https://your-app-url.streamlit.app"
-                            st.markdown(f"[Send WhatsApp Now](https://wa.me/?text={msg})", unsafe_allow_html=True)
-                    
-                    with col3:
-                        max_days = group['Days Pending'].max()
-                        st.error(f"{max_days} days overdue")
 
 
