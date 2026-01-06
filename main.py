@@ -567,7 +567,7 @@ def load_data():
         "Date of Inspection", "Type of Inspection", "Location",
         "Head", "Sub Head", "Deficiencies Noted",
         "Inspection By", "Action By", "Feedback",
-        "User Feedback/Remark"
+        "User Feedback/Remark", "Timestamp of Compliance"
     ]
     try:
         data = sheet.get_all_values()
@@ -762,7 +762,7 @@ with tabs[0]:
     export_df = filtered[[
         "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
         "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "User Feedback/Remark",
-        "Status"
+        "Status", "Timestamp of Compliance"
     ]].copy()
     export_df["Date of Inspection"] = pd.to_datetime(export_df["Date of Inspection"]).dt.date
     towb = BytesIO()
@@ -814,7 +814,7 @@ with tabs[0]:
         display_cols = [
             "Date of Inspection", "Type of Inspection", "Head", "Sub Head", "Location",
             "Deficiencies Noted", "Inspection By", "Action By", "Feedback",
-            "User Feedback/Remark"
+            "User Feedback/Remark", "Timestamp of Compliance"
         ]
         valid_cols = [col for col in display_cols if col in filtered.columns]
         if not valid_cols:
@@ -1518,6 +1518,7 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
 
 
 
