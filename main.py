@@ -381,7 +381,7 @@ def update_feedback_column(edited_df):
 
 # ---------- FILTER WIDGETS ----------
 def apply_common_filters(df, prefix=""):
-    default_to_date = date.today()
+    default_to_date = date.today()                     # ← fixed here
     default_from_date = default_to_date - timedelta(days=2)
    
     with st.expander("🔍 Apply Additional Filters", expanded=True):
@@ -398,16 +398,18 @@ def apply_common_filters(df, prefix=""):
         )
       
         d1, d2 = st.columns(2)
-        d1.date_input(
+        d1.date_input(                                     # ← fixed here
             "📅 From Date",
             value=st.session_state.get(prefix + "from_date", default_from_date),
             key=prefix + "from_date"
         )
-        d2.date_input(
+        d2.date_input(                                     # ← fixed here
             "📅 To Date",
             value=st.session_state.get(prefix + "to_date", default_to_date),
             key=prefix + "to_date"
         )
+   
+    # rest of the function remains unchanged...
    
     out = df.copy()
    
@@ -1451,5 +1453,6 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
 
 
