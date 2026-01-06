@@ -346,40 +346,81 @@ def filter_dataframe(df: pd.DataFrame, include_index: bool = False) -> pd.DataFr
 # ---------- GOOGLE SHEET UPDATE ----------
 def update_feedback_column(edited_df):
     header = sheet.row_values(1)
+    
     def col_idx(name):
         try:
             return header.index(name) + 1
         except ValueError:
-            st.error(f"⚠️ '{name}' column not found")
+            # Optionally show warning only for critical columns
+            if name in ["Feedback", "User Feedback/Remark"]:
+                st.error(f"⚠️ Required column '{name}' not found in Google Sheet!")
             return None
-    feedback_col = col_idx("Feedback")
-    remark_col = col_idx("User Feedback/Remark")
-    head_col = col_idx("Head")
-    action_col = col_idx("Action By")
-    subhead_col = col_idx("Sub Head")
-    if None in (feedback_col, remark_col, head_col, action_col, subhead_col):
+
+    # Required columns (core feedback data)
+    feedback_col   = col_idx("Feedback")
+    remark_col     = col_idx("User Feedback/Remark")
+    head_col       = col_idx("Head")
+    action_col     = col_idx("Action By")
+    subhead_col    = col_idx("Sub Head")
+    
+    # Optional but important new column
+    timestamp_col  = col_idx("Feedback Given At")
+
+    # At minimum, we need the core feedback columns
+    required = [feedback_col, remark_col]
+    if None in required:
+        st.error("Cannot update: Required columns (Feedback / User Feedback/Remark) missing in sheet.")
         return
+
     updates = []
+    session_df = st.session_state.df
+
     for _, row in edited_df.iterrows():
         r = int(row["_sheet_row"])
         def a1(c): return gspread.utils.rowcol_to_a1(r, c)
+
         fv = row.get("Feedback", "") or ""
         rv = row.get("User Feedback/Remark", "") or ""
         hv = row.get("Head", "") or ""
         av = row.get("Action By", "") or ""
         sv = row.get("Sub Head", "") or ""
-        updates += [
-            {"range": a1(feedback_col), "values": [[fv]]},
-            {"range": a1(remark_col), "values": [[rv]]},
-            {"range": a1(head_col), "values": [[hv]]},
-            {"range": a1(action_col), "values": [[av]]},
-            {"range": a1(subhead_col), "values": [[sv]]},
-        ]
-        s = st.session_state.df
-        s.loc[s["_sheet_row"] == r, ["Feedback", "User Feedback/Remark", "Head", "Action By", "Sub Head"]] = [fv, rv, hv, av, sv]
-    if updates:
-        sheet.spreadsheet.values_batch_update({"valueInputOption": "USER_ENTERED", "data": updates})
+        ts = row.get("Feedback Given At", "") or ""   # ← get timestamp from edited row
 
+        # Always update core columns
+        updates += [
+            {"range": a1(feedback_col),   "values": [[fv]]},
+            {"range": a1(remark_col),     "values": [[rv]]},
+            {"range": a1(head_col),       "values": [[hv]]},
+            {"range": a1(action_col),     "values": [[av]]},
+            {"range": a1(subhead_col),    "values": [[sv]]},
+        ]
+
+        # NEW: Save timestamp if the column exists in the sheet
+        if timestamp_col is not None:
+            updates.append({"range": a1(timestamp_col), "values": [[ts]]})
+
+        # Update in-memory session state (include timestamp)
+        update_dict = {
+            "Feedback": fv,
+            "User Feedback/Remark": rv,
+            "Head": hv,
+            "Action By": av,
+            "Sub Head": sv
+        }
+        if timestamp_col is not None:
+            update_dict["Feedback Given At"] = ts
+
+        session_df.loc[session_df["_sheet_row"] == r, list(update_dict.keys())] = list(update_dict.values())
+
+    if updates:
+        sheet.spreadsheet.values_batch_update({
+            "valueInputOption": "USER_ENTERED",
+            "data": updates
+        })
+        # Optional: success message (can be removed if too noisy)
+        # st.success(f"Updated {len(edited_df)} rows in Google Sheet")
+    else:
+        st.info("No updates to send (no changes detected).")
 # ---------- FILTER WIDGETS ----------
 def apply_common_filters(df, prefix=""):
     default_to_date = date.today()                     # ← fixed here
@@ -525,7 +566,7 @@ def load_data():
         "Date of Inspection", "Type of Inspection", "Location",
         "Head", "Sub Head", "Deficiencies Noted",
         "Inspection By", "Action By", "Feedback",
-        "User Feedback/Remark"
+        "User Feedback/Remark", "Feedback Given At"
     ]
     try:
         data = sheet.get_all_values()
@@ -1520,6 +1561,7 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
 
 
 
