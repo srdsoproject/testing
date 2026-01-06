@@ -1,4 +1,3 @@
-#testing
 import streamlit as st
 import pandas as pd
 import gspread
@@ -54,7 +53,7 @@ if not st.session_state.logged_in:
     st.stop()
 
 # ---------- ACKNOWLEDGMENT ----------
-user_id = st.session_state.user["email"]  # use email as unique ID
+user_id = st.session_state.user["email"] # use email as unique ID
 try:
     ack_df = pd.read_excel("responses.xlsx")
     if "UserID" not in ack_df.columns or "Name" not in ack_df.columns:
@@ -87,7 +86,6 @@ if not user_ack_done:
 # ---------- DISPLAY ALL RESPONSES ----------
 # --- Responses Received with Reliable Live Clock ---
 col_title, col_clock = st.columns([4, 1])
-
 with col_title:
     st.markdown("### 📝 Responses Received")
 
@@ -103,7 +101,6 @@ except FileNotFoundError:
 
 # Reliable Live Clock using components.html (guaranteed to work)
 import streamlit.components.v1 as components
-
 clock_html = """
 <div style="text-align: right; color: var(--text-color); opacity: 0.85; font-size: 0.92em; margin-top: 10px; font-family: 'Segoe UI', sans-serif;">
     Last updated: <strong id="live-clock">--</strong>
@@ -127,7 +124,6 @@ clock_html = """
     setInterval(updateClock, 1000);
 </script>
 """
-
 with col_clock:
     components.html(clock_html, height=60)
 
@@ -179,6 +175,7 @@ GATE_LIST = list(dict.fromkeys([
     'LC-04', 'LC-67', 'LC-77', 'LC-75', 'LC-64', 'LC-65', 'LC-5', 'LC-6', 'LC-57', 'LC-62', 'LC-39', 'LC-2/C',
     'LC-6/C', 'LC-11', 'LC-03', 'LC-15/C', 'LC-21', 'LC-26-A', 'LC-60'
 ]))
+
 # Updated Footplate Route Hierarchy
 FOOTPLATE_ROUTE_HIERARCHY = {
     "SUR-DD": ["SUR-KWV", "KWV-DD", "BRB-DD", 'PPJ-WSB', 'SUR-BGVN', 'SUR-MA', 'SUR-PUNE'],
@@ -189,14 +186,17 @@ FOOTPLATE_ROUTE_HIERARCHY = {
     "WADI-SUR": ["WADI-KLBG", "KLBG-SUR", "DUD-HG", 'BOT-NGS', 'WADI-SDB'],
     "KWV-LUR": ["KWV-BTW", 'DRSV-LUR'],
     "MRJ-KWV": ["PVR-KWV", "SGLA-PVR", 'SGRE-KVK'],
-    "KLBG-TJSP" : [], 
+    "KLBG-TJSP" : [],
     "TJSP-KLBG" : [],
 }
+
 FOOTPLATE_ROUTES = list(FOOTPLATE_ROUTE_HIERARCHY.keys())
 ALL_FOOTPLATE_LOCATIONS = FOOTPLATE_ROUTES + [sub for subs in FOOTPLATE_ROUTE_HIERARCHY.values() for sub in subs]
 ALL_LOCATIONS = STATION_LIST + GATE_LIST + ALL_FOOTPLATE_LOCATIONS
+
 HEAD_LIST = ["", "ELECT/TRD", "ELECT/G", "ELECT/TRO", "SIGNAL & TELECOM", "OPTG", "MECHANICAL",
              "ENGINEERING", "COMMERCIAL", "C&W", 'PERSONNEL', 'SECURITY', "FINANCE", "MEDICAL", "STORE"]
+
 SUBHEAD_LIST = {
     "ELECT/TRD": ["T/W WAGON", "TSS/SP/SSP", "OHE SECTION", "OHE STATION", "MISC"],
     "ELECT/G": ["TL/AC COACH", "POWER/PANTRY CAR", "WIRING/EQUIPMENT", "UPS", "AC", "DG", "SOLAR LIGHT", "MISC"],
@@ -212,14 +212,17 @@ SUBHEAD_LIST = {
             'DAMAGED UNDER GEAR PARTS', 'MISC'],
     "FINANCE": ["MISC"], "MEDICAL": ["MISC"], "STORE": ["MISC"],
 }
+
 INSPECTION_BY_LIST = [""] + ["HQ OFFICER CCE/CR", 'DRM/SUR', 'ADRM', 'Sr.DSO', 'Sr.DOM', 'Sr.DEN/S', 'Sr.DEN/C', 'Sr.DEN/Co', 'Sr.DSTE',
                              'Sr.DEE/TRD', 'Sr.DEE/G', 'Sr.DEE/TRO', 'Sr.DME', 'Sr.DCM', 'Sr.DPO', 'Sr.DFM', 'Sr.DMM', 'DSC',
                              'DME','DEE/TRD', 'DFM', 'DSTE/HQ', 'DSTE/KLBG', 'ADEN/T/SUR', 'ADEN/W/SUR', 'ADEN/KWV',
                              'ADEN/PVR', 'ADEN/LUR', 'ADEN/KLBG', 'ADSTE/SUR', 'ADSTE/I/KWV', 'ADSTE/II/KWV',
                              'ADME/SUR', 'AOM/GD', 'AOM/GEN', 'ACM/Cog', 'ACM/TC', 'ACM/GD', 'APO/GEN', 'APO/WEL',
                              'ADFM/I', 'ADFMII', 'ASC', 'ADSO/SUR']
+
 ACTION_BY_LIST = [""] + ['DRM/SUR', 'ADRM', 'Sr.DSO', 'Sr.DOM', 'Sr.DEN/S', 'Sr.DEN/C', 'Sr.DEN/Co', 'Sr.DSTE',
                          'Sr.DEE/TRD', 'Sr.DEE/G', 'Sr.DEE/TRO', 'Sr.DME', 'Sr.DCM', 'Sr.DPO', 'Sr.DFM', 'Sr.DMM', 'DSC', 'CMS']
+
 VALID_INSPECTIONS = [
     "FOOTPLATE INSPECTION", "STATION INSPECTION", "LC GATE INSPECTION",
     "COACHING DEPOT", "ON TRAIN", "SURPRISE/AMBUSH INSPECTION", "WORKSITE INSPECTION", "OTHER (UNUSUAL)",
@@ -248,7 +251,7 @@ def classify_feedback(feedback, user_remark=""):
             "briefed", "guided", "handover", "working properly", "checked found working", "supply restored", "This is not a deficiency.", "This is not a deficiency", "not a deficiency", "this is observation", "It is observation",
             "updated by", "adv to", "counselled the staff", "complied", "checked and found",
             "maintained", "for needful action", "provided at", "in working condition", "is working",
-            "found working", "equipment is working", "item is working", "as per plan", "putright", "put right", 'attend dt','attend dt.', 
+            "found working", "equipment is working", "item is working", "as per plan", "putright", "put right", 'attend dt','attend dt.',
             "operational feasibility", "will be provided", "will be supplied shortly", "advised to ubl", "updated"
         ]
         pending_kw = [
@@ -306,8 +309,10 @@ def filter_dataframe(df: pd.DataFrame, include_index: bool = False) -> pd.DataFr
     pd.DataFrame
         Filtered dataframe.
     """
+    # Note: this function appears incomplete in original code (column_selection is not defined)
+    # Keeping as-is for fidelity - you may need to fix this part later
     df_filtered = df.copy()
-    for column in column_selection:
+    for column in column_selection:  # ← this variable is not defined in your code
         if is_categorical_dtype(df[column]) or df[column].dtype == "object":
             unique_vals = sorted(df[column].dropna().unique())
             selected_vals = st.multiselect(f"Filter {column}", unique_vals, key=f"filter_{column}")
@@ -375,69 +380,62 @@ def update_feedback_column(edited_df):
         sheet.spreadsheet.values_batch_update({"valueInputOption": "USER_ENTERED", "data": updates})
 
 # ---------- FILTER WIDGETS ----------
-import streamlit as st
-import pandas as pd
-from datetime import date, timedelta
-
 def apply_common_filters(df, prefix=""):
     default_to_date = date.today()
     default_from_date = default_to_date - timedelta(days=2)
-    
+   
     with st.expander("🔍 Apply Additional Filters", expanded=True):
         c1, c2 = st.columns(2)
         c1.multiselect(
             "Inspection By", INSPECTION_BY_LIST[1:],
             default=st.session_state.get(prefix + "insp", []),
-            key=prefix + "insp"          # ← FIXED: Now uses prefix
+            key=prefix + "insp"
         )
         c2.multiselect(
             "Action By", ACTION_BY_LIST[1:],
             default=st.session_state.get(prefix + "action", []),
-            key=prefix + "action"        # ← FIXED: Now uses prefix
+            key=prefix + "action"
         )
-       
+      
         d1, d2 = st.columns(2)
         d1.date_input(
             "📅 From Date",
             value=st.session_state.get(prefix + "from_date", default_from_date),
-            key=prefix + "from_date"     # ← FIXED: Now uses prefix
+            key=prefix + "from_date"
         )
         d2.date_input(
             "📅 To Date",
             value=st.session_state.get(prefix + "to_date", default_to_date),
-            key=prefix + "to_date"       # ← FIXED: Now uses prefix
+            key=prefix + "to_date"
         )
-    
+   
     out = df.copy()
-    
-    # Apply Inspection By filter
+   
     if st.session_state.get(prefix + "insp"):
         sel = st.session_state[prefix + "insp"]
         out = out[out["Inspection By"].apply(
             lambda x: any(s.strip() in str(x).split(",") for s in sel)
         )]
-    
-    # Apply Action By filter
+   
     if st.session_state.get(prefix + "action"):
         sel = st.session_state[prefix + "action"]
         out = out[out["Action By"].apply(
             lambda x: any(s.strip() in str(x).split(",") for s in sel)
         )]
-    
-    # Apply date filter
+   
     if st.session_state.get(prefix + "from_date") and st.session_state.get(prefix + "to_date"):
         from_date = st.session_state[prefix + "from_date"]
         to_date = st.session_state[prefix + "to_date"]
-       
+      
         if from_date > to_date:
             st.warning("From Date cannot be after To Date. Adjusting filter.")
             from_date, to_date = to_date, from_date
-       
+      
         out = out[
             (out["Date of Inspection"] >= pd.to_datetime(from_date)) &
             (out["Date of Inspection"] <= pd.to_datetime(to_date))
         ]
-    
+   
     return out
 
 # ---------- HEADER ----------
@@ -452,7 +450,6 @@ st.markdown(
             <h3 class="saral-subtitle">(Safety Abnormality Report & Action List – Version 1.3)</h3>
         </div>
     </div>
-
     <style>
         .saral-header {
             display: flex;
@@ -460,44 +457,37 @@ st.markdown(
             padding: 20px 0;
             margin-bottom: 30px;
         }
-
         .saral-logo {
             height: 80px;
             border-radius: 12px;
             margin-right: 25px;
             object-fit: contain;
         }
-
         .saral-header-text {
             flex: 1;
         }
-
         .saral-initiative {
             margin: 0;
             font-size: 1.35em;
             font-weight: 500;
-            color: #4fc3f7;           /* Light sky blue */
+            color: #4fc3f7; /* Light sky blue */
         }
-
         .saral-safety {
-            color: #4fc3f7;           /* Same light sky blue for emphasis */
+            color: #4fc3f7; /* Same light sky blue for emphasis */
             font-weight: 700;
         }
-
         .saral-title {
             margin: 8px 0 0;
             font-size: 2.8em;
             font-weight: bold;
-            color: inherit;           /* Default text color */
+            color: inherit; /* Default text color */
         }
-
         .saral-subtitle {
             margin: -6px 0 0;
             font-size: 1.15em;
-            color: #666;              /* Slightly muted default */
+            color: #666; /* Slightly muted default */
             font-weight: normal;
         }
-
         /* Mobile responsiveness */
         @media (max-width: 768px) {
             .saral-header {
@@ -521,6 +511,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 # ---------- LOAD DATA ----------
 @st.cache_data(ttl=0)
 def load_data():
@@ -552,6 +543,7 @@ def load_data():
 # Initialize df if None
 if st.session_state.df is None:
     st.session_state.df = load_data()
+
 # ---------- MAIN TABS ----------
 tabs = st.tabs(["📝 View Records", "📊 Analytics"])
 
@@ -573,7 +565,7 @@ with tabs[0]:
     c1.multiselect("Type of Inspection", VALID_INSPECTIONS, key="view_type_filter")
     c2.multiselect("Location", ALL_LOCATIONS, key="view_location_filter")
     c3, c4 = st.columns(2)
-    c3.multiselect("Head", HEAD_LIST[1:], key="view_head_filter")  # Fixed typo: removed erroneous c3 = c3.multiselect
+    c3.multiselect("Head", HEAD_LIST[1:], key="view_head_filter")
     sub_opts = sorted({s for h in st.session_state.view_head_filter for s in SUBHEAD_LIST.get(h, [])})
     c4.multiselect("Sub Head", sub_opts, key="view_sub_filter")
     selected_status = st.selectbox("🔘 Status", ["All", "Pending", "Resolved"], key="view_status_filter")
@@ -581,7 +573,6 @@ with tabs[0]:
     if st.session_state.view_type_filter:
         filtered = filtered[filtered["Type of Inspection"].isin(st.session_state.view_type_filter)]
     if st.session_state.view_location_filter:
-        # Include main routes and their subsections
         selected_locations = st.session_state.view_location_filter
         all_selected_locations = set(selected_locations)
         for loc in selected_locations:
@@ -597,8 +588,6 @@ with tabs[0]:
     filtered = apply_common_filters(filtered, prefix="view_")
     filtered = filtered.apply(lambda x: x.str.replace("\n", " ") if x.dtype == "object" else x)
     filtered = filtered.sort_values("Date of Inspection")
-    #st.write(f"🔹 Showing {len(filtered)} record(s) from **{start_date.strftime('%d.%m.%Y')}** "
-             #f"to **{end_date.strftime('%d.%m.%Y')}**")
     col_a, col_b, col_c, col_d = st.columns(4)
     pending_count = (filtered["Status"] == "Pending").sum()
     no_response_count = filtered["Feedback"].isna().sum() + (filtered["Feedback"].astype(str).str.strip() == "").sum()
@@ -619,7 +608,7 @@ with tabs[0]:
         if not head_summary.empty:
             total_heads = head_summary["Count"].sum()
             display_data = head_summary.copy()
-            thresh = 0.02  # 2% threshold for "Others" category
+            thresh = 0.02 # 2% threshold for "Others" category
             display_data["Percent"] = display_data["Count"] / total_heads
             major = display_data[display_data["Percent"] >= thresh][["Head", "Count"]]
             minor = display_data[display_data["Percent"] < thresh]
@@ -720,6 +709,7 @@ with tabs[0]:
             st.image(buf, use_column_width=True)
             st.download_button("📥 Download Sub Head Distribution (PNG)", data=buf,
                                file_name="subhead_distribution.png", mime="image/png")
+
     export_df = filtered[[
         "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
         "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "User Feedback/Remark",
@@ -760,9 +750,9 @@ with tabs[0]:
         for row in ws.iter_rows(min_row=2, min_col=status_col_idx, max_col=status_col_idx, max_row=len(export_df) + 1):
             for cell in row:
                 if str(cell.value).strip().lower() == "pending":
-                    cell.font = Font(color="FF0000")  # Red
+                    cell.font = Font(color="FF0000") # Red
                 elif str(cell.value).strip().lower() == "resolved":
-                    cell.font = Font(color="008000")  # Green
+                    cell.font = Font(color="008000") # Green
     towb.seek(0)
     st.download_button(
         "📥 Export Filtered Records to Excel",
@@ -770,6 +760,7 @@ with tabs[0]:
         file_name="filtered_records.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
     # ---------- EDITOR ----------
     if not filtered.empty:
         display_cols = [
@@ -784,24 +775,19 @@ with tabs[0]:
         if "Deficiencies Noted" not in valid_cols:
             st.error("⚠️ 'Deficiencies Noted' column is required for search functionality.")
             st.stop()
-
         editable_filtered = filtered.copy()
-
         # Ensure stable ID columns
         if "_original_sheet_index" not in editable_filtered.columns:
             editable_filtered["_original_sheet_index"] = editable_filtered.index
         if "_sheet_row" not in editable_filtered.columns:
             editable_filtered["_sheet_row"] = editable_filtered.index + 2
-
         # Create editable DataFrame
         editable_df = editable_filtered[valid_cols + ["_original_sheet_index", "_sheet_row"]].copy()
-
         # Format Date of Inspection
         if "Date of Inspection" in editable_df.columns:
             editable_df["Date of Inspection"] = pd.to_datetime(
                 editable_df["Date of Inspection"], errors="coerce"
             ).dt.date
-
         # Add Status column
         if "Feedback" in editable_df.columns and "User Feedback/Remark" in editable_df.columns:
             editable_df.insert(
@@ -810,7 +796,6 @@ with tabs[0]:
                 [get_status(r["Feedback"], r["User Feedback/Remark"]) for _, r in editable_df.iterrows()]
             )
             editable_df["Status"] = editable_df["Status"].apply(color_text_status)
-
         # Global Search
         st.markdown("#### 🔍 Search and Filter")
         search_text = st.text_input("Search All Columns (case-insensitive)", "").strip().lower()
@@ -820,7 +805,6 @@ with tabs[0]:
             ).any(axis=1)
             editable_df = editable_df[mask].copy()
             st.info(f"Found {len(editable_df)} matching rows after search.")
-
         # Excel-like Column Filtering (FIXED: No more global variable)
         max_cols = st.slider(
             "Max columns to filter on",
@@ -833,7 +817,6 @@ with tabs[0]:
             options=candidate_columns,
             key="column_select_filter"
         )
-
         if selected_columns:
             # Apply column-specific filters
             df_filtered = editable_df.copy()
@@ -886,10 +869,8 @@ with tabs[0]:
                             df_filtered = df_filtered[df_filtered[column].str.lower().str.contains(search_term.lower(), na=False)]
                         else:
                             df_filtered = df_filtered[df_filtered[column].str.contains(search_term, case=False, na=False)]
-
             editable_df = df_filtered
             st.info(f"Applied column filters → {len(editable_df)} rows remaining.")
-
         # AgGrid Configuration
         gb = GridOptionsBuilder.from_dataframe(editable_df)
         gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True)
@@ -906,7 +887,6 @@ with tabs[0]:
         gb.configure_column("_original_sheet_index", hide=True)
         gb.configure_column("_sheet_row", hide=True)
         gb.configure_grid_options(singleClickEdit=True)
-
         auto_size_js = JsCode("""
         function(params) {
             let allColumnIds = [];
@@ -967,9 +947,9 @@ with tabs[0]:
             for row in ws.iter_rows(min_row=2, min_col=status_col_idx, max_col=status_col_idx, max_row=len(export_edited_df) + 1):
                 for cell in row:
                     if str(cell.value).strip().lower() == "pending":
-                        cell.font = Font(color="FF0000")  # Red
+                        cell.font = Font(color="FF0000") # Red
                     elif str(cell.value).strip().lower() == "resolved":
-                        cell.font = Font(color="008000")  # Green
+                        cell.font = Font(color="008000") # Green
         towb_edited.seek(0)
         st.download_button(
             label="📥 Export Edited Records to Excel",
@@ -978,16 +958,14 @@ with tabs[0]:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
         # Buttons
-        c1, c2, c3 = st.columns([1, 1, 2])  # Extra space column for better alignment
+        c1, c2, c3 = st.columns([1, 1, 2]) # Extra space column for better alignment
         submitted = c1.button("✅ Submit Feedback", use_container_width=True)
         refresh_clicked = c2.button("🔄 Refresh Data", use_container_width=True)
-
         if refresh_clicked:
             with st.spinner("🔄 Refreshing data from Google Sheets..."):
                 st.session_state.df = load_data()
             st.success("✅ Data refreshed successfully!")
             st.rerun()
-
         # Submit Feedback logic with protection against double submission
         if submitted:
             if st.session_state.get("feedback_submitting", False):
@@ -1003,18 +981,14 @@ with tabs[0]:
                             # Ensure indexes are properly set for comparison
                             orig = editable_filtered.set_index("_original_sheet_index")
                             new_df = edited_df.set_index("_original_sheet_index")
-
                             old_remarks = orig["User Feedback/Remark"].fillna("").astype(str)
                             new_remarks = new_df["User Feedback/Remark"].fillna("").astype(str)
-
                             common_ids = new_remarks.index.intersection(old_remarks.index)
                             diff_mask = new_remarks.loc[common_ids] != old_remarks.loc[common_ids]
                             changed_ids = diff_mask[diff_mask].index.tolist()
-
                             if changed_ids:
                                 diffs = new_df.loc[changed_ids].copy()
                                 diffs["_sheet_row"] = orig.loc[changed_ids, "_sheet_row"].values
-
                                 # Updated routing dictionary with fixed typo
                                 routing = {
                                     "Pertains to S&T": ("SIGNAL & TELECOM", "Sr.DSTE"),
@@ -1030,31 +1004,27 @@ with tabs[0]:
                                     "Pertains to Sr. DEN(South)": ("ENGINEERING", "Sr.DEN/S"),
                                     "Pertains to Sr.DEN/C": ("ENGINEERING", "Sr.DEN/C"),
                                     "Pertains to Sr.DEN/Co": ("ENGINEERING", "Sr.DEN/Co"),
-                                    "Pertains to FINANCE": ("FINANCE", "Sr.DFM"),        # ← FIXED: was "FINAINCE"
+                                    "Pertains to FINANCE": ("FINANCE", "Sr.DFM"),
                                     "Pertains to STORE": ("STORE", "Sr.DMM"),
                                     "Pertains to MEDICAL": ("MEDICAL", "CMS"),
                                 }
-
                                 for oid in changed_ids:
                                     user_remark = new_df.loc[oid, "User Feedback/Remark"].strip()
                                     if not user_remark:
                                         continue
-
                                     # Auto-routing based on keywords
                                     routed = False
                                     for key, (head, action_by) in routing.items():
-                                        if key.lower() in user_remark.lower():  # Case-insensitive match
+                                        if key.lower() in user_remark.lower(): # Case-insensitive match
                                             st.session_state.df.at[oid, "Head"] = head
                                             st.session_state.df.at[oid, "Action By"] = action_by
                                             st.session_state.df.at[oid, "Sub Head"] = ""
                                             diffs.at[oid, "Head"] = head
                                             diffs.at[oid, "Action By"] = action_by
                                             diffs.at[oid, "Sub Head"] = ""
-
                                             date_str = orig.loc[oid, "Date of Inspection"]
                                             deficiency = orig.loc[oid, "Deficiencies Noted"]
-                                            forwarded_by = orig.loc[oid, "Head"]  # Original head (if any)
-
+                                            forwarded_by = orig.loc[oid, "Head"] # Original head (if any)
                                             alert_msg = (
                                                 f"📌 **{head} Department Alert**\n"
                                                 f"- Date: {date_str}\n"
@@ -1064,18 +1034,15 @@ with tabs[0]:
                                             )
                                             st.session_state.alerts_log.insert(0, alert_msg)
                                             routed = True
-
                                     # Always copy the remark to Feedback column
                                     diffs.at[oid, "Feedback"] = user_remark
                                     diffs.at[oid, "User Feedback/Remark"] = ""
                                     st.session_state.df.at[oid, "Feedback"] = user_remark
                                     st.session_state.df.at[oid, "User Feedback/Remark"] = ""
-
                                 # Save to Google Sheet
                                 update_feedback_column(
                                     diffs.reset_index().rename(columns={"_original_sheet_index": "_original_sheet_index"})
                                 )
-
                                 st.success(f"✅ Successfully updated {len(changed_ids)} record(s)!")
                             else:
                                 st.info("ℹ️ No changes detected in the feedback.")
@@ -1083,8 +1050,7 @@ with tabs[0]:
                     st.error(f"❌ Error during submission: {str(e)}")
                 finally:
                     st.session_state.feedback_submitting = False
-                    st.rerun()  # Refresh view to show updated Status and clean grid
-
+                    st.rerun() # Refresh view to show updated Status and clean grid
     else:
         st.info("No deficiencies available to update at the moment.")
 
@@ -1096,7 +1062,7 @@ if st.session_state.alerts_log:
             st.markdown(log, unsafe_allow_html=True)
             if st.button("Mark as Read", key=f"mark_{i}"):
                 st.session_state.alerts_log.pop(i)
-                st.session_state.last_alert_clicked = i  # save position
+                st.session_state.last_alert_clicked = i # save position
                 st.rerun()
 # After rerun, if we just clicked
 if "last_alert_clicked" in st.session_state:
@@ -1132,6 +1098,7 @@ st.markdown("""
 - For Medical Department: Pertains to **MEDICAL**
 - For Security Department: Pertains to **SECURITY**
 """)
+
 st.markdown("""
 <div style="text-align: center; margin: 35px 0;">
   <div class="adaptive-credit">
@@ -1216,6 +1183,7 @@ st.markdown("""
 }
 </style>
 """, unsafe_allow_html=True)
+
 st.markdown("### 📞 Need Help or Correction in Data?")
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
@@ -1250,6 +1218,7 @@ with col2:
         """,
         unsafe_allow_html=True
     )
+
 # ---- STREAMLIT BLOCK ----
 with tabs[1]:
     st.markdown("### Total Deficiencies Trend (Bar + Trend Line)")
@@ -1479,6 +1448,3 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
-
-
-
