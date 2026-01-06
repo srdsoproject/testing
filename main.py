@@ -411,18 +411,21 @@ def apply_common_filters(df, prefix=""):
    
     out = df.copy()
    
+    # Apply Inspection By filter
     if st.session_state.get(prefix + "insp"):
         sel = st.session_state[prefix + "insp"]
         out = out[out["Inspection By"].apply(
             lambda x: any(s.strip() in str(x).split(",") for s in sel)
         )]
    
+    # Apply Action By filter
     if st.session_state.get(prefix + "action"):
         sel = st.session_state[prefix + "action"]
         out = out[out["Action By"].apply(
             lambda x: any(s.strip() in str(x).split(",") for s in sel)
         )]
    
+    # Apply date filter
     if st.session_state.get(prefix + "from_date") and st.session_state.get(prefix + "to_date"):
         from_date = st.session_state[prefix + "from_date"]
         to_date = st.session_state[prefix + "to_date"]
@@ -1448,3 +1451,4 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
