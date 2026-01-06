@@ -1452,3 +1452,4 @@ with tabs[1]:
         else:
             st.info("Please select at least one location to view the breakdown.")
 
+
