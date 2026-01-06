@@ -11,6 +11,7 @@ from openpyxl.styles import Alignment, Font, Border, Side, NamedStyle
 from pandas.api.types import is_categorical_dtype, is_numeric_dtype, is_datetime64_any_dtype
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from st_aggrid.shared import JsCode
+from datetime import date, timedelta   # ← ADD THIS LINE
 
 # ---------- CONFIG ----------
 st.set_page_config(page_title="Inspection App", layout="wide")
@@ -1453,6 +1454,7 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
 
 
 
