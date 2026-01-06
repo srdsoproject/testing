@@ -12,6 +12,7 @@ from openpyxl.styles import Alignment, Font, Border, Side, NamedStyle
 from pandas.api.types import is_categorical_dtype, is_numeric_dtype, is_datetime64_any_dtype
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from st_aggrid.shared import JsCode
+import pytz
 
 # ---------- CONFIG ----------
 st.set_page_config(page_title="Inspection App", layout="wide")
@@ -224,7 +225,7 @@ VALID_INSPECTIONS = [
     "FOOTPLATE INSPECTION", "STATION INSPECTION", "LC GATE INSPECTION",
     "COACHING DEPOT", "ON TRAIN", "SURPRISE/AMBUSH INSPECTION", "WORKSITE INSPECTION", "OTHER (UNUSUAL)",
 ]
-
+TIMESTAMP_COL_NAME = "Timestamp of Compliance"
 # ---------- HELPERS ----------
 def normalize_str(text):
     if not isinstance(text, str):
@@ -338,41 +339,79 @@ def filter_dataframe(df: pd.DataFrame, include_index: bool = False) -> pd.DataFr
     return df_filtered
 
 # ---------- GOOGLE SHEET UPDATE ----------
+from datetime import datetime
+import pytz
+
 def update_feedback_column(edited_df):
     header = sheet.row_values(1)
+    
     def col_idx(name):
         try:
             return header.index(name) + 1
         except ValueError:
-            st.error(f"⚠️ '{name}' column not found")
+            # Optional: you can auto-create the column if missing (advanced)
+            st.warning(f"Column '{name}' not found in sheet header.")
             return None
-    feedback_col = col_idx("Feedback")
-    remark_col = col_idx("User Feedback/Remark")
-    head_col = col_idx("Head")
-    action_col = col_idx("Action By")
-    subhead_col = col_idx("Sub Head")
+
+    feedback_col    = col_idx("Feedback")
+    remark_col      = col_idx("User Feedback/Remark")
+    head_col        = col_idx("Head")
+    action_col      = col_idx("Action By")
+    subhead_col     = col_idx("Sub Head")
+    timestamp_col   = col_idx(TIMESTAMP_COL_NAME)
+
     if None in (feedback_col, remark_col, head_col, action_col, subhead_col):
+        st.error("Cannot update: one or more required columns missing in Google Sheet.")
         return
+
     updates = []
+    ist = pytz.timezone('Asia/Kolkata')   # ← change if you prefer UTC or other tz
+
     for _, row in edited_df.iterrows():
         r = int(row["_sheet_row"])
         def a1(c): return gspread.utils.rowcol_to_a1(r, c)
+
         fv = row.get("Feedback", "") or ""
         rv = row.get("User Feedback/Remark", "") or ""
         hv = row.get("Head", "") or ""
         av = row.get("Action By", "") or ""
         sv = row.get("Sub Head", "") or ""
-        updates += [
-            {"range": a1(feedback_col), "values": [[fv]]},
-            {"range": a1(remark_col), "values": [[rv]]},
-            {"range": a1(head_col), "values": [[hv]]},
-            {"range": a1(action_col), "values": [[av]]},
-            {"range": a1(subhead_col), "values": [[sv]]},
-        ]
+
+        # Prepare timestamp only when Feedback is being filled (not empty)
+        timestamp_value = ""
+        if fv.strip():   # only set timestamp when feedback is actually written
+            now_ist = datetime.now(ist)
+            timestamp_value = now_ist.strftime("%d-%m-%Y %H:%M:%S IST")
+
+        updates.extend([
+            {"range": a1(feedback_col),    "values": [[fv]]},
+            {"range": a1(remark_col),      "values": [[rv]]},
+            {"range": a1(head_col),        "values": [[hv]]},
+            {"range": a1(action_col),      "values": [[av]]},
+            {"range": a1(subhead_col),     "values": [[sv]]},
+            {"range": a1(timestamp_col),   "values": [[timestamp_value]]},
+        ])
+
+        # Also update session state DataFrame
         s = st.session_state.df
-        s.loc[s["_sheet_row"] == r, ["Feedback", "User Feedback/Remark", "Head", "Action By", "Sub Head"]] = [fv, rv, hv, av, sv]
+        mask = s["_sheet_row"] == r
+        s.loc[mask, "Feedback"]              = fv
+        s.loc[mask, "User Feedback/Remark"]  = rv
+        s.loc[mask, "Head"]                  = hv
+        s.loc[mask, "Action By"]             = av
+        s.loc[mask, "Sub Head"]              = sv
+        if timestamp_col is not None:
+            s.loc[mask, TIMESTAMP_COL_NAME]  = timestamp_value
+
     if updates:
-        sheet.spreadsheet.values_batch_update({"valueInputOption": "USER_ENTERED", "data": updates})
+        try:
+            sheet.spreadsheet.values_batch_update({
+                "valueInputOption": "USER_ENTERED",
+                "data": updates
+            })
+            st.success(f"Updated {len(updates)//6} record(s) including timestamps.")
+        except Exception as e:
+            st.error(f"Google Sheets update failed: {str(e)}")
 
 # ---------- FILTER WIDGETS ----------
 import streamlit as st
@@ -1479,6 +1518,7 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
 
 
 
