@@ -182,7 +182,7 @@ GATE_LIST = list(dict.fromkeys([
 ]))
 # Updated Footplate Route Hierarchy
 FOOTPLATE_ROUTE_HIERARCHY = {
-    "SUR-DD": ["SUR-KWV", "KWV-DD", "BRB-DD", 'PPJ-WSB', 'SUR-BGVN', 'SUR-MA', 'SUR-PUNE'],
+    "SUR-DD": ["SUR-KWV", "KWV-DD", "BRB-DD", 'PPJ-WSB', 'SUR-BGVN', 'SUR-MA', 'SUR-PUNE', 'SUR', 'BALE', 'PK', 'MVE', 'MO', 'MKPT','WKA', 'ANG', 'MA', 'WDS', 'KWV'],
     "SUR-WADI": ["SUR-KLBG", "SDB-WADI", "KLBG-WADI", "BOT-DUD", "DUD-WADI", "SUR-TKWD", 'BBD-KLBG', 'SUR-DUD', 'SUR-SDB'],
     "LUR-KWV": ["BTW-KWV", "DRSV-KWV", 'SEI-KWV'],
     "KWV-MRJ": ["KWV-PVR", 'DLGN-KVK', 'DLGN-PVR', 'PVR-MRJ'],
@@ -218,7 +218,7 @@ INSPECTION_BY_LIST = [""] + ["HQ OFFICER CCE/CR", 'DRM/SUR', 'ADRM', 'Sr.DSO', '
                              'DME','DEE/TRD', 'DFM', 'DSTE/HQ', 'DSTE/KLBG', 'ADEN/T/SUR', 'ADEN/W/SUR', 'ADEN/KWV',
                              'ADEN/PVR', 'ADEN/LUR', 'ADEN/KLBG', 'ADSTE/SUR', 'ADSTE/I/KWV', 'ADSTE/II/KWV',
                              'ADME/SUR', 'AOM/GD', 'AOM/GEN', 'ACM/Cog', 'ACM/TC', 'ACM/GD', 'APO/GEN', 'APO/WEL',
-                             'ADFM/I', 'ADFMII', 'ASC', 'ADSO/SUR']
+                             'ADFM/I', 'ADFMII', 'ASC', 'ADSO/SUR', "ADME/WADI"]
 ACTION_BY_LIST = [""] + ['DRM/SUR', 'ADRM', 'Sr.DSO', 'Sr.DOM', 'Sr.DEN/S', 'Sr.DEN/C', 'Sr.DEN/Co', 'Sr.DSTE',
                          'Sr.DEE/TRD', 'Sr.DEE/G', 'Sr.DEE/TRO', 'Sr.DME', 'Sr.DCM', 'Sr.DPO', 'Sr.DFM', 'Sr.DMM', 'DSC', 'CMS']
 VALID_INSPECTIONS = [
@@ -1056,22 +1056,20 @@ with tabs[0]:
 
                                 # Updated routing dictionary with fixed typo
                                 routing = {
-                                    "Pertains to S&T": ("SIGNAL & TELECOM", "Sr.DSTE"),
-                                    "Pertains to SECURITY": ("SECURITY", "DSC"),
-                                    "Pertains to OPTG": ("OPTG", "Sr.DOM"),
-                                    "Pertains to COMMERCIAL": ("COMMERCIAL", "Sr.DCM"),
-                                    "Pertains to ELECT/G": ("ELECT/G", "Sr.DEE/G"),
-                                    "Pertains to ELECT/TRD": ("ELECT/TRD", "Sr.DEE/TRD"),
-                                    "Pertaining to TRD dept": ("ELECT/TRD", "Sr.DEE/TRD"),
-                                    "Pertains to MECHANICAL": ("MECHANICAL", "Sr.DME"),
-                                    "Pertains to ELECT/TRO": ("ELECT/TRO", "Sr.DEE/TRO"),
-                                    "Pertains to Sr.DEN/S": ("ENGINEERING", "Sr.DEN/S"),
-                                    "Pertains to Sr. DEN(South)": ("ENGINEERING", "Sr.DEN/S"),
-                                    "Pertains to Sr.DEN/C": ("ENGINEERING", "Sr.DEN/C"),
-                                    "Pertains to Sr.DEN/Co": ("ENGINEERING", "Sr.DEN/Co"),
-                                    "Pertains to FINANCE": ("FINANCE", "Sr.DFM"),        # ← FIXED: was "FINAINCE"
-                                    "Pertains to STORE": ("STORE", "Sr.DMM"),
-                                    "Pertains to MEDICAL": ("MEDICAL", "CMS"),
+                                    "Pertains to Sr.DSTE": ("SIGNAL & TELECOM", "Sr.DSTE"),
+                                    "Pertains to DSC": ("SECURITY", "DSC"),
+                                    "Pertains to Sr.DOM": ("OPTG", "Sr.DOM"),
+                                    "Pertains to Sr.DCM": ("COMMERCIAL", "Sr.DCM"),
+                                    "Pertains to Sr.DEE/G": ("ELECT/G", "Sr.DEE/G"),
+                                    "Pertains to Sr.DEE/TRD": ("ELECT/TRD", "Sr.DEE/TRD"),
+                                    "Pertains to Sr.DME": ("MECHANICAL", "Sr.DME"),
+                                    "Pertains to Sr.DEE/TRO": ("ELECT/TRO", "Sr.DEE/TRO"),
+                                    "Pertains to ENGG/S": ("ENGINEERING", "Sr.DEN/S"),
+                                    "Pertains to ENGG/C": ("ENGINEERING", "Sr.DEN/C"),
+                                    "Pertains to ENGG/Co": ("ENGINEERING", "Sr.DEN/Co"),
+                                    "Pertains to Sr.DFM": ("FINANCE", "Sr.DFM"),        # ← FIXED: was "FINAINCE"
+                                    "Pertains to Sr.DFM": ("STORE", "Sr.DMM"),
+                                    "Pertains to CMS": ("MEDICAL", "CMS"),
                                 }
 
                                 for oid in changed_ids:
@@ -1155,22 +1153,6 @@ else:
     st.info("✅ No pending alerts.")
 
 # -------------------- FOOTER --------------------
-st.markdown("""
-**Use the following syntax or copy to forward attention to other department:**
-- For Operating: Pertains to **OPTG**
-- For Signal & Telecom: Pertains to **S&T**
-- For Commercial: Pertains to **COMMERCIAL**
-- For ELECT/G: Pertains to **ELECT/G**
-- For MECHANICAL: Pertains to **MECHANICAL**
-- For ELECT/TRD: Pertains to **ELECT/TRD**
-- For ELECT/TRO: Pertains to **ELECT/TRO**
-- For Engineering South: Pertains to **Sr.DEN/S**
-- For Engineering North: Pertains to **Sr.DEN/C**
-- For Finance Department: Pertains to **FINANCE**
-- For Store Department: Pertains to **STORE**
-- For Medical Department: Pertains to **MEDICAL**
-- For Security Department: Pertains to **SECURITY**
-""")
 st.markdown("""
 <div style="text-align: center; margin: 35px 0;">
   <div class="adaptive-credit">
@@ -1518,8 +1500,3 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
-
-
-
-
-
