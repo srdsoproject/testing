@@ -1039,91 +1039,100 @@ with tabs[0]:
                         if not need_cols.issubset(edited_df.columns) or "Feedback" not in editable_filtered.columns:
                             st.error("⚠️ Required columns are missing from the data.")
                         else:
-                            # Ensure indexes are properly set for comparison
                             orig = editable_filtered.set_index("_original_sheet_index")
                             new_df = edited_df.set_index("_original_sheet_index")
-
                             old_remarks = orig["User Feedback/Remark"].fillna("").astype(str)
                             new_remarks = new_df["User Feedback/Remark"].fillna("").astype(str)
-
                             common_ids = new_remarks.index.intersection(old_remarks.index)
                             diff_mask = new_remarks.loc[common_ids] != old_remarks.loc[common_ids]
                             changed_ids = diff_mask[diff_mask].index.tolist()
-
                             if changed_ids:
-                                diffs = new_df.loc[changed_ids].copy()
-                                diffs["_sheet_row"] = orig.loc[changed_ids, "_sheet_row"].values
-
-                                # Updated routing dictionary with fixed typo
-                                routing = {
-                                    "Pertains to Sr.DSTE": ("SIGNAL & TELECOM", "Sr.DSTE"),
-                                    "Pertains to DSC": ("SECURITY", "DSC"),
-                                    "Pertains to Sr.DOM": ("OPTG", "Sr.DOM"),
-                                    "Pertains to Sr.DCM": ("COMMERCIAL", "Sr.DCM"),
-                                    "Pertains to Sr.DEE/G": ("ELECT/G", "Sr.DEE/G"),
-                                    "Pertains to Sr.DEE/TRD": ("ELECT/TRD", "Sr.DEE/TRD"),
-                                    "Pertains to Sr.DME": ("MECHANICAL", "Sr.DME"),
-                                    "Pertains to Sr.DEE/TRO": ("ELECT/TRO", "Sr.DEE/TRO"),
-                                    "Pertains to ENGG/S": ("ENGINEERING", "Sr.DEN/S"),
-                                    "Pertains to ENGG/C": ("ENGINEERING", "Sr.DEN/C"),
-                                    "Pertains to ENGG/Co": ("ENGINEERING", "Sr.DEN/Co"),
-                                    "Pertains to Sr.DFM": ("FINANCE", "Sr.DFM"),        # ← FIXED: was "FINAINCE"
-                                    "Pertains to Sr.DFM": ("STORE", "Sr.DMM"),
-                                    "Pertains to CMS": ("MEDICAL", "CMS"),
-                                }
-
-                                for oid in changed_ids:
-                                    user_remark = new_df.loc[oid, "User Feedback/Remark"].strip()
-                                    if not user_remark:
-                                        continue
-
-                                    # Auto-routing based on keywords
-                                    routed = False
-                                    for key, (head, action_by) in routing.items():
-                                        if key.lower() in user_remark.lower():  # Case-insensitive match
-                                            st.session_state.df.at[oid, "Head"] = head
-                                            st.session_state.df.at[oid, "Action By"] = action_by
-                                            st.session_state.df.at[oid, "Sub Head"] = ""
-                                            diffs.at[oid, "Head"] = head
-                                            diffs.at[oid, "Action By"] = action_by
-                                            diffs.at[oid, "Sub Head"] = ""
-
-                                            date_str = orig.loc[oid, "Date of Inspection"]
-                                            deficiency = orig.loc[oid, "Deficiencies Noted"]
-                                            forwarded_by = orig.loc[oid, "Head"]  # Original head (if any)
-
-                                            alert_msg = (
-                                                f"📌 **{head} Department Alert**\n"
-                                                f"- Date: {date_str}\n"
-                                                f"- Deficiency: {deficiency}\n"
-                                                f"- Forwarded By: {forwarded_by}\n"
-                                                f"- Remark: {user_remark}"
-                                            )
-                                            st.session_state.alerts_log.insert(0, alert_msg)
-                                            routed = True
-
-                                    # Always copy the remark to Feedback column
-                                    diffs.at[oid, "Feedback"] = user_remark
-                                    diffs.at[oid, "User Feedback/Remark"] = ""
-                                    st.session_state.df.at[oid, "Feedback"] = user_remark
-                                    st.session_state.df.at[oid, "User Feedback/Remark"] = ""
-
-                                # Save to Google Sheet
-                                update_feedback_column(
-                                    diffs.reset_index().rename(columns={"_original_sheet_index": "_original_sheet_index"})
-                                )
-
-                                st.success(f"✅ Successfully updated {len(changed_ids)} record(s)!")
+                                updates = []  # Build targeted updates here
+                                ist = pytz.timezone('Asia/Kolkata')
+                                header = sheet.row_values(1)
+                                def col_idx(name):
+                                    try:
+                                        return header.index(name) + 1
+                                    except ValueError:
+                                        st.warning(f"Column '{name}' not found.")
+                                        return None
+                                feedback_col = col_idx("Feedback")
+                                remark_col = col_idx("User Feedback/Remark")
+                                head_col = col_idx("Head")
+                                action_col = col_idx("Action By")
+                                subhead_col = col_idx("Sub Head")
+                                timestamp_col = col_idx(TIMESTAMP_COL_NAME)
+                                if None in (feedback_col, remark_col, head_col, action_col, subhead_col):
+                                    st.error("Missing required columns in Google Sheet.")
+                                else:
+                                    for oid in changed_ids:
+                                        r = int(orig.loc[oid, "_sheet_row"])  # Sheet row
+                                        def a1(c): return gspread.utils.rowcol_to_a1(r, c)
+                                        user_remark = new_df.loc[oid, "User Feedback/Remark"].strip()
+                                        if not user_remark:
+                                            continue
+                                        # Auto-routing (same as before)
+                                        routed = False
+                                        for key, (head, action_by) in routing.items():
+                                            if key.lower() in user_remark.lower():
+                                                new_head = head
+                                                new_action = action_by
+                                                new_subhead = ""
+                                                routed = True
+                                                break  # Assuming only one match
+                                        # Copy remark to Feedback, clear Remark
+                                        new_feedback = user_remark
+                                        new_remark = ""
+                                        # Timestamp only if new_feedback non-empty
+                                        timestamp_value = ""
+                                        if new_feedback.strip():
+                                            now_ist = datetime.now(ist)
+                                            timestamp_value = now_ist.strftime("%d-%m-%Y %H:%M:%S IST")
+                                        # Now, compare and add ONLY changed cells
+                                        old_feedback = orig.loc[oid, "Feedback"] or ""
+                                        old_remark = orig.loc[oid, "User Feedback/Remark"] or ""
+                                        old_head = orig.loc[oid, "Head"] or ""
+                                        old_action = orig.loc[oid, "Action By"] or ""
+                                        old_subhead = orig.loc[oid, "Sub Head"] or ""
+                                        old_timestamp = orig.loc[oid, TIMESTAMP_COL_NAME] or "" if TIMESTAMP_COL_NAME in orig.columns else ""
+                                        if new_feedback != old_feedback:
+                                            updates.append({"range": a1(feedback_col), "values": [[new_feedback]]})
+                                        if new_remark != old_remark:
+                                            updates.append({"range": a1(remark_col), "values": [[new_remark]]})
+                                        if routed:  # Only check head/action/subhead if routed
+                                            if new_head != old_head:
+                                                updates.append({"range": a1(head_col), "values": [[new_head]]})
+                                            if new_action != old_action:
+                                                updates.append({"range": a1(action_col), "values": [[new_action]]})
+                                            if new_subhead != old_subhead:
+                                                updates.append({"range": a1(subhead_col), "values": [[new_subhead]]})
+                                        if timestamp_value and timestamp_value != old_timestamp:
+                                            updates.append({"range": a1(timestamp_col), "values": [[timestamp_value]]})
+                                        # Update session_state.df (same as before)
+                                        st.session_state.df.at[oid, "Feedback"] = new_feedback
+                                        st.session_state.df.at[oid, "User Feedback/Remark"] = new_remark
+                                        if routed:
+                                            st.session_state.df.at[oid, "Head"] = new_head
+                                            st.session_state.df.at[oid, "Action By"] = new_action
+                                            st.session_state.df.at[oid, "Sub Head"] = new_subhead
+                                        if timestamp_col is not None:
+                                            st.session_state.df.at[oid, TIMESTAMP_COL_NAME] = timestamp_value
+                                    # Execute batch update ONLY if there are changes
+                                    if updates:
+                                        sheet.spreadsheet.values_batch_update({
+                                            "valueInputOption": "USER_ENTERED",
+                                            "data": updates
+                                        })
+                                        st.success(f"✅ Successfully updated {len(changed_ids)} record(s)!")
+                                    else:
+                                        st.info("ℹ️ No changes to save.")
                             else:
                                 st.info("ℹ️ No changes detected in the feedback.")
                 except Exception as e:
                     st.error(f"❌ Error during submission: {str(e)}")
                 finally:
                     st.session_state.feedback_submitting = False
-                    st.rerun()  # Refresh view to show updated Status and clean grid
-
-    else:
-        st.info("No deficiencies available to update at the moment.")
+                    st.rerun()
 
 # ---------------- ALERT LOG SECTION ----------------
 st.markdown("## 📋 Alerts Log")
@@ -1500,4 +1509,5 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
 
