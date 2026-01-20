@@ -184,15 +184,13 @@ GATE_LIST = list(dict.fromkeys([
 # Updated Footplate Route Hierarchy
 FOOTPLATE_ROUTE_HIERARCHY = {
     "SUR-DD": ["SUR-KWV", "KWV-DD", "BRB-DD", 'PPJ-WSB', 'SUR-BGVN', 'SUR-MA', 'SUR-PUNE', 'SUR', 'BALE', 'PK', 'MVE', 'MO', 'MKPT','WKA', 'ANG', 'MA', 'WDS', 'KWV', 'KEM', 'DHS', 'BLNI', 'JEUR', 'PPJ', 'WSB', 'KEU', 'JNTR', 'BGVN', 'MLM', 'BRB', 'DD'],
-    "SUR-WADI": ["SUR-KLBG", "SDB-WADI", "KLBG-WADI", "BOT-DUD", "DUD-WADI", "SUR-TKWD", 'BBD-KLBG', 'SUR-DUD', 'SUR-SDB', 'SUR', 'TKWD', 'HG', 'TLT', 'AKOR', 'NGS', 'BOT', 'GUR', 'GDGN', 'KUI', 'DUD', 'HDD', 'SVG', 'BBD', 'KLBG', 'HQR', 'MR', 'SDB', 'WADI'],
+    "SUR-WADI": ["SUR-KLBG", "SDB-WADI", "KLBG-WADI", "BOT-DUD", "DUD-WADI", "SUR-TKWD", 'BBD-KLBG', 'SUR-DUD', 'SUR-SDB', 'SUR', 'TKWD', 'HG', 'TLT', 'AKOR', 'NGS', 'BOT', 'GUR', 'GDGN', 'KUI', 'DUD', 'HDD', 'SVG', 'BBD', 'TJSP', 'KLBG', 'HQR', 'MR', 'SDB', 'WADI', 'LC-1', 'LC-60','LC-61','LC-66','LC-74','LC-82','LC-91'],
     "LUR-KWV": ["BTW-KWV", "DRSV-KWV", 'SEI-KWV', 'SEI', 'BTW', 'PJR', 'DRSV', 'YSI', 'KMRD', 'DKY', 'MRX', 'OSA', 'HGL', 'LUR' ],
     "KWV-MRJ": ["KWV-PVR", 'DLGN-KVK', 'DLGN-PVR', 'PVR-MRJ', 'ARAG', 'BLNK', 'SGRE', 'KVK', 'LNP', 'DLGN','JTRD', 'MSDG', 'JVA', 'WSD', 'SGLA', 'PVR', 'MLB'],
     "DD-SUR": ["JEUR-KWV", "BGVN-JNTR", 'BGVN-JNTR', 'DD-KWV', 'KWV-SUR', 'SUR', 'BALE', 'PK', 'MVE', 'MO', 'MKPT','WKA', 'ANG', 'MA', 'WDS', 'KWV', 'KEM', 'DHS', 'BLNI', 'JEUR', 'PPJ', 'WSB', 'KEU', 'JNTR', 'BGVN', 'MLM', 'BRB', 'DD'],
     "WADI-SUR": ["WADI-KLBG", "KLBG-SUR", "DUD-HG", 'BOT-NGS', 'WADI-SDB', 'SUR','TKWD', 'HG', 'TLT', 'AKOR', 'NGS', 'BOT', 'GUR', 'GDGN', 'KUI', 'DUD', 'HDD', 'SVG', 'BBD', 'KLBG', 'HQR', 'MR', 'SDB', 'WADI'],
     "KWV-LUR": ["KWV-BTW", 'DRSV-LUR', 'SEI', 'BTW', 'PJR', 'DRSV', 'YSI', 'KMRD', 'DKY', 'MRX', 'OSA', 'HGL', 'LUR' ],
     "MRJ-KWV": ["PVR-KWV", "SGLA-PVR", 'SGRE-KVK', 'ARAG', 'BLNK', 'SGRE', 'KVK', 'LNP', 'DLGN','JTRD', 'MSDG', 'JVA', 'WSD', 'SGLA', 'PVR', 'MLB'],
-    "KLBG-TJSP" : [], 
-    "TJSP-KLBG" : [],
 }
 FOOTPLATE_ROUTES = list(FOOTPLATE_ROUTE_HIERARCHY.keys())
 ALL_FOOTPLATE_LOCATIONS = FOOTPLATE_ROUTES + [sub for subs in FOOTPLATE_ROUTE_HIERARCHY.values() for sub in subs]
@@ -1501,5 +1499,6 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
 
 
