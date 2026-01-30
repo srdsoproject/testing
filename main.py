@@ -219,7 +219,7 @@ INSPECTION_BY_LIST = [""] + ["HQ OFFICER CCE/CR", 'DRM/SUR', 'ADRM', 'Sr.DSO', '
                              'ADME/SUR', 'AOM/GD', 'AOM/GEN', 'ACM/Cog', 'ACM/TC', 'ACM/GD', 'APO/GEN', 'APO/WEL',
                              'ADFM/I', 'ADFMII', 'ASC', 'ADSO/SUR', "ADME/WADI"]
 ACTION_BY_LIST = [""] + ['DRM/SUR', 'ADRM', 'Sr.DSO', 'Sr.DOM', 'Sr.DEN/S', 'Sr.DEN/C', 'Sr.DEN/Co', 'Sr.DSTE',
-                         'Sr.DEE/TRD', 'Sr.DEE/G', 'Sr.DEE/TRO', 'Sr.DME', 'Sr.DCM', 'Sr.DPO', 'Sr.DFM', 'Sr.DMM', 'DSC', 'CMS']
+                         'Sr.DEE/TRD', 'Sr.DEE/G', 'Sr.DEE/TRO', 'Sr.DME', 'Sr.DCM', 'Sr.DPO', 'Sr.DFM', 'Sr.DMM', 'DSC', 'CMS', 'ADEN/TM/SUR']
 VALID_INSPECTIONS = [
     "FOOTPLATE INSPECTION", "STATION INSPECTION", "LC GATE INSPECTION",
     "COACHING DEPOT", "ON TRAIN", "SURPRISE/AMBUSH INSPECTION", "WORKSITE INSPECTION", "OTHER (UNUSUAL)",
@@ -635,8 +635,6 @@ with tabs[0]:
     filtered = apply_common_filters(filtered, prefix="view_")
     filtered = filtered.apply(lambda x: x.str.replace("\n", " ") if x.dtype == "object" else x)
     filtered = filtered.sort_values("Date of Inspection")
-    #st.write(f"🔹 Showing {len(filtered)} record(s) from **{start_date.strftime('%d.%m.%Y')}** "
-             #f"to **{end_date.strftime('%d.%m.%Y')}**")
     col_a, col_b, col_c, col_d = st.columns(4)
     pending_count = (filtered["Status"] == "Pending").sum()
     no_response_count = filtered["Feedback"].isna().sum() + (filtered["Feedback"].astype(str).str.strip() == "").sum()
@@ -1334,7 +1332,6 @@ with tabs[1]:
             "MEDICAL": "MEDICAL",
             "FINANCE": "FINANCE",
             "STORE": "STORE",
-            "": "UNKNOWN", "UNKNOWN": "UNKNOWN", "--": "UNKNOWN", "---": "UNKNOWN"
         }
         df["Head_std"] = df["Head_clean"].map(dept_map).fillna("UNKNOWN")
         # ------------------------------------------------------------------ #
@@ -1499,8 +1496,3 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
-
-
-
-
-
