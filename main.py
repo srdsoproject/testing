@@ -1217,7 +1217,7 @@ with tabs[1]:
             "ELECT/TRD": "ELECT/TRD",
             "ELECT/TRO": "ELECT/TRO",
             "OPTG": "OPTG", "OPERATING": "OPTG",
-            "SIGNAL & TELECOM": "SIGNAL & TELECOM", "S&T": "SIGNAL & TELECOM",
+            "SIGNAL & TELECOM": "SIGNAL & TELECOM",
             "MECHANICAL": "MECHANICAL",
             "COMMERCIAL": "COMMERCIAL",
             "C&W": "C&W", 
@@ -1390,6 +1390,7 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
 
 
 
