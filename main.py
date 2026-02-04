@@ -1043,33 +1043,6 @@ with tabs[0]:
     else:
         st.info("No deficiencies available to update at the moment.")
 
-# ---------------- ALERT LOG SECTION ----------------
-st.markdown("## 📋 Alerts Log")
-if st.session_state.alerts_log:
-    for i, log in enumerate(st.session_state.alerts_log):
-        with st.expander(f"🔔 Alert {i+1}", expanded=True):
-            st.markdown(log, unsafe_allow_html=True)
-            if st.button("Mark as Read", key=f"mark_{i}"):
-                st.session_state.alerts_log.pop(i)
-                st.session_state.last_alert_clicked = i  # save position
-                st.rerun()
-# After rerun, if we just clicked
-if "last_alert_clicked" in st.session_state:
-    st.markdown(
-        f"""
-        <script>
-            var el = window.document.querySelector('details');
-            if (el) {{
-                el.scrollIntoView({{behavior: "smooth", block: "start"}});
-            }}
-        </script>
-        """,
-        unsafe_allow_html=True
-    )
-    del st.session_state.last_alert_clicked
-else:
-    st.info("✅ No pending alerts.")
-
 # -------------------- FOOTER --------------------
 st.markdown("""
 <div style="text-align: center; margin: 35px 0;">
@@ -1417,4 +1390,3 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
-
