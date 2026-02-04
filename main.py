@@ -848,22 +848,26 @@ with tabs[0]:
             st.info(f"Applied column filters → {len(editable_df)} rows remaining.")
 
         # AgGrid Configuration
-        gb = GridOptionsBuilder.from_dataframe(editable_df)
-        gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True)
-        if "User Feedback/Remark" in editable_df.columns:
-            gb.configure_column(
-                "User Feedback/Remark",
-                editable=True,
-                wrapText=True,
-                autoHeight=True,
-                cellEditor="agTextCellEditor",
-                cellEditorPopup=False,
-                cellEditorParams={"maxLength": 4000}
-            )
-        gb.configure_column("_original_sheet_index", hide=True)
-        gb.configure_column("_sheet_row", hide=True)
-        gb.configure_grid_options(singleClickEdit=True)
+        ggb = GridOptionsBuilder.from_dataframe(editable_df)
 
+        gb.configure_pagination(
+            enabled=True,
+            paginationPageSize=50,
+            paginationPageSizeSelector=[10, 25, 50, 100, 200]
+        )
+        
+        gb.configure_default_column(resizable=True, filter=True, sortable=True)
+        gb.configure_column("User Feedback/Remark", editable=True)
+        
+        grid_options = gb.build()
+        
+        AgGrid(
+            editable_df,
+            gridOptions=grid_options,
+            height=650,
+            update_mode=GridUpdateMode.VALUE_CHANGED,
+            fit_columns_on_grid_load=False
+        )
         auto_size_js = JsCode("""
         function(params) {
             let allColumnIds = [];
@@ -1390,6 +1394,7 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
 
 
 
