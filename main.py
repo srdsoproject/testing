@@ -468,7 +468,7 @@ st.markdown(
 )
 
 # ---------- LOAD DATA ----------
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=5)
 def load_data():
     REQUIRED_COLS = [
         "Date of Inspection", "Type of Inspection", "Location",
@@ -1390,5 +1390,6 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
 
 
