@@ -1009,15 +1009,6 @@ with tabs[0]:
                                             date_str = orig.loc[oid, "Date of Inspection"]
                                             deficiency = orig.loc[oid, "Deficiencies Noted"]
                                             forwarded_by = orig.loc[oid, "Head"]  # Original head (if any)
-
-                                            alert_msg = (
-                                                f"📌 **{head} Department Alert**\n"
-                                                f"- Date: {date_str}\n"
-                                                f"- Deficiency: {deficiency}\n"
-                                                f"- Forwarded By: {forwarded_by}\n"
-                                                f"- Remark: {user_remark}"
-                                            )
-                                            st.session_state.alerts_log.insert(0, alert_msg)
                                             routed = True
 
                                     # Always copy the remark to Feedback column
@@ -1390,3 +1381,4 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
