@@ -1307,42 +1307,23 @@ with tabs[1]:
             st.altair_chart(chart, use_container_width=True)
         else:
             st.info("No station data found in the selected period.")
-       # ------------------------------------------------------------------ #
         # ------------------------------------------------------------------ #
         # 9. LOCATION FILTER → TOTAL PER DEPARTMENT + DETAILED BREAKDOWN
         # ------------------------------------------------------------------ #
         st.markdown("### Department wise deficiencies logged")
-        
-        all_locations = sorted(all_locations)           # assuming this already exists
-        
-        # Add "All" at the beginning
-        location_options = ["All"] + all_locations
-        
-        selected = st.multiselect(
+        all_locations = sorted(all_locations)
+        selected_locations = st.multiselect(
             "Select Locations (Stations / Gates / Routes)",
-            options=location_options,
-            default=["All"]                             # ← starts with All selected
+            options=all_locations,
+            default=all_locations[:10] if len(all_locations) > 10 else all_locations
         )
-        
-        # ────────────────────────────────────────────────
-        # Handle "All" logic
-        if "All" in selected:
-            # If "All" is selected → use every location
-            selected_locations = all_locations
-        else:
-            selected_locations = selected               # normal case
-        
-        # ────────────────────────────────────────────────
-        if selected_locations:   # will be True unless user deselects everything
+        if selected_locations:
             # Expand selected locations to include subsections
             expanded_locations = set(selected_locations)
             for loc in selected_locations:
                 if loc in FOOTPLATE_ROUTE_HIERARCHY:
                     expanded_locations.update(FOOTPLATE_ROUTE_HIERARCHY[loc])
-            
             filtered = df[df["Location_clean"].isin(expanded_locations)].copy()
-        
-            # ── rest of your code remains exactly the same ─────────────────
             # Total per department
             dept_breakdown = (
                 filtered.groupby("Head_std")
@@ -1350,7 +1331,6 @@ with tabs[1]:
                 .reset_index(name="TotalCount")
                 .sort_values("TotalCount", ascending=False)
             )
-            
             # Pending & Resolved per department
             status_breakdown = (
                 filtered.groupby(["Head_std", "Status"])
@@ -1359,13 +1339,55 @@ with tabs[1]:
             )
             status_breakdown.columns = [f"{col}Count" for col in status_breakdown.columns]
             status_breakdown = status_breakdown.reset_index()
-        
+            # Merge
             summary_df = dept_breakdown.merge(status_breakdown, on="Head_std", how="left")
             summary_df["PendingCount"] = summary_df.get("PendingCount", 0)
             summary_df["ResolvedCount"] = summary_df.get("ResolvedCount", 0)
-        
-            # Bar chart, text labels, totals, breakdown list...
-            # (your existing chart + markdown code here – no changes needed)
-        
+            # Bar chart (total only)
+            bar_chart = alt.Chart(summary_df).mark_bar(color="#1f77b4").encode(
+                x=alt.X("TotalCount:Q", title="Total Deficiencies Logged"),
+                y=alt.Y("Head_std:N", title="Department", sort="-x"),
+                tooltip=[
+                    "Head_std",
+                    alt.Tooltip("TotalCount", title="Total", format=","),
+                    alt.Tooltip("PendingCount", title="Pending", format=","),
+                    alt.Tooltip("ResolvedCount", title="Resolved", format=",")
+                ]
+            ).properties(
+                height=max(300, len(summary_df) * 40)
+            )
+            # Add total count as text label
+            text = bar_chart.mark_text(
+                align="left",
+                baseline="middle",
+                dx=3,
+                fontWeight="bold",
+                color="black"
+            ).encode(
+                text=alt.Text("TotalCount:Q", format=",")
+            )
+            final_chart = (bar_chart + text).configure_axis(
+                labelFontSize=12,
+                titleFontSize=14
+            ).configure_title(fontSize=16)
+            st.altair_chart(final_chart, use_container_width=True)
+            # Summary line
+            total = summary_df["TotalCount"].sum()
+            pending = summary_df["PendingCount"].sum()
+            resolved = summary_df["ResolvedCount"].sum()
+            st.markdown(
+                f"**Total Deficiencies Logged:** {total:,} | "
+                f"**Pending:** {pending:,} | "
+                f"**Resolved:** {resolved:,}"
+            )
+            # Department-wise breakdown
+            st.markdown("**Department-wise Breakdown:**")
+            for _, row in summary_df.iterrows():
+                st.markdown(
+                    f"- **{row['Head_std']}**: **Total Deficiencies:** {row['TotalCount']:,} | "
+                    f"**Pending:** {row['PendingCount']:,} | "
+                    f"**Resolved:** {row['ResolvedCount']:,}"
+                )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
