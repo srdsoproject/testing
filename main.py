@@ -1220,7 +1220,7 @@ with tabs[1]:
             "SIGNAL & TELECOM": "SIGNAL & TELECOM", "S&T": "SIGNAL & TELECOM",
             "MECHANICAL": "MECHANICAL",
             "COMMERCIAL": "COMMERCIAL",
-            "C&W": "C&W", "CW": "C&W",
+            "C&W": "C&W", 
             "SECURITY": "SECURITY",
             "PERSONNEL": "PERSONNEL",
             "MEDICAL": "MEDICAL",
@@ -1390,6 +1390,7 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
 
 
 
