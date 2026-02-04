@@ -13,6 +13,7 @@ from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from st_aggrid.shared import JsCode
 import pytz
 from datetime import datetime, date, timedelta
+from st_aggrid import GridOptionsBuilder
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 
 # ---------- CONFIG ----------
@@ -1395,6 +1396,7 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
 
 
 
