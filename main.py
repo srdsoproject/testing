@@ -468,7 +468,7 @@ st.markdown(
 )
 
 # ---------- LOAD DATA ----------
-@st.cache_data(ttl=0)
+@st.cache_data(ttl=300)
 def load_data():
     REQUIRED_COLS = [
         "Date of Inspection", "Type of Inspection", "Location",
@@ -1038,7 +1038,7 @@ with tabs[0]:
                     st.error(f"❌ Error during submission: {str(e)}")
                 finally:
                     st.session_state.feedback_submitting = False
-                    st.rerun()  # Refresh view to show updated Status and clean grid
+                    #st.rerun()  # Refresh view to show updated Status and clean grid
 
     else:
         st.info("No deficiencies available to update at the moment.")
@@ -1390,4 +1390,5 @@ with tabs[1]:
                 )
         else:
             st.info("Please select at least one location to view the breakdown.")
+
 
