@@ -14,3 +14,5 @@ transformers
 torch
 altair
 reportlab==4.2.2
+
+libatlas-base-dev
