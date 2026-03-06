@@ -1,3 +1,2 @@
-libatlas-base-dev
 libopenblas-dev
-libgfortran5
+build-essential
