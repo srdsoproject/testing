@@ -1141,7 +1141,7 @@ with tabs[1]:
     st.markdown("### Total Deficiencies Trend (Bar + Trend Line)")
     df = st.session_state.df.copy()
 
-    # 1. Ensure Status column
+    # 1. Status classification
     if "Status" not in df.columns:
         df["Status"] = df.apply(
             lambda r: classify_feedback(r["Feedback"], r.get("User Feedback/Remark", "")), axis=1
@@ -1185,8 +1185,8 @@ with tabs[1]:
         st.info("No records in the selected date range.")
         st.stop()
 
-    # 4. Aggressive cleaning of department names
-    def clean_department(text):
+    # 4. Aggressive department cleaning — removes junk values
+    def clean_head(text):
         if pd.isna(text):
             return None
         s = str(text).strip()
@@ -1195,26 +1195,23 @@ with tabs[1]:
         s = re.sub(r"[\*\-\_\'\"]", "", s)
         s = re.sub(r"\s+", " ", s).strip().upper()
 
-        # Explicitly block suspicious / invalid values
         blocked = {
             "", "UNDEFINED", "UNKNOWN", "UNIDENTIFIED", "UNSPECIFIED",
             "NIL", "N/A", "NA", "NOT DEFINED", "NONE", "NO DEPARTMENT",
-            "(BLANK)", "BLANK", "MISSING", "?"
+            "(BLANK)", "BLANK", "MISSING", "?", "UNSPEC", "UNKN"
         }
-        if s in blocked or len(s) <= 2:  # too short → likely garbage
+        if s in blocked or len(s) <= 2:
             return None
         return s
 
-    df["Head_clean"] = df["Head"].apply(clean_department)
-
-    # Drop rows without valid department
+    df["Head_clean"] = df["Head"].apply(clean_head)
     df = df[df["Head_clean"].notna()].copy()
 
     if df.empty:
         st.info("No valid department entries remain after cleaning.")
         st.stop()
 
-    # Department name standardization
+    # Standardize department names
     dept_map = {
         "ENGINEERING": "ENGINEERING",
         "ENGG": "ENGINEERING",
@@ -1241,7 +1238,7 @@ with tabs[1]:
 
     df["Head_std"] = df["Head_clean"].map(dept_map).fillna(df["Head_clean"])
 
-    # Final safety net — remove anything that looks suspicious
+    # Final safety net
     df = df[
         ~df["Head_std"].str.contains(
             r"UNDEFINED|UNKNOWN|UNIDENTIFIED|NIL|N/A|^\s*$",
@@ -1249,14 +1246,11 @@ with tabs[1]:
         )
     ].copy()
 
-    # Optional: show what departments remain (uncomment for debugging)
-    # st.write("Departments after cleaning:", df["Head_std"].value_counts())
-
-    # 5. Clean Location & identify stations
+    # 5. Location cleaning & station identification
     if "Location" not in df.columns:
         df["Location"] = ""
-    df["Location_clean"] = df["Location"].astype(str).apply(clean_department)  # reuse same cleaner
-    STATIONS_NORM = {clean_department(x) for x in STATION_LIST if clean_department(x)}
+    df["Location_clean"] = df["Location"].astype(str).apply(clean_head)
+    STATIONS_NORM = {clean_head(x) for x in STATION_LIST if clean_head(x)}
     df["Is_Station"] = df["Location_clean"].isin(STATIONS_NORM)
 
     # Expand footplate routes
@@ -1266,7 +1260,7 @@ with tabs[1]:
             all_locations.update(subsections)
     df = df[df["Location_clean"].isin(all_locations)].copy()
 
-    # 6. Trend chart – chronological order enforced
+    # 6. Monthly trend chart — TEMPORAL AXIS = guaranteed chronological order
     trend = (
         df.groupby(pd.Grouper(key="Date of Inspection", freq="MS"))
         .size()
@@ -1274,25 +1268,26 @@ with tabs[1]:
     )
 
     if not trend.empty:
-        trend = trend.sort_values("Date of Inspection").reset_index(drop=True)
-        trend["Month"] = trend["Date of Inspection"].dt.strftime("%b %Y")
-
-        # Explicit sort order (already chronological because we sorted by date)
-        month_order = trend["Month"].tolist()
-
         bars = alt.Chart(trend).mark_bar(
             color="#1f77b4",
             cornerRadiusTopLeft=3,
             cornerRadiusTopRight=3
         ).encode(
             x=alt.X(
-                "Month:O",
+                "Date of Inspection:T",
                 title="Month",
-                sort=month_order,
-                axis=alt.Axis(labelAngle=-45, labelOverlap=False)
+                timeUnit="yearmonth",
+                axis=alt.Axis(
+                    format="%b %Y",          # Apr 2025, May 2025, etc.
+                    labelAngle=-45,
+                    labelOverlap=False
+                )
             ),
             y=alt.Y("TotalCount:Q", title="Total Deficiencies"),
-            tooltip=["Month", "TotalCount"]
+            tooltip=[
+                alt.Tooltip("Date of Inspection:T", title="Month", format="%b %Y"),
+                alt.Tooltip("TotalCount", title="Count", format=",")
+            ]
         )
 
         line = alt.Chart(trend).transform_regression(
@@ -1302,7 +1297,7 @@ with tabs[1]:
             strokeDash=[5, 3],
             strokeWidth=2.5
         ).encode(
-            x="Month:O",
+            x=alt.X("Date of Inspection:T", timeUnit="yearmonth"),
             y="TotalCount:Q"
         )
 
@@ -1310,7 +1305,7 @@ with tabs[1]:
             height=450,
             title=alt.TitleParams(
                 text="Monthly Deficiency Trend",
-                subtitle=f"Period: {trend['Month'].iloc[0]} – {trend['Month'].iloc[-1]}",
+                subtitle=f"From {trend['Date of Inspection'].min().strftime('%b %Y')} to {trend['Date of Inspection'].max().strftime('%b %Y')}",
                 anchor="start",
                 fontSize=16,
                 subtitleFontSize=12,
@@ -1323,7 +1318,7 @@ with tabs[1]:
 
         st.altair_chart(chart, use_container_width=True)
     else:
-        st.info("No monthly data in selected range.")
+        st.info("No monthly data available in the selected period.")
 
     # 7. Department summary (overall)
     st.markdown("### Department-wise **Total** Deficiencies Logged")
