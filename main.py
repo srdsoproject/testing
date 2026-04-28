@@ -1,3 +1,4 @@
+#inspectionviewer
 import streamlit as st
 import pandas as pd
 import gspread
@@ -87,6 +88,7 @@ if not user_ack_done:
 
 # ---------- DISPLAY ALL RESPONSES ----------
 st.markdown("### 📝 Responses Received")
+
 try:
     ack_df = pd.read_excel("responses.xlsx")
     if not ack_df.empty:
@@ -163,7 +165,7 @@ ALL_FOOTPLATE_LOCATIONS = FOOTPLATE_ROUTES + [sub for subs in FOOTPLATE_ROUTE_HI
 ALL_LOCATIONS = STATION_LIST + GATE_LIST + ALL_FOOTPLATE_LOCATIONS
 
 HEAD_LIST = ["", "ELECT/TRD", "ELECT/G", "ELECT/TRO", "SIGNAL & TELECOM", "OPTG", "MECHANICAL",
-             "ENGINEERING", "COMMERCIAL", "C&W", 'PERSONNEL', 'SECURITY', "FINANCE", "MEDICAL", "STORE"]
+             "ENGINEERING", "COMMERCIAL", 'PERSONNEL', 'SECURITY', "FINANCE", "MEDICAL", "STORE"]
 
 SUBHEAD_LIST = {
     "ELECT/TRD": ["T/W WAGON", "TSS/SP/SSP", "OHE SECTION", "OHE STATION", "MISC"],
@@ -174,10 +176,8 @@ SUBHEAD_LIST = {
     "SIGNAL & TELECOM": ["S&T ASSETS", 'WALKIE-TALKIE/PHONE', 'VDU/BPAC/BLOCK INST./PANEL', 'PASSENGER AMENITIES', 'SIGNAL RELATED', 'P&C', 'TRACK CIRCUIT', 'RELAY ROOM', 'MISC'],
     "OPTG": ["SWR/CSR/CSL/TWRD", "STATION RECORDS", "STATION DEFICIENCIES", "TRAIN O/P RELATED", "LC GATE DEFICIENCIES", "CIRCULAR/KNOWLEDGE/STAFF", "SIGNAL EXCHANGE", 'WALKIE-TALKIE/PHONE',
              "SM OFFICE DEFICIENCIES/ASSETS", "MISC"],
-    "ENGINEERING": ["IOW WORKS (Other)", "IOW WORKS (Safety Related)", "PWI (Track Related)", 'LC GATE DEFICIENCIES'],
+    "ENGINEERING": ["IOW WORKS (Other)", "IOW WORKS (Safety Related)", "PWI (Track Related)", 'LC GATE DEFICIENCIES', 'P&C', 'WORKSITE'],
     "COMMERCIAL": ["REQUIREMENT/ASSETS", "CLEANLINESS/COAL BAGS", "PASSENGER AMENITIES", "STAFF (RAILWAY/CONTRACT)", "MISC"],
-    "C&W": ["BRAKE BINDING", 'WHEEL DEFECT', 'TRAIN PARTING', 'PASSENGER AMENITIES', 'AIR PRESSURE LEAKAGE',
-            'DAMAGED UNDER GEAR PARTS', 'MISC'],
     "FINANCE": ["MISC"], "MEDICAL": ["MISC"], "STORE": ["MISC"],
 }
 
@@ -186,10 +186,10 @@ INSPECTION_BY_LIST = [""] + ["HQ OFFICER CCE/CR", 'DRM/SUR', 'ADRM', 'Sr.DSO', '
                              'DME','DEE/TRD', 'DFM', 'DSTE/HQ', 'DSTE/KLBG', 'ADEN/T/SUR', 'ADEN/W/SUR', 'ADEN/KWV',
                              'ADEN/PVR', 'ADEN/LUR', 'ADEN/KLBG', 'ADSTE/SUR', 'ADSTE/I/KWV', 'ADSTE/II/KWV',
                              'ADME/SUR', 'AOM/GD', 'AOM/GEN', 'ACM/Cog', 'ACM/TC', 'ACM/GD', 'APO/GEN', 'APO/WEL',
-                             'ADFM/I', 'ADFMII', 'ASC', 'ADSO/SUR', "ADME/WADI"]
+                             'ADFM/I', 'ADFMII', 'ASC', 'ADSO/SUR', "ADME/WADI", 'DEN/TRACK']
 
 ACTION_BY_LIST = [""] + ['DRM/SUR', 'ADRM', 'Sr.DSO', 'Sr.DOM', 'Sr.DEN/S', 'Sr.DEN/C', 'Sr.DEN/Co', 'Sr.DSTE',
-                         'Sr.DEE/TRD', 'Sr.DEE/G', 'Sr.DEE/TRO', 'Sr.DME', 'Sr.DCM', 'Sr.DPO', 'Sr.DFM', 'Sr.DMM', 'DSC', 'CMS', 'ADEN/TM/SUR']
+                         'Sr.DEE/TRD', 'Sr.DEE/G', 'Sr.DEE/TRO', 'Sr.DME', 'Sr.DCM', 'Sr.DPO', 'Sr.DFM', 'Sr.DMM', 'DSC', 'CMS', 'ADEN/TM/SUR', 'DEN/TRACK', 'GSU']
 
 VALID_INSPECTIONS = [
     "FOOTPLATE INSPECTION", "STATION INSPECTION", "LC GATE INSPECTION",
@@ -207,6 +207,7 @@ def normalize_str(text):
 def classify_feedback(feedback, user_remark=""):
     if isinstance(feedback, str) and feedback.strip() == "`":
         return ""
+
     def _classify(text_normalized):
         if not text_normalized:
             return None
@@ -269,7 +270,7 @@ def color_text_status(status):
 # ---------- GOOGLE SHEET UPDATE ----------
 def update_feedback_column(edited_df):
     header = sheet.row_values(1)
-
+   
     def col_idx(name):
         try:
             return header.index(name) + 1
@@ -278,10 +279,10 @@ def update_feedback_column(edited_df):
             return None
 
     feedback_col = col_idx("Feedback")
-    remark_col   = col_idx("User Feedback/Remark")
-    head_col     = col_idx("Head")
-    action_col   = col_idx("Action By")
-    subhead_col  = col_idx("Sub Head")
+    remark_col = col_idx("User Feedback/Remark")
+    head_col = col_idx("Head")
+    action_col = col_idx("Action By")
+    subhead_col = col_idx("Sub Head")
     timestamp_col = col_idx(TIMESTAMP_COL_NAME)
 
     if None in (feedback_col, remark_col, head_col, action_col, subhead_col):
@@ -307,12 +308,12 @@ def update_feedback_column(edited_df):
             timestamp_value = now_ist.strftime("%d-%m-%Y %H:%M:%S IST")
 
         updates.extend([
-            {"range": a1(feedback_col),   "values": [[fv]]},
-            {"range": a1(remark_col),      "values": [[rv]]},
-            {"range": a1(head_col),        "values": [[hv]]},
-            {"range": a1(action_col),      "values": [[av]]},
-            {"range": a1(subhead_col),     "values": [[sv]]},
-            {"range": a1(timestamp_col),   "values": [[timestamp_value]]},
+            {"range": a1(feedback_col), "values": [[fv]]},
+            {"range": a1(remark_col), "values": [[rv]]},
+            {"range": a1(head_col), "values": [[hv]]},
+            {"range": a1(action_col), "values": [[av]]},
+            {"range": a1(subhead_col), "values": [[sv]]},
+            {"range": a1(timestamp_col), "values": [[timestamp_value]]},
         ])
 
         s = st.session_state.df
@@ -339,7 +340,7 @@ def update_feedback_column(edited_df):
 def apply_common_filters(df, prefix=""):
     default_to_date = date.today()
     default_from_date = default_to_date - timedelta(days=2)
-
+   
     with st.expander("🔍 Apply Additional Filters", expanded=True):
         c1, c2 = st.columns(2)
         c1.multiselect(
@@ -352,7 +353,7 @@ def apply_common_filters(df, prefix=""):
             default=st.session_state.get(prefix + "action", []),
             key=prefix + "action"
         )
-
+      
         d1, d2 = st.columns(2)
         d1.date_input(
             "📅 From Date",
@@ -364,34 +365,34 @@ def apply_common_filters(df, prefix=""):
             value=st.session_state.get(prefix + "to_date", default_to_date),
             key=prefix + "to_date"
         )
-
+   
     out = df.copy()
-
+   
     if st.session_state.get(prefix + "insp"):
         sel = st.session_state[prefix + "insp"]
         out = out[out["Inspection By"].apply(
             lambda x: any(s.strip() in str(x).split(",") for s in sel)
         )]
-
+   
     if st.session_state.get(prefix + "action"):
         sel = st.session_state[prefix + "action"]
         out = out[out["Action By"].apply(
             lambda x: any(s.strip() in str(x).split(",") for s in sel)
         )]
-
+   
     if st.session_state.get(prefix + "from_date") and st.session_state.get(prefix + "to_date"):
         from_date = st.session_state[prefix + "from_date"]
         to_date = st.session_state[prefix + "to_date"]
-
+      
         if from_date > to_date:
             st.warning("From Date cannot be after To Date. Adjusting filter.")
             from_date, to_date = to_date, from_date
-
+      
         out = out[
             (out["Date of Inspection"] >= pd.to_datetime(from_date)) &
             (out["Date of Inspection"] <= pd.to_datetime(to_date))
         ]
-
+   
     return out
 
 # ---------- HEADER ----------
@@ -515,71 +516,16 @@ with tabs[0]:
     df["Status"] = df.apply(lambda r: classify_feedback(r["Feedback"], r.get("User Feedback/Remark", "")), axis=1)
 
     start_date = df["Date of Inspection"].min() if not df["Date of Inspection"].isna().all() else pd.Timestamp.today()
-    end_date   = df["Date of Inspection"].max() if not df["Date of Inspection"].isna().all() else pd.Timestamp.today()
+    end_date = df["Date of Inspection"].max() if not df["Date of Inspection"].isna().all() else pd.Timestamp.today()
 
-    # ───────────────────────────────────────────────────────────────
-    #   Track previous department/action selections to detect changes
-    # ───────────────────────────────────────────────────────────────
-    if "prev_head_filter" not in st.session_state:
-        st.session_state.prev_head_filter = []
-    if "prev_action_filter" not in st.session_state:
-        st.session_state.prev_action_filter = []
-
-    current_head_filter   = st.session_state.get("view_head_filter",  [])
-    current_action_filter = st.session_state.get("view_action_filter", [])
-
-    head_changed  = set(current_head_filter)  != set(st.session_state.prev_head_filter)
-    action_changed = set(current_action_filter) != set(st.session_state.prev_action_filter)
-
-    if head_changed or action_changed:
-        temp_df = df.copy()
-
-        if current_head_filter:
-            temp_df = temp_df[temp_df["Head"].isin(current_head_filter)]
-        if current_action_filter:
-            temp_df = temp_df[temp_df["Action By"].isin(current_action_filter)]
-
-        if not temp_df.empty:
-            pending_count = (temp_df["Status"] == "Pending").sum()
-            no_response_count = (
-                temp_df["Feedback"].isna().sum() +
-                (temp_df["Feedback"].astype(str).str.strip() == "").sum()
-            )
-            total_selected = len(temp_df)
-
-            warning_msg = f"""
-**Department / Action By filter changed**
-
-**Pending compliance count**       : **{pending_count}** 🔴  
-**No response / blank feedback**    : **{no_response_count}** ⚠️  
-**Total records in this selection** : **{total_selected}**
-
-Please ensure timely compliance / update remarks.
-            """
-
-            with st.expander("⚠️ PENDING COMPLIANCE ALERT – Selected Department(s)", expanded=True):
-                st.warning(warning_msg)
-
-        st.session_state.prev_head_filter  = current_head_filter.copy()
-        st.session_state.prev_action_filter = current_action_filter.copy()
-
-    # ───────────────────────────────────────────────────────────────
-    #                     Filter widgets
-    # ───────────────────────────────────────────────────────────────
     c1, c2 = st.columns(2)
     c1.multiselect("Type of Inspection", VALID_INSPECTIONS, key="view_type_filter")
     c2.multiselect("Location", ALL_LOCATIONS, key="view_location_filter")
 
     c3, c4 = st.columns(2)
     c3.multiselect("Head", HEAD_LIST[1:], key="view_head_filter")
-    sub_opts = sorted({s for h in st.session_state.get("view_head_filter", []) for s in SUBHEAD_LIST.get(h, [])})
+    sub_opts = sorted({s for h in st.session_state.view_head_filter for s in SUBHEAD_LIST.get(h, [])})
     c4.multiselect("Sub Head", sub_opts, key="view_sub_filter")
-
-    st.multiselect(
-        "Action By",
-        ACTION_BY_LIST[1:],
-        key="view_action_filter"
-    )
 
     selected_status = st.selectbox("🔘 Status", ["All", "Pending", "Resolved"], key="view_status_filter")
 
@@ -602,30 +548,22 @@ Please ensure timely compliance / update remarks.
     if st.session_state.view_sub_filter:
         filtered = filtered[filtered["Sub Head"].isin(st.session_state.view_sub_filter)]
 
-    if st.session_state.view_action_filter:
-        filtered = filtered[filtered["Action By"].isin(st.session_state.view_action_filter)]
-
     if selected_status != "All":
         filtered = filtered[filtered["Status"] == selected_status]
 
     filtered = apply_common_filters(filtered, prefix="view_")
-
     filtered = filtered.apply(lambda x: x.str.replace("\n", " ") if x.dtype == "object" else x)
-    filtered = filtered.sort_values("Date of Inspection", ascending=False)
+    filtered = filtered.sort_values("Date of Inspection")
 
     col_a, col_b, col_c, col_d = st.columns(4)
-    pending_count     = (filtered["Status"] == "Pending").sum()
+    pending_count = (filtered["Status"] == "Pending").sum()
     no_response_count = filtered["Feedback"].isna().sum() + (filtered["Feedback"].astype(str).str.strip() == "").sum()
-    resolved_count    = (filtered["Status"] == "Resolved").sum()
-
+    resolved_count = (filtered["Status"] == "Resolved").sum()
     col_a.metric("🟨 Pending", pending_count)
     col_b.metric("⚠️ No Response", no_response_count)
     col_c.metric("🟩 Resolved", resolved_count)
     col_d.metric("📊 Total Records", len(filtered))
-
-    # ───────────────────────────────────────────────────────────────
-    #   Department-wise pie chart when location is selected
-    # ───────────────────────────────────────────────────────────────
+    # Department-wise (Head) Breakdown when Location is selected
     if st.session_state.view_location_filter and not filtered.empty:
         st.markdown("### 📊 Department-wise Distribution")
         head_summary = (
@@ -637,7 +575,7 @@ Please ensure timely compliance / update remarks.
         if not head_summary.empty:
             total_heads = head_summary["Count"].sum()
             display_data = head_summary.copy()
-            thresh = 0.02
+            thresh = 0.02  # 2% threshold for "Others" category
             display_data["Percent"] = display_data["Count"] / total_heads
             major = display_data[display_data["Percent"] >= thresh][["Head", "Count"]]
             minor = display_data[display_data["Percent"] < thresh]
@@ -676,8 +614,7 @@ Please ensure timely compliance / update remarks.
             st.image(buf, use_column_width=True)
             st.download_button("📥 Download Department-wise Distribution (PNG)", data=buf,
                                file_name="head_distribution.png", mime="image/png")
-
-    # Sub Head Breakdown
+    # Sub Head Breakdown when Head is selected
     if st.session_state.view_head_filter and not filtered.empty:
         st.markdown("### Sub Head Distribution")
         subhead_summary = (
@@ -739,15 +676,12 @@ Please ensure timely compliance / update remarks.
             st.image(buf, use_column_width=True)
             st.download_button("📥 Download Sub Head Distribution (PNG)", data=buf,
                                file_name="subhead_distribution.png", mime="image/png")
-
-    # Export filtered records
     export_df = filtered[[
         "Date of Inspection", "Type of Inspection", "Location", "Head", "Sub Head",
         "Deficiencies Noted", "Inspection By", "Action By", "Feedback", "User Feedback/Remark",
         "Status", "Timestamp of Compliance"
     ]].copy()
     export_df["Date of Inspection"] = pd.to_datetime(export_df["Date of Inspection"]).dt.date
-
     towb = BytesIO()
     with pd.ExcelWriter(towb, engine="openpyxl") as writer:
         export_df.to_excel(writer, index=False, sheet_name="Filtered Records")
@@ -771,8 +705,10 @@ Please ensure timely compliance / update remarks.
                     pass
             adjusted_width = (max_length + 2) if max_length < 50 else 50
             ws.column_dimensions[col_letter].width = adjusted_width
-        thin_border = Border(left=Side(style='thin'), right=Side(style='thin'),
-                             top=Side(style='thin'), bottom=Side(style='thin'))
+        thin_border = Border(left=Side(style='thin'),
+                             right=Side(style='thin'),
+                             top=Side(style='thin'),
+                             bottom=Side(style='thin'))
         for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
             for cell in row:
                 cell.border = thin_border
@@ -780,9 +716,9 @@ Please ensure timely compliance / update remarks.
         for row in ws.iter_rows(min_row=2, min_col=status_col_idx, max_col=status_col_idx, max_row=len(export_df) + 1):
             for cell in row:
                 if str(cell.value).strip().lower() == "pending":
-                    cell.font = Font(color="FF0000")
+                    cell.font = Font(color="FF0000")  # Red
                 elif str(cell.value).strip().lower() == "resolved":
-                    cell.font = Font(color="008000")
+                    cell.font = Font(color="008000")  # Green
     towb.seek(0)
     st.download_button(
         "📥 Export Filtered Records to Excel",
@@ -790,10 +726,7 @@ Please ensure timely compliance / update remarks.
         file_name="filtered_records.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-
-    # ───────────────────────────────────────────────────────────────
-    #                     AgGrid Editor
-    # ───────────────────────────────────────────────────────────────
+    # ---------- EDITOR ----------
     if not filtered.empty:
         display_cols = [
             "Date of Inspection", "Type of Inspection", "Head", "Sub Head", "Location",
@@ -801,22 +734,31 @@ Please ensure timely compliance / update remarks.
             "User Feedback/Remark", "Timestamp of Compliance"
         ]
         valid_cols = [col for col in display_cols if col in filtered.columns]
-
         if not valid_cols:
             st.error("⚠️ No valid columns found in the DataFrame.")
             st.stop()
+        if "Deficiencies Noted" not in valid_cols:
+            st.error("⚠️ 'Deficiencies Noted' column is required for search functionality.")
+            st.stop()
 
         editable_filtered = filtered.copy()
+
+        # Ensure stable ID columns
+        if "_original_sheet_index" not in editable_filtered.columns:
+            editable_filtered["_original_sheet_index"] = editable_filtered.index
         if "_sheet_row" not in editable_filtered.columns:
             editable_filtered["_sheet_row"] = editable_filtered.index + 2
 
+        # Create editable DataFrame
         editable_df = editable_filtered[valid_cols + ["_original_sheet_index", "_sheet_row"]].copy()
 
+        # Format Date of Inspection
         if "Date of Inspection" in editable_df.columns:
             editable_df["Date of Inspection"] = pd.to_datetime(
                 editable_df["Date of Inspection"], errors="coerce"
             ).dt.date
 
+        # Add Status column
         if "Feedback" in editable_df.columns and "User Feedback/Remark" in editable_df.columns:
             editable_df.insert(
                 editable_df.columns.get_loc("User Feedback/Remark") + 1,
@@ -825,6 +767,7 @@ Please ensure timely compliance / update remarks.
             )
             editable_df["Status"] = editable_df["Status"].apply(color_text_status)
 
+        # Global Search
         st.markdown("#### 🔍 Search and Filter")
         search_text = st.text_input("Search All Columns (case-insensitive)", "").strip().lower()
         if search_text:
@@ -834,9 +777,78 @@ Please ensure timely compliance / update remarks.
             editable_df = editable_df[mask].copy()
             st.info(f"Found {len(editable_df)} matching rows after search.")
 
+        # Excel-like Column Filtering (FIXED: No more global variable)
+        max_cols = st.slider(
+            "Max columns to filter on",
+            1, len(valid_cols), min(10, len(valid_cols)),
+            key="max_cols_filter"
+        )
+        candidate_columns = valid_cols[:max_cols]
+        selected_columns = st.multiselect(
+            "Select columns to filter",
+            options=candidate_columns,
+            key="column_select_filter"
+        )
+
+        if selected_columns:
+            # Apply column-specific filters
+            df_filtered = editable_df.copy()
+            for column in selected_columns:
+                if is_categorical_dtype(editable_df[column]) or editable_df[column].dtype == "object":
+                    unique_vals = sorted(editable_df[column].dropna().unique())
+                    selected_vals = st.multiselect(
+                        f"Filter {column}",
+                        unique_vals,
+                        key=f"filter_{column}"
+                    )
+                    if selected_vals:
+                        df_filtered = df_filtered[df_filtered[column].isin(selected_vals)]
+                elif is_numeric_dtype(editable_df[column]):
+                    _min = float(editable_df[column].min())
+                    _max = float(editable_df[column].max())
+                    step = (_max - _min) / 100 if _max != _min else 1
+                    selected_range = st.slider(
+                        f"Filter {column}",
+                        _min, _max, (_min, _max), step=step,
+                        key=f"range_{column}"
+                    )
+                    df_filtered = df_filtered[df_filtered[column].between(selected_range[0], selected_range[1])]
+                elif is_datetime64_any_dtype(editable_df[column]):
+                    _min = editable_df[column].min()
+                    _max = editable_df[column].max()
+                    selected_dates = st.date_input(
+                        f"Filter {column}",
+                        [_min, _max],
+                        min_value=_min,
+                        max_value=_max,
+                        key=f"date_{column}"
+                    )
+                    if len(selected_dates) == 2:
+                        df_filtered = df_filtered[df_filtered[column].between(
+                            pd.to_datetime(selected_dates[0]),
+                            pd.to_datetime(selected_dates[1])
+                        )]
+                else:
+                    case = st.selectbox(
+                        f"Case sensitive for {column}?",
+                        ["both", "upper", "lower"],
+                        key=f"case_{column}"
+                    )
+                    search_term = st.text_input(f"Filter {column}", key=f"search_{column}")
+                    if search_term:
+                        if case == "upper":
+                            df_filtered = df_filtered[df_filtered[column].str.upper().str.contains(search_term.upper(), na=False)]
+                        elif case == "lower":
+                            df_filtered = df_filtered[df_filtered[column].str.lower().str.contains(search_term.lower(), na=False)]
+                        else:
+                            df_filtered = df_filtered[df_filtered[column].str.contains(search_term, case=False, na=False)]
+
+            editable_df = df_filtered
+            st.info(f"Applied column filters → {len(editable_df)} rows remaining.")
+
+        # AgGrid Configuration
         gb = GridOptionsBuilder.from_dataframe(editable_df)
         gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True)
-
         if "User Feedback/Remark" in editable_df.columns:
             gb.configure_column(
                 "User Feedback/Remark",
@@ -847,7 +859,6 @@ Please ensure timely compliance / update remarks.
                 cellEditorPopup=False,
                 cellEditorParams={"maxLength": 4000}
             )
-
         gb.configure_column("_original_sheet_index", hide=True)
         gb.configure_column("_sheet_row", hide=True)
         gb.configure_grid_options(singleClickEdit=True)
@@ -862,12 +873,10 @@ Please ensure timely compliance / update remarks.
         }
         """)
         gb.configure_grid_options(onFirstDataRendered=auto_size_js)
-
         grid_options = gb.build()
-
+        # Render AgGrid
         st.markdown("#### 🚈 Inspection Details")
         st.caption("Type your compliance in 'User Feedback/Remark' column. Use column headers to sort.")
-
         grid_response = AgGrid(
             editable_df,
             gridOptions=grid_options,
@@ -875,10 +884,57 @@ Please ensure timely compliance / update remarks.
             height=600,
             allow_unsafe_jscode=True
         )
-
         edited_df = pd.DataFrame(grid_response["data"])
-
-        c1, c2, c3 = st.columns([1, 1, 2])
+        # Download button for filtered/edited results as Excel
+        export_cols = [col for col in valid_cols if col not in ["_original_sheet_index", "_sheet_row"]] + ["Status"]
+        export_edited_df = edited_df[export_cols].copy()
+        export_edited_df["Date of Inspection"] = pd.to_datetime(export_edited_df["Date of Inspection"]).dt.date
+        towb_edited = BytesIO()
+        with pd.ExcelWriter(towb_edited, engine="openpyxl") as writer:
+            export_edited_df.to_excel(writer, index=False, sheet_name="Edited Records")
+            ws = writer.sheets["Edited Records"]
+            date_style = NamedStyle(name="date_style", number_format="DD-MM-YYYY")
+            for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
+                for cell in row:
+                    cell.alignment = Alignment(wrap_text=True, vertical="top")
+            date_col_idx = export_edited_df.columns.get_loc("Date of Inspection") + 1
+            for row in ws.iter_rows(min_row=2, min_col=date_col_idx, max_col=date_col_idx, max_row=len(export_edited_df) + 1):
+                for cell in row:
+                    cell.style = date_style
+            for col in ws.columns:
+                max_length = 0
+                col_letter = col[0].column_letter
+                for cell in col:
+                    try:
+                        if cell.value:
+                            max_length = max(max_length, len(str(cell.value)))
+                    except:
+                        pass
+                adjusted_width = (max_length + 2) if max_length < 50 else 50
+                ws.column_dimensions[col_letter].width = adjusted_width
+            thin_border = Border(left=Side(style='thin'),
+                                 right=Side(style='thin'),
+                                 top=Side(style='thin'),
+                                 bottom=Side(style='thin'))
+            for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
+                for cell in row:
+                    cell.border = thin_border
+            status_col_idx = export_edited_df.columns.get_loc("Status") + 1
+            for row in ws.iter_rows(min_row=2, min_col=status_col_idx, max_col=status_col_idx, max_row=len(export_edited_df) + 1):
+                for cell in row:
+                    if str(cell.value).strip().lower() == "pending":
+                        cell.font = Font(color="FF0000")  # Red
+                    elif str(cell.value).strip().lower() == "resolved":
+                        cell.font = Font(color="008000")  # Green
+        towb_edited.seek(0)
+        st.download_button(
+            label="📥 Export Edited Records to Excel",
+            data=towb_edited,
+            file_name=f"edited_records_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        # Buttons
+        c1, c2, c3 = st.columns([1, 1, 2])  # Extra space column for better alignment
         submitted = c1.button("✅ Submit Feedback", use_container_width=True)
         refresh_clicked = c2.button("🔄 Refresh Data", use_container_width=True)
 
@@ -888,21 +944,25 @@ Please ensure timely compliance / update remarks.
             st.success("✅ Data refreshed successfully!")
             st.rerun()
 
+        # Submit Feedback logic with protection against double submission
         if submitted:
             if st.session_state.get("feedback_submitting", False):
                 st.warning("⏳ Submission already in progress. Please wait...")
             else:
                 st.session_state.feedback_submitting = True
                 try:
-                    with st.spinner("💾 Saving feedback to Google Sheet..."):
+                    with st.spinner("💾 Saving feedback to Google Sheet... Please do not refresh or close the page."):
                         need_cols = {"_original_sheet_index", "User Feedback/Remark"}
                         if not need_cols.issubset(edited_df.columns) or "Feedback" not in editable_filtered.columns:
                             st.error("⚠️ Required columns are missing from the data.")
                         else:
+                            # Ensure indexes are properly set for comparison
                             orig = editable_filtered.set_index("_original_sheet_index")
                             new_df = edited_df.set_index("_original_sheet_index")
+
                             old_remarks = orig["User Feedback/Remark"].fillna("").astype(str)
                             new_remarks = new_df["User Feedback/Remark"].fillna("").astype(str)
+
                             common_ids = new_remarks.index.intersection(old_remarks.index)
                             diff_mask = new_remarks.loc[common_ids] != old_remarks.loc[common_ids]
                             changed_ids = diff_mask[diff_mask].index.tolist()
@@ -911,16 +971,43 @@ Please ensure timely compliance / update remarks.
                                 diffs = new_df.loc[changed_ids].copy()
                                 diffs["_sheet_row"] = orig.loc[changed_ids, "_sheet_row"].values
 
+                                # Updated routing dictionary with fixed typo
+                                routing = {
+                                    "Pertains to 0": ("0", "0"),
+                                }
+
                                 for oid in changed_ids:
                                     user_remark = new_df.loc[oid, "User Feedback/Remark"].strip()
                                     if not user_remark:
                                         continue
+
+                                    # Auto-routing based on keywords
+                                    routed = False
+                                    for key, (head, action_by) in routing.items():
+                                        if key.lower() in user_remark.lower():  # Case-insensitive match
+                                            st.session_state.df.at[oid, "Head"] = head
+                                            st.session_state.df.at[oid, "Action By"] = action_by
+                                            st.session_state.df.at[oid, "Sub Head"] = ""
+                                            diffs.at[oid, "Head"] = head
+                                            diffs.at[oid, "Action By"] = action_by
+                                            diffs.at[oid, "Sub Head"] = ""
+
+                                            date_str = orig.loc[oid, "Date of Inspection"]
+                                            deficiency = orig.loc[oid, "Deficiencies Noted"]
+                                            forwarded_by = orig.loc[oid, "Head"]  # Original head (if any)
+                                            routed = True
+
+                                    # Always copy the remark to Feedback column
                                     diffs.at[oid, "Feedback"] = user_remark
                                     diffs.at[oid, "User Feedback/Remark"] = ""
                                     st.session_state.df.at[oid, "Feedback"] = user_remark
                                     st.session_state.df.at[oid, "User Feedback/Remark"] = ""
 
-                                update_feedback_column(diffs.reset_index().rename(columns={"_original_sheet_index": "_original_sheet_index"}))
+                                # Save to Google Sheet
+                                update_feedback_column(
+                                    diffs.reset_index().rename(columns={"_original_sheet_index": "_original_sheet_index"})
+                                )
+
                                 st.success(f"✅ Successfully updated {len(changed_ids)} record(s)!")
                             else:
                                 st.info("ℹ️ No changes detected in the feedback.")
@@ -928,6 +1015,7 @@ Please ensure timely compliance / update remarks.
                     st.error(f"❌ Error during submission: {str(e)}")
                 finally:
                     st.session_state.feedback_submitting = False
+                    #st.rerun()  # Refresh view to show updated Status and clean grid
 
     else:
         st.info("No deficiencies available to update at the moment.")
@@ -1017,7 +1105,6 @@ st.markdown("""
 }
 </style>
 """, unsafe_allow_html=True)
-
 st.markdown("### 📞 Need Help or Correction in Data?")
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
@@ -1052,332 +1139,231 @@ with col2:
         """,
         unsafe_allow_html=True
     )
-
-# -------------------- ANALYTICS TAB --------------------
+# ---- STREAMLIT BLOCK ----
 with tabs[1]:
     st.markdown("### Total Deficiencies Trend (Bar + Trend Line)")
     df = st.session_state.df.copy()
-
-    # 1. Status classification
+    # ------------------------------------------------------------------ #
+    # 1. Ensure Status column (Pending / Resolved)
+    # ------------------------------------------------------------------ #
     if "Status" not in df.columns:
         df["Status"] = df.apply(
             lambda r: classify_feedback(r["Feedback"], r.get("User Feedback/Remark", "")), axis=1
         )
-
-    df["Status"] = (
-        df["Status"]
-        .fillna("Pending")
-        .replace({"": "Pending", "NA": "Pending"})
-        .str.strip()
-        .str.upper()
-        .map({"PENDING": "Pending", "RESOLVED": "Resolved", "CLOSED": "Resolved"})
-        .fillna("Pending")
-    )
-
+    df["Status"] = df["Status"].fillna("Pending").replace({"": "Pending", "NA": "Pending"})
+    df["Status"] = df["Status"].str.strip().str.upper().map({
+        "PENDING": "Pending", "RESOLVED": "Resolved", "CLOSED": "Resolved"
+    }).fillna("Pending")
     if df.empty:
         st.info("No data available for analytics.")
-        st.stop()
-
-    # 2. Parse dates
-    df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
-    df = df.dropna(subset=["Date of Inspection"])
-
-    # 3. Date range filter
-    min_date = df["Date of Inspection"].min().date()
-    max_date = df["Date of Inspection"].max().date()
-
-    start_date, end_date = st.date_input(
-        "Select Inspection Date Range",
-        value=(min_date, max_date),
-        min_value=min_date,
-        max_value=max_date
-    )
-
-    df = df[
-        (df["Date of Inspection"] >= pd.to_datetime(start_date)) &
-        (df["Date of Inspection"] <= pd.to_datetime(end_date))
-    ].copy()
-
-    if df.empty:
-        st.info("No records in the selected date range.")
-        st.stop()
-
-    # 4. Aggressive department cleaning — removes junk values
-    def clean_head(text):
-        if pd.isna(text):
-            return None
-        s = str(text).strip()
-        if not s:
-            return None
-        s = re.sub(r"[\*\-\_\'\"]", "", s)
-        s = re.sub(r"\s+", " ", s).strip().upper()
-
-        blocked = {
-            "", "UNDEFINED", "UNKNOWN", "UNIDENTIFIED", "UNSPECIFIED",
-            "NIL", "N/A", "NA", "NOT DEFINED", "NONE", "NO DEPARTMENT",
-            "(BLANK)", "BLANK", "MISSING", "?", "UNSPEC", "UNKN"
+    else:
+        # ------------------------------------------------------------------ #
+        # 2. Parse dates
+        # ------------------------------------------------------------------ #
+        df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
+        df = df.dropna(subset=["Date of Inspection"])
+        # ------------------------------------------------------------------ #
+        # 3. Date filter
+        # ------------------------------------------------------------------ #
+        min_date = df["Date of Inspection"].min().date()
+        max_date = df["Date of Inspection"].max().date()
+        start_date, end_date = st.date_input(
+            "Select Inspection Date Range",
+            value=(min_date, max_date),
+            min_value=min_date,
+            max_value=max_date
+        )
+        df = df[
+            (df["Date of Inspection"] >= pd.to_datetime(start_date)) &
+            (df["Date of Inspection"] <= pd.to_datetime(end_date))
+        ].copy()
+        # ------------------------------------------------------------------ #
+        # 4. Clean department names
+        # ------------------------------------------------------------------ #
+        def clean_name(text):
+            if pd.isna(text):
+                return "UNKNOWN"
+            s = str(text).strip()
+            s = re.sub(r"[\*\-\_\'\"]", "", s)
+            s = re.sub(r"\s+", " ", s).strip()
+            return s.upper()
+        df["Head_clean"] = df["Head"].apply(clean_name)
+        dept_map = {
+            "ENGINEERING": "ENGINEERING",
+            "ELECT/G": "ELECT/G", "ELECTG": "ELECT/G",
+            "ELECT/TRD": "ELECT/TRD",
+            "ELECT/TRO": "ELECT/TRO",
+            "OPTG": "OPTG", "OPERATING": "OPTG",
+            "SIGNAL & TELECOM": "SIGNAL & TELECOM",
+            "MECHANICAL": "MECHANICAL",
+            "COMMERCIAL": "COMMERCIAL",
+            "C&W": "C&W", 
+            "SECURITY": "SECURITY",
+            "PERSONNEL": "PERSONNEL",
+            "MEDICAL": "MEDICAL",
+            "FINANCE": "FINANCE",
+            "STORE": "STORE",
         }
-        if s in blocked or len(s) <= 2:
-            return None
-        return s
-
-    df["Head_clean"] = df["Head"].apply(clean_head)
-    df = df[df["Head_clean"].notna()].copy()
-
-    if df.empty:
-        st.info("No valid department entries remain after cleaning.")
-        st.stop()
-
-    # Standardize department names
-    dept_map = {
-        "ENGINEERING": "ENGINEERING",
-        "ENGG": "ENGINEERING",
-        "ELECT/G": "ELECT/G",
-        "ELECTG": "ELECT/G",
-        "ELECT/TRD": "ELECT/TRD",
-        "ELECT/TRO": "ELECT/TRO",
-        "OPTG": "OPTG",
-        "OPERATING": "OPTG",
-        "SIGNAL & TELECOM": "SIGNAL & TELECOM",
-        "S&T": "SIGNAL & TELECOM",
-        "SIGNAL": "SIGNAL & TELECOM",
-        "MECHANICAL": "MECHANICAL",
-        "MECH": "MECHANICAL",
-        "COMMERCIAL": "COMMERCIAL",
-        "C&W": "C&W",
-        "CARRIAGE & WAGON": "C&W",
-        "SECURITY": "SECURITY",
-        "PERSONNEL": "PERSONNEL",
-        "MEDICAL": "MEDICAL",
-        "FINANCE": "FINANCE",
-        "STORE": "STORE",
-    }
-
-    df["Head_std"] = df["Head_clean"].map(dept_map).fillna(df["Head_clean"])
-
-    # Final safety net
-    df = df[
-        ~df["Head_std"].str.contains(
-            r"UNDEFINED|UNKNOWN|UNIDENTIFIED|NIL|N/A|^\s*$",
-            na=False, regex=True
-        )
-    ].copy()
-
-    # 5. Location cleaning & station identification
-    if "Location" not in df.columns:
-        df["Location"] = ""
-    df["Location_clean"] = df["Location"].astype(str).apply(clean_head)
-    STATIONS_NORM = {clean_head(x) for x in STATION_LIST if clean_head(x)}
-    df["Is_Station"] = df["Location_clean"].isin(STATIONS_NORM)
-
-    # Expand footplate routes
-    all_locations = set(df["Location_clean"].dropna().unique())
-    for main_route, subsections in FOOTPLATE_ROUTE_HIERARCHY.items():
-        if main_route in all_locations:
-            all_locations.update(subsections)
-    df = df[df["Location_clean"].isin(all_locations)].copy()
-
-    # 6. Monthly trend chart — TEMPORAL AXIS = guaranteed chronological order
-    trend = (
-        df.groupby(pd.Grouper(key="Date of Inspection", freq="MS"))
-        .size()
-        .reset_index(name="TotalCount")
-    )
-
-    if not trend.empty:
-        bars = alt.Chart(trend).mark_bar(
-            color="#1f77b4",
-            cornerRadiusTopLeft=3,
-            cornerRadiusTopRight=3
-        ).encode(
-            x=alt.X(
-                "Date of Inspection:T",
-                title="Month",
-                timeUnit="yearmonth",
-                axis=alt.Axis(
-                    format="%b %Y",          # Apr 2025, May 2025, etc.
-                    labelAngle=-45,
-                    labelOverlap=False
-                )
-            ),
-            y=alt.Y("TotalCount:Q", title="Total Deficiencies"),
-            tooltip=[
-                alt.Tooltip("Date of Inspection:T", title="Month", format="%b %Y"),
-                alt.Tooltip("TotalCount", title="Count", format=",")
-            ]
-        )
-
-        line = alt.Chart(trend).transform_regression(
-            "Date of Inspection", "TotalCount", method="linear"
-        ).mark_line(
-            color="#d62728",
-            strokeDash=[5, 3],
-            strokeWidth=2.5
-        ).encode(
-            x=alt.X("Date of Inspection:T", timeUnit="yearmonth"),
-            y="TotalCount:Q"
-        )
-
-        chart = (bars + line).properties(
-            height=450,
-            title=alt.TitleParams(
-                text="Monthly Deficiency Trend",
-                subtitle=f"From {trend['Date of Inspection'].min().strftime('%b %Y')} to {trend['Date of Inspection'].max().strftime('%b %Y')}",
-                anchor="start",
-                fontSize=16,
-                subtitleFontSize=12,
-                subtitleColor="#666"
+        df["Head_std"] = df["Head_clean"].map(dept_map).fillna("UNKNOWN")
+        # ------------------------------------------------------------------ #
+        # 5. Clean Location & identify stations
+        # ------------------------------------------------------------------ #
+        if "Location" not in df.columns:
+            df["Location"] = ""
+        df["Location_clean"] = df["Location"].astype(str).apply(clean_name)
+        STATIONS_NORM = {clean_name(x) for x in STATION_LIST}
+        df["Is_Station"] = df["Location_clean"].isin(STATIONS_NORM)
+        # Expand footplate routes to include subsections
+        all_locations = set(df["Location_clean"].dropna().unique())
+        for main_route, subsections in FOOTPLATE_ROUTE_HIERARCHY.items():
+            if main_route in all_locations:
+                all_locations.update(subsections)
+        df = df[df["Location_clean"].isin(all_locations)]
+        # ------------------------------------------------------------------ #
+        # 6. Trend chart (total deficiencies)
+        # ------------------------------------------------------------------ #
+        trend = df.groupby(pd.Grouper(key="Date of Inspection", freq="MS")).size().reset_index(name="TotalCount")
+        if not trend.empty:
+            trend = trend.sort_values("Date of Inspection")
+            trend["Month"] = trend["Date of Inspection"].dt.strftime("%b-%Y")
+            bars = alt.Chart(trend).mark_bar(color="#1f77b4", cornerRadius=3).encode(
+                x=alt.X("Month:O", title="Month", sort=trend["Month"].tolist()),
+                y=alt.Y("TotalCount:Q", title="Total Deficiencies"),
+                tooltip=["Month", "TotalCount"]
             )
-        ).configure_axis(
-            labelFontSize=11,
-            titleFontSize=13
-        )
-
-        st.altair_chart(chart, use_container_width=True)
-    else:
-        st.info("No monthly data available in the selected period.")
-
-    # 7. Department summary (overall)
-    st.markdown("### Department-wise **Total** Deficiencies Logged")
-    dept_counts = (
-        df.groupby("Head_std", as_index=False)
-        .size()
-        .rename(columns={"size": "TotalCount"})
-        .sort_values("TotalCount", ascending=False)
-    )
-
-    total_deficiencies = dept_counts["TotalCount"].sum()
-    dept_counts["color"] = "#ff7f0e"
-    dept_counts.loc[:2, "color"] = "red"
-
-    for _, row in dept_counts.iterrows():
-        st.markdown(f"- **{row['Head_std']}** : **{row['TotalCount']:,}**")
-
-    st.markdown(f"**Grand Total: {total_deficiencies:,}**")
-
-    dept_chart = alt.Chart(dept_counts).mark_bar().encode(
-        x=alt.X("TotalCount:Q", title="Total Deficiencies"),
-        y=alt.Y("Head_std:N", sort="-x", title="Department"),
-        color=alt.Color("color:N", scale=None),
-        tooltip=["Head_std", alt.Tooltip("TotalCount", format=",")]
-    ).properties(height=400)
-
-    st.altair_chart(dept_chart, use_container_width=True)
-
-    top3 = dept_counts.head(3)
-    critical_text = ", ".join([f"**{r['Head_std']}** ({r['TotalCount']:,})" for _, r in top3.iterrows()])
-    st.markdown(f"**Critical Departments:** {critical_text}")
-
-    # 8. TOP 3 STATIONS
-    st.markdown("### Top 3 Stations having most logged deficiencies")
-    station_df = df[df["Is_Station"]].copy()
-    if not station_df.empty:
-        top3_stations = (
-            station_df.groupby("Location_clean", as_index=False)
-            .size()
-            .rename(columns={"size": "TotalCount"})
-            .sort_values("TotalCount", ascending=False)
-            .head(3)
-        )
-        top3_stations["Label"] = top3_stations["Location_clean"]
-        top3_stations["color"] = "red"
-
-        chart = alt.Chart(top3_stations).mark_bar().encode(
+            line = alt.Chart(trend).transform_regression("Date of Inspection", "TotalCount").mark_line(
+                color="red", strokeDash=[6, 4], strokeWidth=2.5
+            ).encode(x="Month:O", y="TotalCount:Q")
+            st.altair_chart(bars + line, use_container_width=True)
+        else:
+            st.info("No data in selected range.")
+        # ------------------------------------------------------------------ #
+        # 7. Department summary (overall)
+        # ------------------------------------------------------------------ #
+        st.markdown("### Department-wise **Total** Deficiencies Logged")
+        dept_counts = df.groupby("Head_std").size().reset_index(name="TotalCount") \
+                        .sort_values("TotalCount", ascending=False)
+        total_deficiencies = dept_counts["TotalCount"].sum()
+        dept_counts["color"] = "#ff7f0e"
+        dept_counts.loc[:2, "color"] = "red"
+        for _, row in dept_counts.iterrows():
+            st.markdown(f"- **{row['Head_std']}** : **{row['TotalCount']:,}**")
+        st.markdown(f"**Grand Total: {total_deficiencies:,}**")
+        dept_chart = alt.Chart(dept_counts).mark_bar().encode(
             x=alt.X("TotalCount:Q", title="Total Deficiencies"),
-            y=alt.Y("Label:N", sort="-x", title="Station"),
+            y=alt.Y("Head_std:N", sort="-x", title="Department"),
             color=alt.Color("color:N", scale=None),
-            tooltip=["Label", alt.Tooltip("TotalCount", format=",")]
-        ).properties(height=260)
-
-        st.altair_chart(chart, use_container_width=True)
-    else:
-        st.info("No station data found in the selected period.")
-
-    # 9. LOCATION FILTER → DEPARTMENT BREAKDOWN
-    st.markdown("### Department wise deficiencies logged")
-    all_locations = sorted(df["Location_clean"].dropna().unique())
-    selected_locations = st.multiselect(
-        "Select Locations (Stations / Gates / Routes)",
-        options=all_locations,
-        default=all_locations[:10] if len(all_locations) > 10 else all_locations
-    )
-
-    if selected_locations:
-        expanded_locations = set(selected_locations)
-        for loc in selected_locations:
-            if loc in FOOTPLATE_ROUTE_HIERARCHY:
-                expanded_locations.update(FOOTPLATE_ROUTE_HIERARCHY[loc])
-
-        filtered = df[df["Location_clean"].isin(expanded_locations)].copy()
-
-        dept_breakdown = (
-            filtered.groupby("Head_std", as_index=False)
-            .size()
-            .rename(columns={"size": "TotalCount"})
-            .sort_values("TotalCount", ascending=False)
-        )
-
-        status_breakdown = (
-            filtered.groupby(["Head_std", "Status"], as_index=False)
-            .size()
-            .pivot(index="Head_std", columns="Status", values="size")
-            .fillna(0)
-        )
-        status_breakdown.columns = [f"{col}Count" for col in status_breakdown.columns]
-        status_breakdown = status_breakdown.reset_index()
-
-        summary_df = dept_breakdown.merge(status_breakdown, on="Head_std", how="left")
-        summary_df["PendingCount"] = summary_df.get("PendingCount", 0).astype(int)
-        summary_df["ResolvedCount"] = summary_df.get("ResolvedCount", 0).astype(int)
-
-        bar_chart = alt.Chart(summary_df).mark_bar(color="#1f77b4").encode(
-            x=alt.X("TotalCount:Q", title="Total Deficiencies Logged"),
-            y=alt.Y("Head_std:N", title="Department", sort="-x"),
-            tooltip=[
-                "Head_std",
-                alt.Tooltip("TotalCount", title="Total", format=","),
-                alt.Tooltip("PendingCount", title="Pending", format=","),
-                alt.Tooltip("ResolvedCount", title="Resolved", format=",")
-            ]
-        ).properties(
-            height=max(300, len(summary_df) * 40)
-        )
-
-        text = bar_chart.mark_text(
-            align="left",
-            baseline="middle",
-            dx=3,
-            fontWeight="bold",
-            color="black"
-        ).encode(
-            text=alt.Text("TotalCount:Q", format=",")
-        )
-
-        final_chart = (bar_chart + text).configure_axis(
-            labelFontSize=12,
-            titleFontSize=14
-        )
-
-        st.altair_chart(final_chart, use_container_width=True)
-
-        total = summary_df["TotalCount"].sum()
-        pending = summary_df["PendingCount"].sum()
-        resolved = summary_df["ResolvedCount"].sum()
-
-        st.markdown(
-            f"**Total Deficiencies Logged:** {int(total):,} | "
-            f"**Pending:** {int(pending):,} | "
-            f"**Resolved:** {int(resolved):,}"
-        )
-
-        st.markdown("**Department-wise Breakdown:**")
-        for _, row in summary_df.iterrows():
-            st.markdown(
-                f"- **{row['Head_std']}**: **Total:** {int(row['TotalCount']):,} | "
-                f"**Pending:** {int(row['PendingCount']):,} | "
-                f"**Resolved:** {int(row['ResolvedCount']):,}"
+            tooltip=["Head_std", alt.Tooltip("TotalCount", format=",")]
+        ).properties(height=400)
+        st.altair_chart(dept_chart, use_container_width=True)
+        top3 = dept_counts.head(3)
+        critical_text = ", ".join([f"**{r['Head_std']}** ({r['TotalCount']:,})" for _, r in top3.iterrows()])
+        st.markdown(f"**Critical Departments:** {critical_text}")
+        # ------------------------------------------------------------------ #
+        # 8. TOP 3 STATIONS ONLY
+        # ------------------------------------------------------------------ #
+        st.markdown("### Top 3 Stations having most logged deficiencies")
+        station_df = df[df["Is_Station"]].copy()
+        if not station_df.empty:
+            top3_stations = (
+                station_df.groupby("Location_clean")
+                .size()
+                .reset_index(name="TotalCount")
+                .sort_values("TotalCount", ascending=False)
+                .head(3)
+                .copy()
             )
-    else:
-        st.info("Please select at least one location to view the breakdown.")
-
-
+            top3_stations["Label"] = top3_stations["Location_clean"]
+            top3_stations["color"] = "red"
+            chart = alt.Chart(top3_stations).mark_bar().encode(
+                x=alt.X("TotalCount:Q", title="Total Deficiencies"),
+                y=alt.Y("Label:N", sort="-x", title="Station"),
+                color=alt.Color("color:N", scale=None),
+                tooltip=["Label", alt.Tooltip("TotalCount", format=",")]
+            ).properties(height=260)
+            st.altair_chart(chart, use_container_width=True)
+        else:
+            st.info("No station data found in the selected period.")
+        # ------------------------------------------------------------------ #
+        # 9. LOCATION FILTER → TOTAL PER DEPARTMENT + DETAILED BREAKDOWN
+        # ------------------------------------------------------------------ #
+        st.markdown("### Department wise deficiencies logged")
+        all_locations = sorted(all_locations)
+        selected_locations = st.multiselect(
+            "Select Locations (Stations / Gates / Routes)",
+            options=all_locations,
+            default=all_locations[:10] if len(all_locations) > 10 else all_locations
+        )
+        if selected_locations:
+            # Expand selected locations to include subsections
+            expanded_locations = set(selected_locations)
+            for loc in selected_locations:
+                if loc in FOOTPLATE_ROUTE_HIERARCHY:
+                    expanded_locations.update(FOOTPLATE_ROUTE_HIERARCHY[loc])
+            filtered = df[df["Location_clean"].isin(expanded_locations)].copy()
+            # Total per department
+            dept_breakdown = (
+                filtered.groupby("Head_std")
+                .size()
+                .reset_index(name="TotalCount")
+                .sort_values("TotalCount", ascending=False)
+            )
+            # Pending & Resolved per department
+            status_breakdown = (
+                filtered.groupby(["Head_std", "Status"])
+                .size()
+                .unstack(fill_value=0)
+            )
+            status_breakdown.columns = [f"{col}Count" for col in status_breakdown.columns]
+            status_breakdown = status_breakdown.reset_index()
+            # Merge
+            summary_df = dept_breakdown.merge(status_breakdown, on="Head_std", how="left")
+            summary_df["PendingCount"] = summary_df.get("PendingCount", 0)
+            summary_df["ResolvedCount"] = summary_df.get("ResolvedCount", 0)
+            # Bar chart (total only)
+            bar_chart = alt.Chart(summary_df).mark_bar(color="#1f77b4").encode(
+                x=alt.X("TotalCount:Q", title="Total Deficiencies Logged"),
+                y=alt.Y("Head_std:N", title="Department", sort="-x"),
+                tooltip=[
+                    "Head_std",
+                    alt.Tooltip("TotalCount", title="Total", format=","),
+                    alt.Tooltip("PendingCount", title="Pending", format=","),
+                    alt.Tooltip("ResolvedCount", title="Resolved", format=",")
+                ]
+            ).properties(
+                height=max(300, len(summary_df) * 40)
+            )
+            # Add total count as text label
+            text = bar_chart.mark_text(
+                align="left",
+                baseline="middle",
+                dx=3,
+                fontWeight="bold",
+                color="black"
+            ).encode(
+                text=alt.Text("TotalCount:Q", format=",")
+            )
+            final_chart = (bar_chart + text).configure_axis(
+                labelFontSize=12,
+                titleFontSize=14
+            ).configure_title(fontSize=16)
+            st.altair_chart(final_chart, use_container_width=True)
+            # Summary line
+            total = summary_df["TotalCount"].sum()
+            pending = summary_df["PendingCount"].sum()
+            resolved = summary_df["ResolvedCount"].sum()
+            st.markdown(
+                f"**Total Deficiencies Logged:** {total:,} | "
+                f"**Pending:** {pending:,} | "
+                f"**Resolved:** {resolved:,}"
+            )
+            # Department-wise breakdown
+            st.markdown("**Department-wise Breakdown:**")
+            for _, row in summary_df.iterrows():
+                st.markdown(
+                    f"- **{row['Head_std']}**: **Total Deficiencies:** {row['TotalCount']:,} | "
+                    f"**Pending:** {row['PendingCount']:,} | "
+                    f"**Resolved:** {row['ResolvedCount']:,}"
+                )
+        else:
+            st.info("Please select at least one location to view the breakdown.")
