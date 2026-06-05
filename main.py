@@ -1189,7 +1189,7 @@ with tabs[1]:
             return s.upper()
         df["Head_clean"] = df["Head"].apply(clean_name)
         dept_map = {
-            "ENGINEERING": "ENGINEERING",
+            "ENGINEERING": "ENGINEERING", "GSU": "GSU",
             "ELECT/G": "ELECT/G", "ELECTG": "ELECT/G",
             "ELECT/TRD": "ELECT/TRD",
             "ELECT/TRO": "ELECT/TRO",
