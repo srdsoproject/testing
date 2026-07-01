@@ -1223,35 +1223,28 @@ with tabs[1]:
         # 6. Trend chart (total deficiencies)
         # ------------------------------------------------------------------ #
         # 6. Trend chart (total deficiencies)
-        # Ensure we group only by valid dates
         trend = df.groupby(pd.Grouper(key="Date of Inspection", freq="MS")).size().reset_index(name="TotalCount")
-        
-        # Filter out rows where the Date of Inspection is NaT/Null
         trend = trend.dropna(subset=["Date of Inspection"])
         
         if not trend.empty:
             trend = trend.sort_values("Date of Inspection")
-            # Use dt.strftime to create the labels
-            trend["Month"] = trend["Date of Inspection"].dt.strftime("%b-%Y")
             
-            # CRITICAL: Drop any rows where Month might have become empty or invalid
-            trend = trend[trend["Month"].notna() & (trend["Month"] != "")]
+            # 1. Create the base chart using the ACTUAL datetime objects
+            # We use 'T' (temporal) instead of 'O' (ordinal)
+            base = alt.Chart(trend).encode(
+                x=alt.X("Date of Inspection:T", title="Month", axis=alt.Axis(format="%b-%Y")),
+                y=alt.Y("TotalCount:Q", title="Total Deficiencies")
+            )
         
-            bars = alt.Chart(trend).mark_bar(color="#1f77b4", cornerRadius=3).encode(
-                # Use a specific order (sort by the actual date, not the string label)
-                x=alt.X("Month:O", title="Month", sort=list(trend["Month"])),
-                y=alt.Y("TotalCount:Q", title="Total Deficiencies"),
-                tooltip=["Month", "TotalCount"]
-            )
-            
-            # For the regression line, ensure it uses the Date objects, not the strings
-            line = alt.Chart(trend).transform_regression("Date of Inspection", "TotalCount").mark_line(
+            # 2. Define the bars
+            bars = base.mark_bar(color="#1f77b4", cornerRadius=3)
+        
+            # 3. Define the regression line using the temporal field
+            line = base.transform_regression("Date of Inspection", "TotalCount").mark_line(
                 color="red", strokeDash=[6, 4], strokeWidth=2.5
-            ).encode(
-                x="Month:O", 
-                y="TotalCount:Q"
             )
-            
+        
+            # 4. Layer them
             st.altair_chart(bars + line, use_container_width=True)
         else:
             st.info("No data in selected range.")
