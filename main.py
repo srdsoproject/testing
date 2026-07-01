@@ -1303,7 +1303,7 @@ with tabs[1]:
         selected_locations = st.multiselect(
             "Select Locations (Stations / Gates / Routes)",
             options=all_locations,
-            default=all_locations[:10] if len(all_locations) > 10 else all_locations
+            default=all_locations
         )
         if selected_locations:
             # Expand selected locations to include subsections
