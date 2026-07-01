@@ -1222,18 +1222,36 @@ with tabs[1]:
         # ------------------------------------------------------------------ #
         # 6. Trend chart (total deficiencies)
         # ------------------------------------------------------------------ #
+        # 6. Trend chart (total deficiencies)
+        # Ensure we group only by valid dates
         trend = df.groupby(pd.Grouper(key="Date of Inspection", freq="MS")).size().reset_index(name="TotalCount")
+        
+        # Filter out rows where the Date of Inspection is NaT/Null
+        trend = trend.dropna(subset=["Date of Inspection"])
+        
         if not trend.empty:
             trend = trend.sort_values("Date of Inspection")
+            # Use dt.strftime to create the labels
             trend["Month"] = trend["Date of Inspection"].dt.strftime("%b-%Y")
+            
+            # CRITICAL: Drop any rows where Month might have become empty or invalid
+            trend = trend[trend["Month"].notna() & (trend["Month"] != "")]
+        
             bars = alt.Chart(trend).mark_bar(color="#1f77b4", cornerRadius=3).encode(
-                x=alt.X("Month:O", title="Month", sort=trend["Month"].tolist()),
+                # Use a specific order (sort by the actual date, not the string label)
+                x=alt.X("Month:O", title="Month", sort=list(trend["Month"])),
                 y=alt.Y("TotalCount:Q", title="Total Deficiencies"),
                 tooltip=["Month", "TotalCount"]
             )
+            
+            # For the regression line, ensure it uses the Date objects, not the strings
             line = alt.Chart(trend).transform_regression("Date of Inspection", "TotalCount").mark_line(
                 color="red", strokeDash=[6, 4], strokeWidth=2.5
-            ).encode(x="Month:O", y="TotalCount:Q")
+            ).encode(
+                x="Month:O", 
+                y="TotalCount:Q"
+            )
+            
             st.altair_chart(bars + line, use_container_width=True)
         else:
             st.info("No data in selected range.")
