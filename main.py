@@ -872,40 +872,17 @@ with tabs[0]:
             params.columnApi.autoSizeColumns(allColumnIds);
         }
         """)
-        # 1. Update GridBuilder configurations
-        from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode, JsCode
-        
-        gb = GridOptionsBuilder.from_dataframe(editable_df)
-        
-        # 1. Configure the specific column for text wrapping
-        # 'autoHeight: True' tells the grid to grow the row vertically as you type
-        gb.configure_column("User Feedback/Remark", 
-                            editable=True, 
-                            wrapText=True, 
-                            autoHeight=True,
-                            minWidth=200) # Ensure it doesn't get squashed
-        
-        # 2. Configure other columns to be flexible
-        gb.configure_default_column(resizable=True)
-        
-        # 3. Use JsCode to ensure columns always fill the window exactly
-        # This prevents horizontal scrolling
+        gb.configure_grid_options(onFirstDataRendered=auto_size_js)
         grid_options = gb.build()
-        grid_options['onFirstDataRendered'] = JsCode("""
-            function(params) {
-                params.api.sizeColumnsToFit();
-            }
-        """)
-        
         # Render AgGrid
         st.markdown("#### 🚈 Inspection Details")
+        st.caption("Type your compliance in 'User Feedback/Remark' column. Use column headers to sort.")
         grid_response = AgGrid(
             editable_df,
             gridOptions=grid_options,
             update_mode=GridUpdateMode.VALUE_CHANGED,
-            height=600, # Keeps the window fixed in size
-            allow_unsafe_jscode=True,
-            theme='streamlit' # Recommended for clean integration
+            height=600,
+            allow_unsafe_jscode=True
         )
         edited_df = pd.DataFrame(grid_response["data"])
         # Download button for filtered/edited results as Excel
