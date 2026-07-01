@@ -872,17 +872,38 @@ with tabs[0]:
             params.columnApi.autoSizeColumns(allColumnIds);
         }
         """)
-        gb.configure_grid_options(onFirstDataRendered=auto_size_js)
+        # 1. Update GridBuilder configurations
+        gb = GridOptionsBuilder.from_dataframe(editable_df)
+        
+        # Configure the specific column to allow wrapping
+        gb.configure_column("User Feedback/Remark", 
+                            editable=True, 
+                            wrapText=True, 
+                            autoHeight=True)
+        
+        # Ensure the grid layout fits the container
+        gb.configure_grid_options(
+            domLayout='normal', 
+            onFirstDataRendered=JsCode("""
+                function(params) {
+                    params.api.sizeColumnsToFit();
+                }
+            """)
+        )
+        
         grid_options = gb.build()
-        # Render AgGrid
+        
+        # 2. Render AgGrid
         st.markdown("#### 🚈 Inspection Details")
         st.caption("Type your compliance in 'User Feedback/Remark' column. Use column headers to sort.")
+        
         grid_response = AgGrid(
             editable_df,
             gridOptions=grid_options,
             update_mode=GridUpdateMode.VALUE_CHANGED,
             height=600,
-            allow_unsafe_jscode=True
+            allow_unsafe_jscode=True,
+            fit_columns_on_grid_load=True # Forces initial fit
         )
         edited_df = pd.DataFrame(grid_response["data"])
         # Download button for filtered/edited results as Excel
