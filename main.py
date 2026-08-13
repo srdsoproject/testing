@@ -908,8 +908,8 @@ def build_excel_export(export_df, sheet_name):
 # HELPERS — pie-chart breakdown (shared by Head / Sub Head distributions)
 # =========================================================================
 def render_pie_breakdown(df, group_col, chart_title, caption_parts, threshold=0.02):
-    """Render a colour-coded pie chart with an embedded counts table in the same
-    image (no leader lines). caption_parts is joined for the footer.
+    """Clean pie + table image: coloured slices with % inside, no leader lines.
+    Right-hand table (colour swatch | name | count) acts as the legend.
     """
     summary = (
         df.groupby(group_col)[group_col]
@@ -931,114 +931,128 @@ def render_pie_breakdown(df, group_col, chart_title, caption_parts, threshold=0.
             ignore_index=True,
         )
 
-    # Distinct colour palette (cycles if more slices than colours)
+    # Tableau-style palette
     base_colors = [
-        "#4e79a7", "#f28e2b", "#e15759", "#76b7b2", "#59a14f",
-        "#edc948", "#b07aa1", "#ff9da7", "#9c755f", "#bab0ac",
-        "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
-        "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf",
+        "#4E79A7", "#F28E2B", "#E15759", "#76B7B2", "#59A14F",
+        "#EDC948", "#B07AA1", "#FF9DA7", "#9C755F", "#BAB0AC",
+        "#1F77B4", "#FF7F0E", "#2CA02C", "#D62728", "#9467BD",
+        "#8C564B", "#E377C2", "#7F7F7F", "#BCBD22", "#17BECF",
     ]
     colors = [base_colors[i % len(base_colors)] for i in range(len(major))]
-
-    # Full table rows (all categories) — name + count only
-    table_rows = [[str(r[group_col]), int(r["Count"])] for _, r in summary.iterrows()]
-    table_rows.append(["TOTAL", total])
-
-    # Map category -> colour for table side colour swatches (major only; others grey)
     color_map = {str(row[group_col]): colors[i] for i, (_, row) in enumerate(major.iterrows())}
 
-    # Layout: compact pie on left, table on right
-    fig = plt.figure(figsize=(10.5, 5.0))
-    ax_pie = fig.add_axes([0.02, 0.10, 0.42, 0.80])
-    ax_tbl = fig.add_axes([0.48, 0.06, 0.50, 0.86])
+    # ----- Figure layout: pie left, table right -----
+    fig = plt.figure(figsize=(11, 5.2), facecolor="white")
+    ax_pie = fig.add_axes([0.03, 0.14, 0.40, 0.72])
+    ax_tbl = fig.add_axes([0.48, 0.10, 0.50, 0.78])
     ax_tbl.axis("off")
 
-    wedges, texts, autotexts = ax_pie.pie(
+    # Pie – % only inside slices, no external labels / lines
+    def _autopct(pct):
+        return f"{pct:.1f}%" if pct >= 3 else ""  # hide tiny labels to avoid clutter
+
+    wedges, _texts, autotexts = ax_pie.pie(
         major["Count"],
         colors=colors,
         startangle=90,
-        autopct="%1.1f%%",
-        textprops=dict(color="black", fontsize=8),
-        pctdistance=0.62,
-        wedgeprops=dict(width=1.0, edgecolor="white", linewidth=1.2),
+        autopct=_autopct,
+        pctdistance=0.60,
+        wedgeprops=dict(edgecolor="white", linewidth=1.5),
     )
     for t in autotexts:
         t.set_fontsize(8)
         t.set_fontweight("bold")
+        t.set_color("white")
+    ax_pie.set_aspect("equal")
 
-    # Colour legend under the pie (compact, no leader lines)
-    ax_pie.legend(
-        wedges,
-        [f"{row[group_col]}" for _, row in major.iterrows()],
-        loc="upper center",
-        bbox_to_anchor=(0.5, -0.02),
-        fontsize=7,
-        frameon=False,
-        ncol=2 if len(major) > 4 else 1,
-        handlelength=1.2,
-        handletextpad=0.4,
-        columnspacing=0.8,
-    )
+    # ----- Table: colour | name | count -----
+    # Build cell text with a leading block character as colour marker column
+    headers = ["", group_col, "Count"]
+    cell_text = []
+    row_colors = []  # background for name column
+    for _, r in summary.iterrows():
+        name = str(r[group_col])
+        cell_text.append(["●", name, f"{int(r['Count'])}"])
+        row_colors.append(color_map.get(name, "#CCCCCC"))
+    cell_text.append(["", "TOTAL", f"{total}"])
+    row_colors.append(None)
 
-    # Embedded table
-    col_labels = [group_col, "Count"]
     table = ax_tbl.table(
-        cellText=table_rows,
-        colLabels=col_labels,
+        cellText=cell_text,
+        colLabels=headers,
         loc="center",
         cellLoc="left",
-        colLoc="center",
     )
     table.auto_set_font_size(False)
-    table.set_fontsize(8)
-    table.scale(1.0, 1.45)
+    table.set_fontsize(9)
+    table.scale(1.05, 1.55)
 
-    n_cols = len(col_labels)
-    last = len(table_rows)
+    n_rows = len(cell_text)  # data rows (excl. header)
+    # Header styling
+    for j in range(3):
+        c = table[(0, j)]
+        c.set_facecolor("#1F4E79")
+        c.set_text_props(color="white", fontweight="bold", fontsize=9, ha="center")
 
-    # Header
-    for j in range(n_cols):
-        cell = table[(0, j)]
-        cell.set_facecolor("#1f4e79")
-        cell.set_text_props(color="white", fontweight="bold", fontsize=8)
+    # Body rows
+    for i in range(1, n_rows + 1):
+        is_total = (i == n_rows)
+        swatch = row_colors[i - 1]
 
-    # Data rows — colour swatch on name cell matching pie (when present)
-    for i, (name, _cnt) in enumerate(table_rows[:-1], start=1):
-        swatch = color_map.get(name)
-        for j in range(n_cols):
-            cell = table[(i, j)]
-            if i % 2 == 0:
-                cell.set_facecolor("#f7f9fc")
-            if j == 0 and swatch:
-                # Light tint of the pie colour for easy matching
-                cell.set_facecolor(swatch)
-                cell.set_text_props(color="white", fontweight="bold", fontsize=8)
-            if j == 1:
-                cell.set_text_props(ha="center")
+        # Colour dot column
+        c0 = table[(i, 0)]
+        c0.set_text_props(ha="center", fontsize=12, fontweight="bold")
+        if swatch and not is_total:
+            c0.set_text_props(color=swatch, ha="center", fontsize=14)
+            c0.set_facecolor("#FFFFFF")
+        else:
+            c0.set_facecolor("#E8F0FE" if is_total else "#FFFFFF")
+            c0.get_text().set_text("")
 
-    # TOTAL row
-    for j in range(n_cols):
-        cell = table[(last, j)]
-        cell.set_facecolor("#e8f0fe")
-        cell.set_text_props(fontweight="bold", fontsize=8)
-        if j == 1:
-            cell.set_text_props(ha="center", fontweight="bold")
+        # Name column
+        c1 = table[(i, 1)]
+        c1.set_text_props(ha="left", fontsize=9)
+        if is_total:
+            c1.set_facecolor("#E8F0FE")
+            c1.set_text_props(fontweight="bold")
+        else:
+            c1.set_facecolor("#F8FAFC" if i % 2 == 0 else "#FFFFFF")
 
-    for i in range(last + 1):
-        table[(i, 0)].set_width(0.72)
-        table[(i, 1)].set_width(0.28)
+        # Count column
+        c2 = table[(i, 2)]
+        c2.set_text_props(ha="center", fontsize=9)
+        if is_total:
+            c2.set_facecolor("#E8F0FE")
+            c2.set_text_props(fontweight="bold", ha="center")
+        else:
+            c2.set_facecolor("#F8FAFC" if i % 2 == 0 else "#FFFFFF")
 
-    fig.suptitle(chart_title, fontsize=13, fontweight="bold", y=0.98)
-    fig.text(0.5, 0.012, " | ".join(caption_parts), ha="center", fontsize=7.5, color="gray")
+    # Column widths
+    for i in range(n_rows + 1):
+        table[(i, 0)].set_width(0.10)
+        table[(i, 1)].set_width(0.62)
+        table[(i, 2)].set_width(0.28)
+
+    # Thin borders
+    for key, cell in table.get_celld().items():
+        cell.set_edgecolor("#D0D7DE")
+        cell.set_linewidth(0.6)
+
+    fig.suptitle(chart_title, fontsize=14, fontweight="bold", y=0.96, color="#1A1A1A")
+    fig.text(
+        0.5, 0.02, " | ".join(caption_parts),
+        ha="center", fontsize=7.5, color="#666666",
+    )
 
     buf = BytesIO()
-    plt.savefig(buf, format="png", dpi=150, bbox_inches="tight", facecolor="white")
+    plt.savefig(buf, format="png", dpi=160, bbox_inches="tight", facecolor="white")
     buf.seek(0)
     plt.close(fig)
 
     st.image(buf)
     st.download_button(
-        f"📥 Download {chart_title} (PNG)", data=buf,
+        f"📥 Download {chart_title} (PNG)",
+        data=buf,
         file_name=f"{group_col.lower().replace(' ', '_')}_distribution.png",
         mime="image/png",
         key=f"dl_{group_col}_{chart_title}",
