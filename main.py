@@ -118,32 +118,49 @@ img {
 
 /* Captcha image specifically */
 .stImage > img {
-    max-width: min(100%, 320px) !important;
+    max-width: min(100%, 420px) !important;
+    max-height: 320px !important;
+    width: auto !important;
+    height: auto !important;
+    object-fit: contain !important;
     margin: 0 auto;
     display: block;
 }
+/* Keep markdown header logo small even if CSS class is missed */
+img.saral-logo,
+.saral-header img {
+    height: 48px !important;
+    max-height: 48px !important;
+    max-width: 120px !important;
+    width: auto !important;
+    object-fit: contain !important;
+}
 
-/* ---------- Header (already present, enhanced) ---------- */
+/* ---------- Header – compact, space-aware ---------- */
 .saral-header {
     display: flex;
     align-items: center;
-    padding: 12px 0 20px;
-    margin-bottom: 20px;
+    padding: 8px 0 12px;
+    margin-bottom: 12px;
     flex-wrap: wrap;
-    gap: 12px;
+    gap: 10px;
 }
 .saral-logo {
-    height: 70px;
-    border-radius: 12px;
-    margin-right: 20px;
+    /* Strict size so the logo never dominates the screen */
+    height: 48px !important;
+    width: auto !important;
+    max-height: 48px !important;
+    max-width: 120px !important;
+    border-radius: 8px;
+    margin-right: 14px;
     object-fit: contain;
     flex-shrink: 0;
 }
-.saral-header-text { flex: 1; min-width: 200px; }
-.saral-initiative { margin: 0; font-size: 1.2em; font-weight: 500; color: #4fc3f7; }
+.saral-header-text { flex: 1; min-width: 160px; }
+.saral-initiative { margin: 0; font-size: 1.0em; font-weight: 500; color: #4fc3f7; }
 .saral-safety { color: #4fc3f7; font-weight: 700; }
-.saral-title { margin: 6px 0 0; font-size: 2.4em; font-weight: bold; line-height: 1.15; }
-.saral-subtitle { margin: 4px 0 0; font-size: 1.05em; color: #666; }
+.saral-title { margin: 2px 0 0; font-size: 1.75em; font-weight: bold; line-height: 1.15; }
+.saral-subtitle { margin: 2px 0 0; font-size: 0.95em; color: #666; }
 
 /* ---------- Footer credit ---------- */
 .adaptive-credit {
@@ -183,12 +200,18 @@ img {
     }
     .saral-logo {
         margin-right: 0;
-        margin-bottom: 10px;
-        height: 60px;
+        margin-bottom: 6px;
+        height: 40px !important;
+        max-height: 40px !important;
+        max-width: 100px !important;
     }
-    .saral-title { font-size: 1.9em; }
-    .saral-subtitle { font-size: 0.95em; }
-    .saral-initiative { font-size: 1.05em; }
+    .saral-title { font-size: 1.45em; }
+    .saral-subtitle { font-size: 0.85em; }
+    .saral-initiative { font-size: 0.9em; }
+    .saral-header {
+        padding: 6px 0 10px;
+        margin-bottom: 8px;
+    }
 
     /* Metrics in a tighter grid */
     div[data-testid="stMetric"] {
@@ -909,7 +932,7 @@ def render_pie_breakdown(df, group_col, chart_title, caption_parts, threshold=0.
         )
 
     # Slightly smaller figure on narrow screens for better fit
-    fig, ax = plt.subplots(figsize=(9, 5.5))
+    fig, ax = plt.subplots(figsize=(7.5, 4.5))
     wedges, texts, autotexts = ax.pie(
         major["Count"], startangle=90, autopct='%1.1f%%',
         textprops=dict(color='black', fontsize=9)
@@ -933,7 +956,7 @@ def render_pie_breakdown(df, group_col, chart_title, caption_parts, threshold=0.
     plt.tight_layout(rect=[0, 0.06, 1, 0.94])
 
     buf = BytesIO()
-    plt.savefig(buf, format="png", dpi=160, bbox_inches="tight")
+    plt.savefig(buf, format="png", dpi=140, bbox_inches="tight")
     buf.seek(0)
     plt.close(fig)
 
