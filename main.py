@@ -908,52 +908,65 @@ def build_excel_export(export_df, sheet_name):
 # HELPERS — pie-chart breakdown (shared by Head / Sub Head distributions)
 # =========================================================================
 def render_pie_breakdown(df, group_col, chart_title, caption_parts, threshold=0.02):
-    """Clean pie + table image: coloured slices with % inside, no leader lines.
-    Right-hand table (colour swatch | name | count) acts as the legend.
+    """Clean pie + table image. Colours are assigned by category name so the
+    pie slices and table rows always match. No leader lines.
     """
+    # Normalise the grouping column so keys match everywhere
+    work = df.copy()
+    work[group_col] = work[group_col].fillna("").astype(str).str.strip()
+    work.loc[work[group_col] == "", group_col] = "(Blank)"
+
     summary = (
-        df.groupby(group_col)[group_col]
+        work.groupby(group_col, sort=False)[group_col]
         .count()
         .reset_index(name="Count")
         .sort_values(by="Count", ascending=False)
+        .reset_index(drop=True)
     )
     if summary.empty:
         return
 
     total = int(summary["Count"].sum())
-    display_data = summary.copy()
-    display_data["Percent"] = display_data["Count"] / total
-    major = display_data[display_data["Percent"] >= threshold][[group_col, "Count"]].copy()
-    minor = display_data[display_data["Percent"] < threshold]
-    if not minor.empty:
-        major = pd.concat(
-            [major, pd.DataFrame([{group_col: "Others", "Count": int(minor["Count"].sum())}])],
-            ignore_index=True,
-        )
+    summary["Percent"] = summary["Count"] / total
 
-    # Tableau-style palette
+    # Assign a unique colour to EVERY category (stable by rank order)
     base_colors = [
         "#4E79A7", "#F28E2B", "#E15759", "#76B7B2", "#59A14F",
         "#EDC948", "#B07AA1", "#FF9DA7", "#9C755F", "#BAB0AC",
         "#1F77B4", "#FF7F0E", "#2CA02C", "#D62728", "#9467BD",
         "#8C564B", "#E377C2", "#7F7F7F", "#BCBD22", "#17BECF",
+        "#393B79", "#637939", "#8C6D31", "#843C39", "#7B4173",
     ]
-    colors = [base_colors[i % len(base_colors)] for i in range(len(major))]
-    color_map = {str(row[group_col]): colors[i] for i, (_, row) in enumerate(major.iterrows())}
+    color_map = {}
+    for i, name in enumerate(summary[group_col].tolist()):
+        color_map[name] = base_colors[i % len(base_colors)]
 
-    # ----- Figure layout: pie left, table right -----
+    # Major slices for the pie (small ones rolled into Others)
+    major = summary[summary["Percent"] >= threshold][[group_col, "Count"]].copy()
+    minor = summary[summary["Percent"] < threshold]
+    others_color = "#A0A0A0"
+    if not minor.empty:
+        major = pd.concat(
+            [major, pd.DataFrame([{group_col: "Others", "Count": int(minor["Count"].sum())}])],
+            ignore_index=True,
+        )
+        color_map["Others"] = others_color
+
+    # Pie colours in the exact same order as major rows
+    pie_colors = [color_map[str(n)] for n in major[group_col].tolist()]
+
+    # ----- Figure -----
     fig = plt.figure(figsize=(11, 5.2), facecolor="white")
     ax_pie = fig.add_axes([0.03, 0.14, 0.40, 0.72])
     ax_tbl = fig.add_axes([0.48, 0.10, 0.50, 0.78])
     ax_tbl.axis("off")
 
-    # Pie – % only inside slices, no external labels / lines
     def _autopct(pct):
-        return f"{pct:.1f}%" if pct >= 3 else ""  # hide tiny labels to avoid clutter
+        return f"{pct:.1f}%" if pct >= 3 else ""
 
     wedges, _texts, autotexts = ax_pie.pie(
-        major["Count"],
-        colors=colors,
+        major["Count"].tolist(),
+        colors=pie_colors,
         startangle=90,
         autopct=_autopct,
         pctdistance=0.60,
@@ -965,17 +978,13 @@ def render_pie_breakdown(df, group_col, chart_title, caption_parts, threshold=0.
         t.set_color("white")
     ax_pie.set_aspect("equal")
 
-    # ----- Table: colour | name | count -----
-    # Build cell text with a leading block character as colour marker column
+    # ----- Table: colour dot | name | count (same colour_map as pie) -----
     headers = ["", group_col, "Count"]
     cell_text = []
-    row_colors = []  # background for name column
     for _, r in summary.iterrows():
         name = str(r[group_col])
         cell_text.append(["●", name, f"{int(r['Count'])}"])
-        row_colors.append(color_map.get(name, "#CCCCCC"))
     cell_text.append(["", "TOTAL", f"{total}"])
-    row_colors.append(None)
 
     table = ax_tbl.table(
         cellText=cell_text,
@@ -987,54 +996,44 @@ def render_pie_breakdown(df, group_col, chart_title, caption_parts, threshold=0.
     table.set_fontsize(9)
     table.scale(1.05, 1.55)
 
-    n_rows = len(cell_text)  # data rows (excl. header)
-    # Header styling
+    n_data = len(summary)  # excludes TOTAL
+    # Header
     for j in range(3):
         c = table[(0, j)]
         c.set_facecolor("#1F4E79")
         c.set_text_props(color="white", fontweight="bold", fontsize=9, ha="center")
 
-    # Body rows
-    for i in range(1, n_rows + 1):
-        is_total = (i == n_rows)
-        swatch = row_colors[i - 1]
+    for i in range(1, n_data + 1):
+        name = str(summary.iloc[i - 1][group_col])
+        swatch = color_map[name]
+        alt = "#F8FAFC" if i % 2 == 0 else "#FFFFFF"
 
-        # Colour dot column
         c0 = table[(i, 0)]
-        c0.set_text_props(ha="center", fontsize=12, fontweight="bold")
-        if swatch and not is_total:
-            c0.set_text_props(color=swatch, ha="center", fontsize=14)
-            c0.set_facecolor("#FFFFFF")
-        else:
-            c0.set_facecolor("#E8F0FE" if is_total else "#FFFFFF")
-            c0.get_text().set_text("")
+        c0.set_facecolor(alt)
+        c0.set_text_props(color=swatch, ha="center", fontsize=14, fontweight="bold")
 
-        # Name column
         c1 = table[(i, 1)]
-        c1.set_text_props(ha="left", fontsize=9)
-        if is_total:
-            c1.set_facecolor("#E8F0FE")
-            c1.set_text_props(fontweight="bold")
-        else:
-            c1.set_facecolor("#F8FAFC" if i % 2 == 0 else "#FFFFFF")
+        c1.set_facecolor(alt)
+        c1.set_text_props(ha="left", fontsize=9, color="#1A1A1A")
 
-        # Count column
         c2 = table[(i, 2)]
-        c2.set_text_props(ha="center", fontsize=9)
-        if is_total:
-            c2.set_facecolor("#E8F0FE")
-            c2.set_text_props(fontweight="bold", ha="center")
-        else:
-            c2.set_facecolor("#F8FAFC" if i % 2 == 0 else "#FFFFFF")
+        c2.set_facecolor(alt)
+        c2.set_text_props(ha="center", fontsize=9, color="#1A1A1A")
 
-    # Column widths
-    for i in range(n_rows + 1):
+    # TOTAL row
+    total_row = n_data + 1
+    for j in range(3):
+        c = table[(total_row, j)]
+        c.set_facecolor("#E8F0FE")
+        c.set_text_props(fontweight="bold", fontsize=9, ha="center" if j != 1 else "left")
+    table[(total_row, 0)].get_text().set_text("")
+
+    for i in range(n_data + 2):  # header + data + total
         table[(i, 0)].set_width(0.10)
         table[(i, 1)].set_width(0.62)
         table[(i, 2)].set_width(0.28)
 
-    # Thin borders
-    for key, cell in table.get_celld().items():
+    for _key, cell in table.get_celld().items():
         cell.set_edgecolor("#D0D7DE")
         cell.set_linewidth(0.6)
 
