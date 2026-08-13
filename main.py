@@ -908,8 +908,8 @@ def build_excel_export(export_df, sheet_name):
 # HELPERS — pie-chart breakdown (shared by Head / Sub Head distributions)
 # =========================================================================
 def render_pie_breakdown(df, group_col, chart_title, caption_parts, threshold=0.02):
-    """Render a labelled pie chart (small slices grouped into 'Others') plus a
-    download button. caption_parts is a list of strings joined for the footer.
+    """Render a labelled pie chart with an embedded counts table in the same
+    image, plus a download button. caption_parts is joined for the footer.
     """
     summary = (
         df.groupby(group_col)[group_col]
@@ -923,40 +923,93 @@ def render_pie_breakdown(df, group_col, chart_title, caption_parts, threshold=0.
     total = summary["Count"].sum()
     display_data = summary.copy()
     display_data["Percent"] = display_data["Count"] / total
-    major = display_data[display_data["Percent"] >= threshold][[group_col, "Count"]]
+    major = display_data[display_data["Percent"] >= threshold][[group_col, "Count"]].copy()
     minor = display_data[display_data["Percent"] < threshold]
     if not minor.empty:
         major = pd.concat(
-            [major, pd.DataFrame([{group_col: "Others", "Count": minor["Count"].sum()}])],
+            [major, pd.DataFrame([{group_col: "Others", "Count": int(minor["Count"].sum())}])],
             ignore_index=True
         )
 
-    # Slightly smaller figure on narrow screens for better fit
-    fig, ax = plt.subplots(figsize=(7.5, 4.5))
-    wedges, texts, autotexts = ax.pie(
-        major["Count"], startangle=90, autopct='%1.1f%%',
-        textprops=dict(color='black', fontsize=9)
+    # Full table data (all categories, not only major slices)
+    table_rows = []
+    for _, row in summary.iterrows():
+        pct = row["Count"] / total * 100
+        table_rows.append([str(row[group_col]), int(row["Count"]), f"{pct:.1f}%"])
+    table_rows.append(["TOTAL", int(total), "100%"])
+
+    # Layout: pie on left, table on right
+    fig = plt.figure(figsize=(11, 5.2))
+    ax_pie = fig.add_axes([0.02, 0.12, 0.48, 0.78])
+    ax_tbl = fig.add_axes([0.52, 0.08, 0.46, 0.82])
+    ax_tbl.axis("off")
+
+    wedges, texts, autotexts = ax_pie.pie(
+        major["Count"], startangle=90, autopct="%1.1f%%",
+        textprops=dict(color="black", fontsize=8),
+        pctdistance=0.72,
     )
     for i, (wedge, (_, row)) in enumerate(zip(wedges, major.iterrows())):
         ang = (wedge.theta2 + wedge.theta1) / 2.0
         x = np.cos(np.deg2rad(ang))
         y = np.sin(np.deg2rad(ang))
         place_right = (i % 2 == 0)
-        lx = 1.45 if place_right else -1.45
-        ly = 1.15 * y
-        ax.text(lx, ly, f"{row[group_col]} ({row['Count']})",
-                ha="left" if place_right else "right",
-                va="center", fontsize=9,
-                bbox=dict(facecolor="white", edgecolor="gray", alpha=0.7, pad=1))
-        ax.annotate("", xy=(0.9 * x, 0.9 * y), xytext=(lx, ly),
-                    arrowprops=dict(arrowstyle="-", lw=0.8, color="black"))
+        lx = 1.35 if place_right else -1.35
+        ly = 1.1 * y
+        ax_pie.text(
+            lx, ly, f"{row[group_col]} ({row['Count']})",
+            ha="left" if place_right else "right",
+            va="center", fontsize=8,
+            bbox=dict(facecolor="white", edgecolor="gray", alpha=0.75, pad=1),
+        )
+        ax_pie.annotate(
+            "", xy=(0.88 * x, 0.88 * y), xytext=(lx, ly),
+            arrowprops=dict(arrowstyle="-", lw=0.7, color="black"),
+        )
 
-    fig.suptitle(chart_title, fontsize=13, fontweight="bold")
-    fig.text(0.5, 0.02, " | ".join(caption_parts), ha='center', fontsize=8, color='gray')
-    plt.tight_layout(rect=[0, 0.06, 1, 0.94])
+    # Embedded table
+    col_labels = [group_col, "Count", "%"]
+    table = ax_tbl.table(
+        cellText=table_rows,
+        colLabels=col_labels,
+        loc="center",
+        cellLoc="left",
+        colLoc="center",
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(8)
+    table.scale(1.0, 1.35)
+
+    # Style header + total row
+    for j in range(len(col_labels)):
+        cell = table[(0, j)]
+        cell.set_facecolor("#1f4e79")
+        cell.set_text_props(color="white", fontweight="bold", fontsize=8)
+    last = len(table_rows)
+    for j in range(len(col_labels)):
+        cell = table[(last, j)]
+        cell.set_facecolor("#e8f0fe")
+        cell.set_text_props(fontweight="bold", fontsize=8)
+
+    # Alternating row colours for readability
+    for i in range(1, last):
+        for j in range(len(col_labels)):
+            if i % 2 == 0:
+                table[(i, j)].set_facecolor("#f7f9fc")
+
+    # Column widths: name wider, count/% narrower
+    for i in range(last + 1):
+        table[(i, 0)].set_width(0.55)
+        table[(i, 1)].set_width(0.22)
+        table[(i, 2)].set_width(0.18)
+        table[(i, 1)].set_text_props(ha="center")
+        table[(i, 2)].set_text_props(ha="center")
+
+    fig.suptitle(chart_title, fontsize=13, fontweight="bold", y=0.98)
+    fig.text(0.5, 0.015, " | ".join(caption_parts), ha="center", fontsize=7.5, color="gray")
 
     buf = BytesIO()
-    plt.savefig(buf, format="png", dpi=140, bbox_inches="tight")
+    plt.savefig(buf, format="png", dpi=150, bbox_inches="tight", facecolor="white")
     buf.seek(0)
     plt.close(fig)
 
@@ -968,15 +1021,6 @@ def render_pie_breakdown(df, group_col, chart_title, caption_parts, threshold=0.
         key=f"dl_{group_col}_{chart_title}",
         use_container_width=True,
     )
-
-    # Distribution table (counts + %) — full breakdown, not only major slices
-    table_df = summary.copy()
-    table_df["Percent"] = (table_df["Count"] / total * 100).round(1).astype(str) + "%"
-    table_df = table_df.rename(columns={group_col: group_col, "Count": "Count", "Percent": "%"})
-    table_df = table_df[[group_col, "Count", "%"]]
-    st.markdown(f"**{group_col} distribution (counts)**")
-    st.dataframe(table_df, use_container_width=True, hide_index=True)
-    st.caption(f"Total records in this breakdown: **{total}**")
 
 
 # =========================================================================
