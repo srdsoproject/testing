@@ -404,7 +404,6 @@ if not st.session_state.logged_in:
         st.image(
             generate_captcha_image(st.session_state.captcha_text),
             caption="Type the characters shown above (not case-sensitive)",
-            width="content",
         )
         captcha_answer = st.text_input(
             "Enter the characters shown in the image",
@@ -938,7 +937,7 @@ def render_pie_breakdown(df, group_col, chart_title, caption_parts, threshold=0.
     buf.seek(0)
     plt.close(fig)
 
-    st.image(buf, width="stretch")
+    st.image(buf)
     st.download_button(
         f"📥 Download {chart_title} (PNG)", data=buf,
         file_name=f"{group_col.lower().replace(' ', '_')}_distribution.png",
