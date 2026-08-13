@@ -908,8 +908,8 @@ def build_excel_export(export_df, sheet_name):
 # HELPERS — pie-chart breakdown (shared by Head / Sub Head distributions)
 # =========================================================================
 def render_pie_breakdown(df, group_col, chart_title, caption_parts, threshold=0.02):
-    """Render a labelled pie chart with an embedded counts table in the same
-    image, plus a download button. caption_parts is joined for the footer.
+    """Render a colour-coded pie chart with an embedded counts table in the same
+    image (no leader lines). caption_parts is joined for the footer.
     """
     summary = (
         df.groupby(group_col)[group_col]
@@ -920,7 +920,7 @@ def render_pie_breakdown(df, group_col, chart_title, caption_parts, threshold=0.
     if summary.empty:
         return
 
-    total = summary["Count"].sum()
+    total = int(summary["Count"].sum())
     display_data = summary.copy()
     display_data["Percent"] = display_data["Count"] / total
     major = display_data[display_data["Percent"] >= threshold][[group_col, "Count"]].copy()
@@ -928,51 +928,59 @@ def render_pie_breakdown(df, group_col, chart_title, caption_parts, threshold=0.
     if not minor.empty:
         major = pd.concat(
             [major, pd.DataFrame([{group_col: "Others", "Count": int(minor["Count"].sum())}])],
-            ignore_index=True
+            ignore_index=True,
         )
 
-    # Full table data (all categories) — name + count only
-    table_rows = []
-    for _, row in summary.iterrows():
-        table_rows.append([str(row[group_col]), int(row["Count"])])
-    table_rows.append(["TOTAL", int(total)])
+    # Distinct colour palette (cycles if more slices than colours)
+    base_colors = [
+        "#4e79a7", "#f28e2b", "#e15759", "#76b7b2", "#59a14f",
+        "#edc948", "#b07aa1", "#ff9da7", "#9c755f", "#bab0ac",
+        "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
+        "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf",
+    ]
+    colors = [base_colors[i % len(base_colors)] for i in range(len(major))]
 
-    # Layout: pie + labels on left, table on right (no overlap)
-    fig = plt.figure(figsize=(12, 5.4))
-    # Pie occupies left half; leave room for labels on the LEFT side of the pie
-    ax_pie = fig.add_axes([0.08, 0.12, 0.38, 0.78])
-    ax_tbl = fig.add_axes([0.55, 0.08, 0.42, 0.82])
+    # Full table rows (all categories) — name + count only
+    table_rows = [[str(r[group_col]), int(r["Count"])] for _, r in summary.iterrows()]
+    table_rows.append(["TOTAL", total])
+
+    # Map category -> colour for table side colour swatches (major only; others grey)
+    color_map = {str(row[group_col]): colors[i] for i, (_, row) in enumerate(major.iterrows())}
+
+    # Layout: compact pie on left, table on right
+    fig = plt.figure(figsize=(10.5, 5.0))
+    ax_pie = fig.add_axes([0.02, 0.10, 0.42, 0.80])
+    ax_tbl = fig.add_axes([0.48, 0.06, 0.50, 0.86])
     ax_tbl.axis("off")
 
     wedges, texts, autotexts = ax_pie.pie(
-        major["Count"], startangle=90, autopct="%1.1f%%",
+        major["Count"],
+        colors=colors,
+        startangle=90,
+        autopct="%1.1f%%",
         textprops=dict(color="black", fontsize=8),
-        pctdistance=0.65,
-        radius=0.95,
+        pctdistance=0.62,
+        wedgeprops=dict(width=1.0, edgecolor="white", linewidth=1.2),
     )
-    # Place ALL leader labels on the LEFT of the pie so they never cross into the table
-    for i, (wedge, (_, row)) in enumerate(zip(wedges, major.iterrows())):
-        ang = (wedge.theta2 + wedge.theta1) / 2.0
-        x = np.cos(np.deg2rad(ang))
-        y = np.sin(np.deg2rad(ang))
-        # Fixed left-side label column
-        lx = -1.55
-        # Spread labels vertically to reduce stacking
-        n = max(len(major), 1)
-        ly = 1.15 - (2.3 * i / max(n - 1, 1)) if n > 1 else 0.0
-        ax_pie.annotate(
-            f"{row[group_col]} ({row['Count']})",
-            xy=(0.85 * x, 0.85 * y),
-            xytext=(lx, ly),
-            ha="right",
-            va="center",
-            fontsize=8,
-            bbox=dict(facecolor="white", edgecolor="gray", alpha=0.8, pad=1.5),
-            arrowprops=dict(arrowstyle="-", lw=0.7, color="gray",
-                            connectionstyle="arc3,rad=0"),
-        )
+    for t in autotexts:
+        t.set_fontsize(8)
+        t.set_fontweight("bold")
 
-    # Embedded table (Sub Head / Head + Count only)
+    # Colour legend under the pie (compact, no leader lines)
+    ax_pie.legend(
+        wedges,
+        [f"{row[group_col]}" for _, row in major.iterrows()],
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.02),
+        fontsize=7,
+        frameon=False,
+        ncol=2 if len(major) > 4 else 1,
+        handlelength=1.2,
+        handletextpad=0.4,
+        columnspacing=0.8,
+    )
+
+    # Embedded table
     col_labels = [group_col, "Count"]
     table = ax_tbl.table(
         cellText=table_rows,
@@ -983,33 +991,45 @@ def render_pie_breakdown(df, group_col, chart_title, caption_parts, threshold=0.
     )
     table.auto_set_font_size(False)
     table.set_fontsize(8)
-    table.scale(1.0, 1.4)
+    table.scale(1.0, 1.45)
 
-    # Style header + total row
-    for j in range(len(col_labels)):
+    n_cols = len(col_labels)
+    last = len(table_rows)
+
+    # Header
+    for j in range(n_cols):
         cell = table[(0, j)]
         cell.set_facecolor("#1f4e79")
         cell.set_text_props(color="white", fontweight="bold", fontsize=8)
-    last = len(table_rows)
-    for j in range(len(col_labels)):
+
+    # Data rows — colour swatch on name cell matching pie (when present)
+    for i, (name, _cnt) in enumerate(table_rows[:-1], start=1):
+        swatch = color_map.get(name)
+        for j in range(n_cols):
+            cell = table[(i, j)]
+            if i % 2 == 0:
+                cell.set_facecolor("#f7f9fc")
+            if j == 0 and swatch:
+                # Light tint of the pie colour for easy matching
+                cell.set_facecolor(swatch)
+                cell.set_text_props(color="white", fontweight="bold", fontsize=8)
+            if j == 1:
+                cell.set_text_props(ha="center")
+
+    # TOTAL row
+    for j in range(n_cols):
         cell = table[(last, j)]
         cell.set_facecolor("#e8f0fe")
         cell.set_text_props(fontweight="bold", fontsize=8)
+        if j == 1:
+            cell.set_text_props(ha="center", fontweight="bold")
 
-    # Alternating row colours for readability
-    for i in range(1, last):
-        for j in range(len(col_labels)):
-            if i % 2 == 0:
-                table[(i, j)].set_facecolor("#f7f9fc")
-
-    # Column widths: name wider, count narrower
     for i in range(last + 1):
         table[(i, 0)].set_width(0.72)
         table[(i, 1)].set_width(0.28)
-        table[(i, 1)].set_text_props(ha="center")
 
     fig.suptitle(chart_title, fontsize=13, fontweight="bold", y=0.98)
-    fig.text(0.5, 0.015, " | ".join(caption_parts), ha="center", fontsize=7.5, color="gray")
+    fig.text(0.5, 0.012, " | ".join(caption_parts), ha="center", fontsize=7.5, color="gray")
 
     buf = BytesIO()
     plt.savefig(buf, format="png", dpi=150, bbox_inches="tight", facecolor="white")
@@ -1024,6 +1044,7 @@ def render_pie_breakdown(df, group_col, chart_title, caption_parts, threshold=0.
         key=f"dl_{group_col}_{chart_title}",
         use_container_width=True,
     )
+
 
 
 # =========================================================================
