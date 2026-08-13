@@ -22,7 +22,15 @@ from datetime import datetime, date, timedelta
 # =========================================================================
 # CONFIG
 # =========================================================================
-st.set_page_config(page_title="Inspection App", layout="wide")
+st.set_page_config(
+    page_title="S.A.R.A.L Inspection App",
+    layout="wide",
+    initial_sidebar_state="auto",  # collapsed on mobile by default in many clients
+    menu_items={
+        "Get Help": "https://wa.me/919022507772",
+        "About": "S.A.R.A.L – Safety Abnormality Report & Action List (Solapur Division)",
+    },
+)
 
 TIMESTAMP_COL_NAME = "Timestamp of Compliance"
 
@@ -32,6 +40,252 @@ TIMESTAMP_COL_NAME = "Timestamp of Compliance"
 CAPTCHA_CHARS = "".join(c for c in (string.ascii_uppercase + string.digits) if c not in "0O1IL")
 CAPTCHA_LENGTH = 5
 CAPTCHA_MAX_ATTEMPTS = 5  # lock out after this many wrong CAPTCHA attempts in a session
+
+# =========================================================================
+# GLOBAL RESPONSIVE CSS (mobile-first + adaptive)
+# =========================================================================
+st.markdown(
+    """
+<style>
+/* ---------- Base / Reset ---------- */
+html, body, [class*="css"] {
+    font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
+/* Make main content breathe on all devices */
+.main .block-container {
+    padding-top: 1rem !important;
+    padding-bottom: 2rem !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+    max-width: 100% !important;
+}
+
+/* Touch-friendly buttons & inputs */
+.stButton > button,
+.stDownloadButton > button,
+div[data-testid="stForm"] button {
+    min-height: 44px !important;          /* Apple HIG / Material touch target */
+    border-radius: 10px !important;
+    font-weight: 600 !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+}
+
+.stTextInput input,
+.stTextArea textarea,
+.stSelectbox > div,
+.stMultiSelect > div {
+    min-height: 42px !important;
+    font-size: 16px !important;           /* prevents iOS zoom on focus */
+}
+
+/* Metrics – stack nicely */
+div[data-testid="stMetric"] {
+    background: rgba(128,128,128,0.06);
+    border-radius: 12px;
+    padding: 12px 8px !important;
+    text-align: center;
+}
+
+/* Expanders more readable */
+.streamlit-expanderHeader {
+    font-size: 1.05rem !important;
+    font-weight: 600 !important;
+}
+
+/* Dataframes & tables */
+.stDataFrame, .stTable {
+    width: 100% !important;
+    overflow-x: auto !important;
+}
+
+/* AgGrid container – allow horizontal scroll on small screens */
+.ag-theme-streamlit, .ag-root-wrapper {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Images */
+img {
+    max-width: 100% !important;
+    height: auto !important;
+}
+
+/* Captcha image specifically */
+.stImage > img {
+    max-width: min(100%, 320px) !important;
+    margin: 0 auto;
+    display: block;
+}
+
+/* ---------- Header (already present, enhanced) ---------- */
+.saral-header {
+    display: flex;
+    align-items: center;
+    padding: 12px 0 20px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+.saral-logo {
+    height: 70px;
+    border-radius: 12px;
+    margin-right: 20px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+.saral-header-text { flex: 1; min-width: 200px; }
+.saral-initiative { margin: 0; font-size: 1.2em; font-weight: 500; color: #4fc3f7; }
+.saral-safety { color: #4fc3f7; font-weight: 700; }
+.saral-title { margin: 6px 0 0; font-size: 2.4em; font-weight: bold; line-height: 1.15; }
+.saral-subtitle { margin: 4px 0 0; font-size: 1.05em; color: #666; }
+
+/* ---------- Footer credit ---------- */
+.adaptive-credit {
+    display: inline-block;
+    padding: 12px 24px;
+    background: var(--bg-glass, rgba(255,255,255,0.75));
+    border: 2px solid #40c4ff;
+    border-radius: 16px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 6px 20px rgba(64,196,255,0.2);
+    font-size: 14px;
+    line-height: 1.45;
+    max-width: 95vw;
+}
+
+/* ---------- Mobile / small tablet (<= 768px) ---------- */
+@media (max-width: 768px) {
+    .main .block-container {
+        padding-left: 0.6rem !important;
+        padding-right: 0.6rem !important;
+        padding-top: 0.6rem !important;
+    }
+
+    /* Force columns to stack */
+    div[data-testid="column"] {
+        width: 100% !important;
+        flex: 1 1 100% !important;
+        min-width: 100% !important;
+    }
+
+    /* Header stacks */
+    .saral-header {
+        flex-direction: column;
+        text-align: center;
+        padding: 10px 0 16px;
+    }
+    .saral-logo {
+        margin-right: 0;
+        margin-bottom: 10px;
+        height: 60px;
+    }
+    .saral-title { font-size: 1.9em; }
+    .saral-subtitle { font-size: 0.95em; }
+    .saral-initiative { font-size: 1.05em; }
+
+    /* Metrics in a tighter grid */
+    div[data-testid="stMetric"] {
+        margin-bottom: 8px;
+    }
+
+    /* Buttons full-width on mobile for easier tapping */
+    .stButton > button,
+    .stDownloadButton > button {
+        width: 100% !important;
+    }
+
+    /* Forms */
+    div[data-testid="stForm"] {
+        padding: 0.5rem !important;
+    }
+
+    /* Tabs – larger touch targets */
+    button[data-baseweb="tab"] {
+        font-size: 0.95rem !important;
+        padding: 10px 12px !important;
+    }
+
+    /* Sidebar content a bit tighter */
+    section[data-testid="stSidebar"] .block-container {
+        padding-top: 1rem !important;
+    }
+
+    /* Reduce AgGrid height on mobile so user can still scroll the page */
+    .ag-theme-streamlit {
+        height: 420px !important;
+    }
+
+    /* WhatsApp / contact button */
+    a button {
+        font-size: 16px !important;
+        padding: 12px 20px !important;
+        width: 100% !important;
+        max-width: 320px;
+    }
+
+    /* Captcha form columns */
+    .stForm [data-testid="column"] {
+        width: 100% !important;
+    }
+}
+
+/* ---------- Very small phones (<= 400px) ---------- */
+@media (max-width: 400px) {
+    .saral-title { font-size: 1.65em; }
+    .main .block-container {
+        padding-left: 0.4rem !important;
+        padding-right: 0.4rem !important;
+    }
+    .adaptive-credit {
+        padding: 10px 14px;
+        font-size: 13px;
+    }
+}
+
+/* ---------- Tablet (769–1024px) – soft adjustments ---------- */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .main .block-container {
+        padding-left: 1.2rem !important;
+        padding-right: 1.2rem !important;
+    }
+    .saral-title { font-size: 2.2em; }
+}
+
+/* ---------- Dark / light adaptive credit (kept from original) ---------- */
+@media (prefers-color-scheme: light) {
+  :root {
+    --text-color: #1a1a1a; --text-highlight: #0d47a1; --text-sub: #1565c0;
+    --bg-glass: rgba(255, 255, 255, 0.75); --border-color: #40c4ff;
+    --shadow-base: rgba(64, 196, 255, 0.2); --shadow-hover: rgba(64, 196, 255, 0.35);
+    --glow-color: rgba(179, 229, 252, 0.9);
+  }
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text-color: #ffffff; --text-highlight: #e3f2fd; --text-sub: #bbdefb;
+    --bg-glass: rgba(15, 25, 45, 0.65); --border-color: #40c4ff;
+    --shadow-base: rgba(64, 196, 255, 0.15); --shadow-hover: rgba(64, 196, 255, 0.4);
+    --glow-color: rgba(179, 229, 252, 0.95);
+  }
+}
+.adaptive-credit p { margin: 0; color: var(--text-color); font-weight: 500; letter-spacing: 0.5px; }
+.adaptive-credit p span.highlight { color: var(--text-highlight); font-weight: 700; }
+.adaptive-credit p em { font-style: normal; color: var(--text-sub); }
+.adaptive-credit:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 28px var(--shadow-hover), 0 0 30px var(--glow-color);
+}
+</style>
+""",
+    unsafe_allow_html=True,
+)
 
 # =========================================================================
 # SESSION STATE INITIALIZATION (single pass — no duplicates)
@@ -133,7 +387,8 @@ def login(email, password):
 
 
 if not st.session_state.logged_in:
-    st.title("🔐 Login to S.A.R.A.L (Safety Abnormality Report & Action List)")
+    st.title("🔐 Login to S.A.R.A.L")
+    st.caption("Safety Abnormality Report & Action List")
 
     if st.session_state.captcha_fail_count >= CAPTCHA_MAX_ATTEMPTS:
         st.error(
@@ -142,16 +397,22 @@ if not st.session_state.logged_in:
         st.stop()
 
     with st.form("login_form", clear_on_submit=False):
-        email = st.text_input("📧 Email")
+        email = st.text_input("📧 Email", placeholder="your.email@example.com")
         password = st.text_input("🔒 Password", type="password")
 
         st.markdown("**🤖 Human check:**")
         st.image(
             generate_captcha_image(st.session_state.captcha_text),
             caption="Type the characters shown above (not case-sensitive)",
+            use_container_width=False,
         )
-        captcha_answer = st.text_input("Enter the characters shown in the image", key="captcha_input")
+        captcha_answer = st.text_input(
+            "Enter the characters shown in the image",
+            key="captcha_input",
+            placeholder="e.g. AB3K9",
+        )
 
+        # On mobile these stack automatically thanks to CSS; on desktop they stay side-by-side
         btn_col1, btn_col2 = st.columns([2, 1])
         with btn_col1:
             submitted = st.form_submit_button("Login", use_container_width=True)
@@ -210,7 +471,7 @@ if not user_ack_done:
         )
         with st.form("ack_form"):
             responder_name = st.text_input("✍️ Your Name")
-            ack_submitted = st.form_submit_button("Submit Acknowledgment")
+            ack_submitted = st.form_submit_button("Submit Acknowledgment", use_container_width=True)
             if ack_submitted:
                 if responder_name.strip():
                     new_entry = {"UserID": user_id, "Name": responder_name.strip()}
@@ -234,7 +495,7 @@ try:
 except FileNotFoundError:
     st.info("No responses submitted yet.")
 
-if st.button("🗑️ Clear All Responses", key="clear_responses_btn"):
+if st.button("🗑️ Clear All Responses", key="clear_responses_btn", use_container_width=True):
     pd.DataFrame(columns=["UserID", "Name"]).to_excel("responses.xlsx", index=False)
     st.success("✅ All responses have been cleared.")
 
@@ -268,7 +529,7 @@ except Exception as e:
 st.sidebar.markdown(f"👤 Logged in as: **{st.session_state.user['name']}**")
 st.sidebar.markdown(f"📧 {st.session_state.user['email']}")
 
-if st.sidebar.button("🚪 Logout"):
+if st.sidebar.button("🚪 Logout", use_container_width=True):
     st.session_state.logged_in = False
     st.session_state.user = None
     st.rerun()
@@ -648,31 +909,32 @@ def render_pie_breakdown(df, group_col, chart_title, caption_parts, threshold=0.
             ignore_index=True
         )
 
-    fig, ax = plt.subplots(figsize=(10, 6))
+    # Slightly smaller figure on narrow screens for better fit
+    fig, ax = plt.subplots(figsize=(9, 5.5))
     wedges, texts, autotexts = ax.pie(
         major["Count"], startangle=90, autopct='%1.1f%%',
-        textprops=dict(color='black', fontsize=10)
+        textprops=dict(color='black', fontsize=9)
     )
     for i, (wedge, (_, row)) in enumerate(zip(wedges, major.iterrows())):
         ang = (wedge.theta2 + wedge.theta1) / 2.0
         x = np.cos(np.deg2rad(ang))
         y = np.sin(np.deg2rad(ang))
         place_right = (i % 2 == 0)
-        lx = 1.5 if place_right else -1.5
-        ly = 1.2 * y
+        lx = 1.45 if place_right else -1.45
+        ly = 1.15 * y
         ax.text(lx, ly, f"{row[group_col]} ({row['Count']})",
                 ha="left" if place_right else "right",
-                va="center", fontsize=10,
+                va="center", fontsize=9,
                 bbox=dict(facecolor="white", edgecolor="gray", alpha=0.7, pad=1))
         ax.annotate("", xy=(0.9 * x, 0.9 * y), xytext=(lx, ly),
                     arrowprops=dict(arrowstyle="-", lw=0.8, color="black"))
 
-    fig.suptitle(chart_title, fontsize=14, fontweight="bold")
-    fig.text(0.5, 0.02, " | ".join(caption_parts), ha='center', fontsize=9, color='gray')
+    fig.suptitle(chart_title, fontsize=13, fontweight="bold")
+    fig.text(0.5, 0.02, " | ".join(caption_parts), ha='center', fontsize=8, color='gray')
     plt.tight_layout(rect=[0, 0.06, 1, 0.94])
 
     buf = BytesIO()
-    plt.savefig(buf, format="png", dpi=200, bbox_inches="tight")
+    plt.savefig(buf, format="png", dpi=160, bbox_inches="tight")
     buf.seek(0)
     plt.close(fig)
 
@@ -681,7 +943,8 @@ def render_pie_breakdown(df, group_col, chart_title, caption_parts, threshold=0.
         f"📥 Download {chart_title} (PNG)", data=buf,
         file_name=f"{group_col.lower().replace(' ', '_')}_distribution.png",
         mime="image/png",
-        key=f"dl_{group_col}_{chart_title}"
+        key=f"dl_{group_col}_{chart_title}",
+        use_container_width=True,
     )
 
 
@@ -692,28 +955,13 @@ st.markdown(
     """
     <div class="saral-header">
         <img src="https://raw.githubusercontent.com/srdsoproject/testing/main/Central%20Railway%20Logo.png"
-             class="saral-logo">
+             class="saral-logo" alt="Central Railway Logo">
         <div class="saral-header-text">
             <h2 class="saral-initiative">An Initiative by <span class="saral-safety">Safety Department</span>, Solapur Division</h2>
             <h1 class="saral-title">📋 S.A.R.A.L</h1>
             <h3 class="saral-subtitle">(Safety Abnormality Report & Action List – Version 1.3)</h3>
         </div>
     </div>
-    <style>
-        .saral-header { display: flex; align-items: center; padding: 20px 0; margin-bottom: 30px; }
-        .saral-logo { height: 80px; border-radius: 12px; margin-right: 25px; object-fit: contain; }
-        .saral-header-text { flex: 1; }
-        .saral-initiative { margin: 0; font-size: 1.35em; font-weight: 500; color: #4fc3f7; }
-        .saral-safety { color: #4fc3f7; font-weight: 700; }
-        .saral-title { margin: 8px 0 0; font-size: 2.8em; font-weight: bold; }
-        .saral-subtitle { margin: -6px 0 0; font-size: 1.15em; color: #666; }
-        @media (max-width: 768px) {
-            .saral-header { flex-direction: column; text-align: center; padding: 16px 0; }
-            .saral-logo { margin-right: 0; margin-bottom: 16px; height: 70px; }
-            .saral-title { font-size: 2.4em; }
-            .saral-subtitle { font-size: 1.05em; }
-        }
-    </style>
     """,
     unsafe_allow_html=True
 )
@@ -775,6 +1023,7 @@ with tabs[0]:
     start_date = df["Date of Inspection"].min() if not df["Date of Inspection"].isna().all() else pd.Timestamp.today()
     end_date = df["Date of Inspection"].max() if not df["Date of Inspection"].isna().all() else pd.Timestamp.today()
 
+    # Primary filters – these will stack on mobile via CSS
     c1, c2 = st.columns(2)
     c1.multiselect("Type of Inspection", VALID_INSPECTIONS, key="view_type_filter")
     c2.multiselect("Location", ALL_LOCATIONS, key="view_location_filter")
@@ -807,6 +1056,7 @@ with tabs[0]:
     filtered = filtered.apply(lambda x: x.str.replace("\n", " ") if x.dtype == "object" else x)
     filtered = filtered.sort_values("Date of Inspection")
 
+    # Metrics – 2×2 on mobile, 4 across on desktop
     col_a, col_b, col_c, col_d = st.columns(4)
     pending_count = (filtered["Status"] == "Pending").sum()
     no_response_count = filtered["Feedback"].isna().sum() + (filtered["Feedback"].astype(str).str.strip() == "").sum()
@@ -850,7 +1100,8 @@ with tabs[0]:
         "📥 Export Filtered Records to Excel",
         data=build_excel_export(export_df, "Filtered Records"),
         file_name="filtered_records.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
     )
 
     # ---------- EDITOR ----------
@@ -953,7 +1204,13 @@ with tabs[0]:
         # ---- AgGrid configuration ----
         grid_display_df = editable_df.drop(columns=["_status_plain"], errors="ignore")
         gb = GridOptionsBuilder.from_dataframe(grid_display_df)
-        gb.configure_default_column(editable=False, wrapText=True, autoHeight=True, resizable=True)
+        gb.configure_default_column(
+            editable=False,
+            wrapText=True,
+            autoHeight=True,
+            resizable=True,
+            suppressMovable=True,  # helps on touch devices
+        )
         if "User Feedback/Remark" in grid_display_df.columns:
             gb.configure_column(
                 "User Feedback/Remark",
@@ -963,7 +1220,12 @@ with tabs[0]:
             )
         gb.configure_column("_original_sheet_index", hide=True)
         gb.configure_column("_sheet_row", hide=True)
-        gb.configure_grid_options(singleClickEdit=True)
+        gb.configure_grid_options(
+            singleClickEdit=True,
+            suppressHorizontalScroll=False,
+            enableCellTextSelection=True,
+            ensureDomOrder=True,
+        )
 
         auto_size_js = JsCode("""
         function(params) {
@@ -978,13 +1240,15 @@ with tabs[0]:
         grid_options = gb.build()
 
         st.markdown("#### 🚈 Inspection Details")
-        st.caption("Type your compliance in 'User Feedback/Remark' column. Use column headers to sort.")
+        st.caption("Type your compliance in 'User Feedback/Remark' column. Use column headers to sort. On mobile you can scroll the grid horizontally.")
         grid_response = AgGrid(
             grid_display_df,
             gridOptions=grid_options,
             update_mode=GridUpdateMode.VALUE_CHANGED,
-            height=600,
-            allow_unsafe_jscode=True
+            height=500,                 # CSS will reduce this further on small screens
+            allow_unsafe_jscode=True,
+            fit_columns_on_grid_load=False,
+            theme="streamlit",
         )
         edited_df = pd.DataFrame(grid_response["data"])
 
@@ -998,11 +1262,12 @@ with tabs[0]:
             label="📥 Export Edited Records to Excel",
             data=build_excel_export(export_edited_df, "Edited Records"),
             file_name=f"edited_records_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
         )
 
         # ---- Buttons ----
-        b1, b2, b3 = st.columns([1, 1, 2])
+        b1, b2 = st.columns(2)
         submitted = b1.button("✅ Submit Feedback", use_container_width=True)
         refresh_clicked = b2.button("🔄 Refresh Data", use_container_width=True)
 
@@ -1062,7 +1327,7 @@ with tabs[0]:
 # FOOTER
 # =========================================================================
 st.markdown("""
-<div style="text-align: center; margin: 35px 0;">
+<div style="text-align: center; margin: 28px 0;">
   <div class="adaptive-credit">
     <p>
       <strong>Designed & Developed by</strong>
@@ -1071,38 +1336,6 @@ st.markdown("""
     </p>
   </div>
 </div>
-<style>
-@media (prefers-color-scheme: light) {
-  :root {
-    --text-color: #1a1a1a; --text-highlight: #0d47a1; --text-sub: #1565c0;
-    --bg-glass: rgba(255, 255, 255, 0.75); --border-color: #40c4ff;
-    --shadow-base: rgba(64, 196, 255, 0.2); --shadow-hover: rgba(64, 196, 255, 0.35);
-    --glow-color: rgba(179, 229, 252, 0.9);
-  }
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text-color: #ffffff; --text-highlight: #e3f2fd; --text-sub: #bbdefb;
-    --bg-glass: rgba(15, 25, 45, 0.65); --border-color: #40c4ff;
-    --shadow-base: rgba(64, 196, 255, 0.15); --shadow-hover: rgba(64, 196, 255, 0.4);
-    --glow-color: rgba(179, 229, 252, 0.95);
-  }
-}
-.adaptive-credit {
-  display: inline-block; padding: 14px 36px; background: var(--bg-glass);
-  border: 2px solid var(--border-color); border-radius: 18px;
-  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 8px 25px var(--shadow-base);
-  transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
-  font-family: 'Roboto', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  font-size: 15px; line-height: 1.5;
-}
-.adaptive-credit p { margin: 0; color: var(--text-color); font-weight: 500; letter-spacing: 0.8px; text-shadow: none; transition: text-shadow 0.4s ease; }
-.adaptive-credit p span.highlight { color: var(--text-highlight); font-weight: 700; }
-.adaptive-credit p em { font-style: normal; color: var(--text-sub); }
-.adaptive-credit:hover { transform: translateY(-4px); box-shadow: 0 14px 35px var(--shadow-hover), 0 0 40px var(--glow-color), 0 0 0 1px var(--border-color); }
-.adaptive-credit:hover p { text-shadow: 0 0 10px var(--glow-color), 0 0 20px var(--glow-color), 0 0 30px var(--glow-color), 0 0 40px rgba(179, 229, 252, 0.6); }
-</style>
 """, unsafe_allow_html=True)
 
 st.markdown("### 📞 Need Help or Correction in Data?")
@@ -1112,20 +1345,20 @@ with col2:
     st.markdown(
         f"""
         <div style="text-align: center;">
-            <a href="{whatsapp_url}" target="_blank">
+            <a href="{whatsapp_url}" target="_blank" rel="noopener noreferrer">
                 <button style="
-                    background-color: #25D366; color: white; font-size: 18px; font-weight: bold;
-                    padding: 14px 32px; border: none; border-radius: 50px; cursor: pointer;
-                    box-shadow: 0 4px 15px rgba(37, 211, 102, 0.4); transition: all 0.3s ease;"
-                onmouseover="this.style.backgroundColor='#128C7E'; this.style.transform='scale(1.05)';"
-                onmouseout="this.style.backgroundColor='#25D366'; this.style.transform='scale(1)';">
+                    background-color: #25D366; color: white; font-size: 17px; font-weight: bold;
+                    padding: 14px 28px; border: none; border-radius: 50px; cursor: pointer;
+                    box-shadow: 0 4px 15px rgba(37, 211, 102, 0.4); transition: all 0.3s ease;
+                    max-width: 100%;">
                     📱 Contact Us on WhatsApp<br>
                     <small>+91 90225 07772</small>
                 </button>
             </a>
-            <p style="margin-top: 15px; color: gray; font-size: 14px;">
-                For data corrections: <br>
-                ✉️ <a href="mailto:sursafetyposition@gmail.com">sursafetyposition@gmail.com</a> | Rly: 55620
+            <p style="margin-top: 14px; color: gray; font-size: 13px; line-height: 1.5;">
+                For data corrections:<br>
+                ✉️ <a href="mailto:sursafetyposition@gmail.com">sursafetyposition@gmail.com</a><br>
+                Rly: 55620
             </p>
         </div>
         """,
@@ -1234,7 +1467,7 @@ with tabs[1]:
             y=alt.Y("Head_std:N", sort="-x", title="Department"),
             color=alt.Color("color:N", scale=None),
             tooltip=["Head_std", alt.Tooltip("TotalCount", format=",")]
-        ).properties(height=400)
+        ).properties(height=max(280, len(dept_counts) * 36))
         st.altair_chart(dept_chart, use_container_width=True)
 
         top3 = dept_counts.head(3)
@@ -1260,7 +1493,7 @@ with tabs[1]:
                 y=alt.Y("Label:N", sort="-x", title="Station"),
                 color=alt.Color("color:N", scale=None),
                 tooltip=["Label", alt.Tooltip("TotalCount", format=",")]
-            ).properties(height=260)
+            ).properties(height=220)
             st.altair_chart(chart, use_container_width=True)
         else:
             st.info("No station data found in the selected period.")
@@ -1304,7 +1537,7 @@ with tabs[1]:
                     alt.Tooltip("PendingCount", title="Pending", format=","),
                     alt.Tooltip("ResolvedCount", title="Resolved", format=",")
                 ]
-            ).properties(height=max(300, len(summary_df) * 40))
+            ).properties(height=max(280, len(summary_df) * 38))
 
             text = bar_chart.mark_text(
                 align="left", baseline="middle", dx=3, fontWeight="bold", color="black"
