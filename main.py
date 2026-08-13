@@ -931,12 +931,11 @@ def render_pie_breakdown(df, group_col, chart_title, caption_parts, threshold=0.
             ignore_index=True
         )
 
-    # Full table data (all categories, not only major slices)
+    # Full table data (all categories) — name + count only
     table_rows = []
     for _, row in summary.iterrows():
-        pct = row["Count"] / total * 100
-        table_rows.append([str(row[group_col]), int(row["Count"]), f"{pct:.1f}%"])
-    table_rows.append(["TOTAL", int(total), "100%"])
+        table_rows.append([str(row[group_col]), int(row["Count"])])
+    table_rows.append(["TOTAL", int(total)])
 
     # Layout: pie on left, table on right
     fig = plt.figure(figsize=(11, 5.2))
@@ -967,8 +966,8 @@ def render_pie_breakdown(df, group_col, chart_title, caption_parts, threshold=0.
             arrowprops=dict(arrowstyle="-", lw=0.7, color="black"),
         )
 
-    # Embedded table
-    col_labels = [group_col, "Count", "%"]
+    # Embedded table (Sub Head / Head + Count only)
+    col_labels = [group_col, "Count"]
     table = ax_tbl.table(
         cellText=table_rows,
         colLabels=col_labels,
@@ -978,7 +977,7 @@ def render_pie_breakdown(df, group_col, chart_title, caption_parts, threshold=0.
     )
     table.auto_set_font_size(False)
     table.set_fontsize(8)
-    table.scale(1.0, 1.35)
+    table.scale(1.0, 1.4)
 
     # Style header + total row
     for j in range(len(col_labels)):
@@ -997,13 +996,11 @@ def render_pie_breakdown(df, group_col, chart_title, caption_parts, threshold=0.
             if i % 2 == 0:
                 table[(i, j)].set_facecolor("#f7f9fc")
 
-    # Column widths: name wider, count/% narrower
+    # Column widths: name wider, count narrower
     for i in range(last + 1):
-        table[(i, 0)].set_width(0.55)
-        table[(i, 1)].set_width(0.22)
-        table[(i, 2)].set_width(0.18)
+        table[(i, 0)].set_width(0.72)
+        table[(i, 1)].set_width(0.28)
         table[(i, 1)].set_text_props(ha="center")
-        table[(i, 2)].set_text_props(ha="center")
 
     fig.suptitle(chart_title, fontsize=13, fontweight="bold", y=0.98)
     fig.text(0.5, 0.015, " | ".join(caption_parts), ha="center", fontsize=7.5, color="gray")
