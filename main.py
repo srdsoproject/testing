@@ -8,7 +8,9 @@ from matplotlib import pyplot as plt
 import altair as alt
 import re
 import random
+import string
 import numpy as np
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from openpyxl.styles import Alignment, Font, Border, Side, NamedStyle
 from pandas.api.types import is_numeric_dtype, is_datetime64_any_dtype
 import pandas.api.types as ptypes
@@ -24,13 +26,19 @@ st.set_page_config(page_title="Inspection App", layout="wide")
 
 TIMESTAMP_COL_NAME = "Timestamp of Compliance"
 
+# Characters used for the CAPTCHA text. Visually-confusable characters
+# (0/O, 1/I/l) are excluded so a genuine human isn't penalised for a
+# reasonable misread.
+CAPTCHA_CHARS = "".join(c for c in (string.ascii_uppercase + string.digits) if c not in "0O1IL")
+CAPTCHA_LENGTH = 5
+CAPTCHA_MAX_ATTEMPTS = 5  # lock out after this many wrong CAPTCHA attempts in a session
+
 # =========================================================================
 # SESSION STATE INITIALIZATION (single pass — no duplicates)
 # =========================================================================
 DEFAULT_SESSION_STATE = {
-    "captcha_num1": lambda: random.randint(1, 10),
-    "captcha_num2": lambda: random.randint(1, 10),
-    "captcha_passed": lambda: False,
+    "captcha_text": lambda: None,       # the correct answer for the current image
+    "captcha_fail_count": lambda: 0,    # wrong CAPTCHA attempts this session
     "logged_in": lambda: False,
     "user": lambda: None,
     "df": lambda: None,
@@ -41,9 +49,77 @@ for _key, _default_factory in DEFAULT_SESSION_STATE.items():
         st.session_state[_key] = _default_factory()
 
 
+# =========================================================================
+# IMAGE CAPTCHA
+# =========================================================================
+def _load_captcha_font(size):
+    """Best-effort load of a bundled TrueType font; falls back to PIL's
+    built-in bitmap font if none of the common system paths exist."""
+    candidates = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+        "C:\\Windows\\Fonts\\arialbd.ttf",
+    ]
+    for path in candidates:
+        try:
+            return ImageFont.truetype(path, size)
+        except Exception:
+            continue
+    return ImageFont.load_default()
+
+
+def generate_captcha_text(length=CAPTCHA_LENGTH):
+    return "".join(random.choices(CAPTCHA_CHARS, k=length))
+
+
+def generate_captcha_image(text, width=240, height=90):
+    """Render `text` as a distorted image: randomised per-character
+    position/rotation/colour, background noise lines and dots, plus a
+    slight blur — enough to defeat simple OCR without being unreadable."""
+    bg = (245, 247, 250)
+    image = Image.new("RGB", (width, height), color=bg)
+    draw = ImageDraw.Draw(image)
+
+    # Background noise lines (drawn first, so text sits on top)
+    for _ in range(8):
+        xy = [
+            (random.randint(0, width), random.randint(0, height)),
+            (random.randint(0, width), random.randint(0, height)),
+        ]
+        draw.line(xy, fill=tuple(random.randint(190, 220) for _ in range(3)), width=2)
+
+    font = _load_captcha_font(46)
+    char_width = width // len(text)
+    for i, ch in enumerate(text):
+        char_img = Image.new("RGBA", (char_width, height), (0, 0, 0, 0))
+        char_draw = ImageDraw.Draw(char_img)
+        color = tuple(random.randint(20, 90) for _ in range(3))
+        char_draw.text((char_width * 0.15, height * 0.2), ch, font=font, fill=color)
+        angle = random.randint(-28, 28)
+        rotated = char_img.rotate(angle, expand=0, resample=Image.BICUBIC)
+        x_offset = i * char_width + random.randint(-4, 4)
+        y_offset = random.randint(-6, 6)
+        image.paste(rotated, (x_offset, y_offset), rotated)
+
+    # Foreground noise dots
+    for _ in range(120):
+        x, y = random.randint(0, width - 1), random.randint(0, height - 1)
+        draw.point((x, y), fill=tuple(random.randint(120, 180) for _ in range(3)))
+
+    image = image.filter(ImageFilter.SMOOTH)
+    buf = BytesIO()
+    image.save(buf, format="PNG")
+    buf.seek(0)
+    return buf
+
+
 def new_captcha():
-    st.session_state.captcha_num1 = random.randint(1, 10)
-    st.session_state.captcha_num2 = random.randint(1, 10)
+    st.session_state.captcha_text = generate_captcha_text()
+
+
+if st.session_state.captcha_text is None:
+    new_captcha()
 
 
 # =========================================================================
@@ -59,27 +135,39 @@ def login(email, password):
 if not st.session_state.logged_in:
     st.title("🔐 Login to S.A.R.A.L (Safety Abnormality Report & Action List)")
 
+    if st.session_state.captcha_fail_count >= CAPTCHA_MAX_ATTEMPTS:
+        st.error(
+            "🚫 Too many incorrect attempts. Please refresh the page and try again."
+        )
+        st.stop()
+
+    img_col, refresh_col = st.columns([3, 1])
+    with img_col:
+        st.image(
+            generate_captcha_image(st.session_state.captcha_text),
+            caption="Enter the characters shown above (not case-sensitive)",
+        )
+    with refresh_col:
+        st.write("")
+        st.write("")
+        if st.button("🔄 New Image", key="captcha_refresh_btn"):
+            new_captcha()
+            st.rerun()
+
     with st.form("login_form", clear_on_submit=False):
         email = st.text_input("📧 Email")
         password = st.text_input("🔒 Password", type="password")
-
-        st.markdown(
-            f"**🤖 Human check:** What is {st.session_state.captcha_num1} + "
-            f"{st.session_state.captcha_num2}?"
-        )
-        captcha_answer = st.text_input("Your answer", key="captcha_input")
+        captcha_answer = st.text_input("🤖 Type the characters shown in the image above", key="captcha_input")
 
         submitted = st.form_submit_button("Login")
 
         if submitted:
-            expected = st.session_state.captcha_num1 + st.session_state.captcha_num2
-            try:
-                given = int(captcha_answer.strip())
-            except (ValueError, AttributeError):
-                given = None
+            given = (captcha_answer or "").strip().upper()
+            expected = (st.session_state.captcha_text or "").upper()
 
-            if given != expected:
-                st.error("❌ Incorrect answer to the human check. Please try again.")
+            if not given or given != expected:
+                st.session_state.captcha_fail_count += 1
+                st.error("❌ Incorrect CAPTCHA. Please look at the new image and try again.")
                 new_captcha()
                 st.rerun()
             else:
@@ -87,9 +175,12 @@ if not st.session_state.logged_in:
                 if user:
                     st.session_state.logged_in = True
                     st.session_state.user = user
+                    st.session_state.captcha_fail_count = 0
+                    new_captcha()  # burn this CAPTCHA so it can't be replayed
                     st.success(f"✅ Welcome, {user['name']}!")
                     st.rerun()
                 else:
+                    st.session_state.captcha_fail_count += 1
                     st.error("❌ Invalid email or password.")
                     new_captcha()
                     st.rerun()
