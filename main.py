@@ -937,33 +937,39 @@ def render_pie_breakdown(df, group_col, chart_title, caption_parts, threshold=0.
         table_rows.append([str(row[group_col]), int(row["Count"])])
     table_rows.append(["TOTAL", int(total)])
 
-    # Layout: pie on left, table on right
-    fig = plt.figure(figsize=(11, 5.2))
-    ax_pie = fig.add_axes([0.02, 0.12, 0.48, 0.78])
-    ax_tbl = fig.add_axes([0.52, 0.08, 0.46, 0.82])
+    # Layout: pie + labels on left, table on right (no overlap)
+    fig = plt.figure(figsize=(12, 5.4))
+    # Pie occupies left half; leave room for labels on the LEFT side of the pie
+    ax_pie = fig.add_axes([0.08, 0.12, 0.38, 0.78])
+    ax_tbl = fig.add_axes([0.55, 0.08, 0.42, 0.82])
     ax_tbl.axis("off")
 
     wedges, texts, autotexts = ax_pie.pie(
         major["Count"], startangle=90, autopct="%1.1f%%",
         textprops=dict(color="black", fontsize=8),
-        pctdistance=0.72,
+        pctdistance=0.65,
+        radius=0.95,
     )
+    # Place ALL leader labels on the LEFT of the pie so they never cross into the table
     for i, (wedge, (_, row)) in enumerate(zip(wedges, major.iterrows())):
         ang = (wedge.theta2 + wedge.theta1) / 2.0
         x = np.cos(np.deg2rad(ang))
         y = np.sin(np.deg2rad(ang))
-        place_right = (i % 2 == 0)
-        lx = 1.35 if place_right else -1.35
-        ly = 1.1 * y
-        ax_pie.text(
-            lx, ly, f"{row[group_col]} ({row['Count']})",
-            ha="left" if place_right else "right",
-            va="center", fontsize=8,
-            bbox=dict(facecolor="white", edgecolor="gray", alpha=0.75, pad=1),
-        )
+        # Fixed left-side label column
+        lx = -1.55
+        # Spread labels vertically to reduce stacking
+        n = max(len(major), 1)
+        ly = 1.15 - (2.3 * i / max(n - 1, 1)) if n > 1 else 0.0
         ax_pie.annotate(
-            "", xy=(0.88 * x, 0.88 * y), xytext=(lx, ly),
-            arrowprops=dict(arrowstyle="-", lw=0.7, color="black"),
+            f"{row[group_col]} ({row['Count']})",
+            xy=(0.85 * x, 0.85 * y),
+            xytext=(lx, ly),
+            ha="right",
+            va="center",
+            fontsize=8,
+            bbox=dict(facecolor="white", edgecolor="gray", alpha=0.8, pad=1.5),
+            arrowprops=dict(arrowstyle="-", lw=0.7, color="gray",
+                            connectionstyle="arc3,rad=0"),
         )
 
     # Embedded table (Sub Head / Head + Count only)
