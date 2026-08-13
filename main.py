@@ -908,10 +908,8 @@ def build_excel_export(export_df, sheet_name):
 # HELPERS — pie-chart breakdown (shared by Head / Sub Head distributions)
 # =========================================================================
 def render_pie_breakdown(df, group_col, chart_title, caption_parts, threshold=0.02):
-    """Clean pie + table image. Colours are assigned by category name so the
-    pie slices and table rows always match. No leader lines.
+    """Pie chart with leader lines + labels, and a counts table on the right.
     """
-    # Normalise the grouping column so keys match everywhere
     work = df.copy()
     work[group_col] = work[group_col].fillna("").astype(str).str.strip()
     work.loc[work[group_col] == "", group_col] = "(Blank)"
@@ -929,119 +927,121 @@ def render_pie_breakdown(df, group_col, chart_title, caption_parts, threshold=0.
     total = int(summary["Count"].sum())
     summary["Percent"] = summary["Count"] / total
 
-    # Assign a unique colour to EVERY category (stable by rank order)
-    base_colors = [
-        "#4E79A7", "#F28E2B", "#E15759", "#76B7B2", "#59A14F",
-        "#EDC948", "#B07AA1", "#FF9DA7", "#9C755F", "#BAB0AC",
-        "#1F77B4", "#FF7F0E", "#2CA02C", "#D62728", "#9467BD",
-        "#8C564B", "#E377C2", "#7F7F7F", "#BCBD22", "#17BECF",
-        "#393B79", "#637939", "#8C6D31", "#843C39", "#7B4173",
-    ]
-    color_map = {}
-    for i, name in enumerate(summary[group_col].tolist()):
-        color_map[name] = base_colors[i % len(base_colors)]
-
-    # Major slices for the pie (small ones rolled into Others)
     major = summary[summary["Percent"] >= threshold][[group_col, "Count"]].copy()
     minor = summary[summary["Percent"] < threshold]
-    others_color = "#A0A0A0"
     if not minor.empty:
         major = pd.concat(
             [major, pd.DataFrame([{group_col: "Others", "Count": int(minor["Count"].sum())}])],
             ignore_index=True,
         )
-        color_map["Others"] = others_color
 
-    # Pie colours in the exact same order as major rows
-    pie_colors = [color_map[str(n)] for n in major[group_col].tolist()]
+    base_colors = [
+        "#4E79A7", "#F28E2B", "#E15759", "#76B7B2", "#59A14F",
+        "#EDC948", "#B07AA1", "#FF9DA7", "#9C755F", "#BAB0AC",
+        "#1F77B4", "#FF7F0E", "#2CA02C", "#D62728", "#9467BD",
+        "#8C564B", "#E377C2", "#7F7F7F", "#BCBD22", "#17BECF",
+    ]
+    colors = [base_colors[i % len(base_colors)] for i in range(len(major))]
 
-    # ----- Figure -----
-    fig = plt.figure(figsize=(11, 5.2), facecolor="white")
-    ax_pie = fig.add_axes([0.03, 0.14, 0.40, 0.72])
-    ax_tbl = fig.add_axes([0.48, 0.10, 0.50, 0.78])
+    # Table rows: name + count only
+    table_rows = [[str(r[group_col]), int(r["Count"])] for _, r in summary.iterrows()]
+    table_rows.append(["TOTAL", total])
+
+    # Layout: pie left (with room for labels), table right
+    fig = plt.figure(figsize=(12, 5.5), facecolor="white")
+    ax_pie = fig.add_axes([0.02, 0.12, 0.50, 0.78])
+    ax_tbl = fig.add_axes([0.58, 0.10, 0.40, 0.80])
     ax_tbl.axis("off")
 
-    def _autopct(pct):
-        return f"{pct:.1f}%" if pct >= 3 else ""
-
-    wedges, _texts, autotexts = ax_pie.pie(
+    wedges, texts, autotexts = ax_pie.pie(
         major["Count"].tolist(),
-        colors=pie_colors,
+        colors=colors,
         startangle=90,
-        autopct=_autopct,
-        pctdistance=0.60,
-        wedgeprops=dict(edgecolor="white", linewidth=1.5),
+        autopct="%1.1f%%",
+        pctdistance=0.55,
+        textprops=dict(color="black", fontsize=8),
+        wedgeprops=dict(edgecolor="white", linewidth=1.2),
     )
     for t in autotexts:
         t.set_fontsize(8)
         t.set_fontweight("bold")
-        t.set_color("white")
+
+    # Leader lines + labels — alternate left/right around the pie
+    for i, (wedge, (_, row)) in enumerate(zip(wedges, major.iterrows())):
+        ang = (wedge.theta2 + wedge.theta1) / 2.0
+        x = np.cos(np.deg2rad(ang))
+        y = np.sin(np.deg2rad(ang))
+
+        # Prefer left side for labels so they stay away from the table
+        # but allow right-side labels only for slices clearly on the right
+        # and keep them close to the pie (short lines)
+        if x >= 0:
+            lx = 1.25
+            ha = "left"
+        else:
+            lx = -1.25
+            ha = "right"
+        ly = 1.15 * y
+
+        label = f"{row[group_col]} ({int(row['Count'])})"
+        ax_pie.annotate(
+            label,
+            xy=(0.92 * x, 0.92 * y),
+            xytext=(lx, ly),
+            ha=ha,
+            va="center",
+            fontsize=8,
+            bbox=dict(boxstyle="round,pad=0.25", facecolor="white", edgecolor="#AAAAAA", alpha=0.9),
+            arrowprops=dict(arrowstyle="-", color="#555555", lw=0.8,
+                            connectionstyle="arc3,rad=0"),
+        )
+
+    ax_pie.set_xlim(-1.7, 1.7)
+    ax_pie.set_ylim(-1.5, 1.5)
     ax_pie.set_aspect("equal")
 
-    # ----- Table: colour dot | name | count (same colour_map as pie) -----
-    headers = ["", group_col, "Count"]
-    cell_text = []
-    for _, r in summary.iterrows():
-        name = str(r[group_col])
-        cell_text.append(["●", name, f"{int(r['Count'])}"])
-    cell_text.append(["", "TOTAL", f"{total}"])
-
+    # Table
+    col_labels = [group_col, "Count"]
     table = ax_tbl.table(
-        cellText=cell_text,
-        colLabels=headers,
+        cellText=table_rows,
+        colLabels=col_labels,
         loc="center",
         cellLoc="left",
     )
     table.auto_set_font_size(False)
     table.set_fontsize(9)
-    table.scale(1.05, 1.55)
+    table.scale(1.05, 1.5)
 
-    n_data = len(summary)  # excludes TOTAL
-    # Header
-    for j in range(3):
-        c = table[(0, j)]
-        c.set_facecolor("#1F4E79")
-        c.set_text_props(color="white", fontweight="bold", fontsize=9, ha="center")
+    n_data = len(table_rows) - 1  # exclude TOTAL
+    for j in range(2):
+        cell = table[(0, j)]
+        cell.set_facecolor("#1F4E79")
+        cell.set_text_props(color="white", fontweight="bold", fontsize=9, ha="center")
 
     for i in range(1, n_data + 1):
-        name = str(summary.iloc[i - 1][group_col])
-        swatch = color_map[name]
-        alt = "#F8FAFC" if i % 2 == 0 else "#FFFFFF"
+        alt = "#F5F7FA" if i % 2 == 0 else "#FFFFFF"
+        table[(i, 0)].set_facecolor(alt)
+        table[(i, 0)].set_text_props(ha="left", fontsize=9)
+        table[(i, 1)].set_facecolor(alt)
+        table[(i, 1)].set_text_props(ha="center", fontsize=9)
 
-        c0 = table[(i, 0)]
-        c0.set_facecolor(alt)
-        c0.set_text_props(color=swatch, ha="center", fontsize=14, fontweight="bold")
+    # TOTAL
+    last = n_data + 1
+    for j in range(2):
+        table[(last, j)].set_facecolor("#E8F0FE")
+        table[(last, j)].set_text_props(fontweight="bold", fontsize=9,
+                                        ha="center" if j == 1 else "left")
 
-        c1 = table[(i, 1)]
-        c1.set_facecolor(alt)
-        c1.set_text_props(ha="left", fontsize=9, color="#1A1A1A")
+    for i in range(last + 1):
+        table[(i, 0)].set_width(0.70)
+        table[(i, 1)].set_width(0.30)
 
-        c2 = table[(i, 2)]
-        c2.set_facecolor(alt)
-        c2.set_text_props(ha="center", fontsize=9, color="#1A1A1A")
-
-    # TOTAL row
-    total_row = n_data + 1
-    for j in range(3):
-        c = table[(total_row, j)]
-        c.set_facecolor("#E8F0FE")
-        c.set_text_props(fontweight="bold", fontsize=9, ha="center" if j != 1 else "left")
-    table[(total_row, 0)].get_text().set_text("")
-
-    for i in range(n_data + 2):  # header + data + total
-        table[(i, 0)].set_width(0.10)
-        table[(i, 1)].set_width(0.62)
-        table[(i, 2)].set_width(0.28)
-
-    for _key, cell in table.get_celld().items():
+    for _k, cell in table.get_celld().items():
         cell.set_edgecolor("#D0D7DE")
         cell.set_linewidth(0.6)
 
-    fig.suptitle(chart_title, fontsize=14, fontweight="bold", y=0.96, color="#1A1A1A")
-    fig.text(
-        0.5, 0.02, " | ".join(caption_parts),
-        ha="center", fontsize=7.5, color="#666666",
-    )
+    fig.suptitle(chart_title, fontsize=14, fontweight="bold", y=0.97, color="#1A1A1A")
+    fig.text(0.5, 0.02, " | ".join(caption_parts), ha="center", fontsize=7.5, color="#666666")
 
     buf = BytesIO()
     plt.savefig(buf, format="png", dpi=160, bbox_inches="tight", facecolor="white")
