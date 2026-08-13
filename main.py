@@ -28,6 +28,16 @@ if "captcha_num2" not in st.session_state:
     st.session_state.captcha_num2 = random.randint(1, 10)
 if "captcha_passed" not in st.session_state:
     st.session_state.captcha_passed = False
+if "captcha_num1" not in st.session_state:
+    st.session_state.captcha_num1 = random.randint(1, 10)
+if "captcha_num2" not in st.session_state:
+    st.session_state.captcha_num2 = random.randint(1, 10)
+if "captcha_passed" not in st.session_state:
+    st.session_state.captcha_passed = False
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+if "user" not in st.session_state:
+    st.session_state.user = None
 
 def new_captcha():
     st.session_state.captcha_num1 = random.randint(1, 10)
