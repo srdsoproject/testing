@@ -18,19 +18,23 @@ from datetime import datetime, date, timedelta
 # ---------- CONFIG ----------
 st.set_page_config(page_title="Inspection App", layout="wide")
 
-# ---------- SESSION STATE INITIALIZATION ----------
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if "user" not in st.session_state:
-    st.session_state.user = {}
-if "ack_done" not in st.session_state:
-    st.session_state.ack_done = False
-if "df" not in st.session_state:
-    st.session_state.df = None
+
+import random
+
+# ---------- SESSION STATE INITIALIZATION (add these) ----------
+if "captcha_num1" not in st.session_state:
+    st.session_state.captcha_num1 = random.randint(1, 10)
+if "captcha_num2" not in st.session_state:
+    st.session_state.captcha_num2 = random.randint(1, 10)
+if "captcha_passed" not in st.session_state:
+    st.session_state.captcha_passed = False
+
+def new_captcha():
+    st.session_state.captcha_num1 = random.randint(1, 10)
+    st.session_state.captcha_num2 = random.randint(1, 10)
 
 # ---------- LOGIN ----------
 def login(email, password):
-    """Check credentials against st.secrets['users']"""
     for user in st.secrets["users"]:
         if user["email"] == email and user["password"] == password:
             return user
@@ -38,19 +42,38 @@ def login(email, password):
 
 if not st.session_state.logged_in:
     st.title("🔐 Login to S.A.R.A.L (Safety Abnormality Report & Action List)")
-    with st.form("login_form", clear_on_submit=True):
+
+    with st.form("login_form", clear_on_submit=False):
         email = st.text_input("📧 Email")
         password = st.text_input("🔒 Password", type="password")
+
+        st.markdown(f"**🤖 Human check:** What is {st.session_state.captcha_num1} + {st.session_state.captcha_num2}?")
+        captcha_answer = st.text_input("Your answer", key="captcha_input")
+
         submitted = st.form_submit_button("Login")
+
         if submitted:
-            user = login(email, password)
-            if user:
-                st.session_state.logged_in = True
-                st.session_state.user = user
-                st.success(f"✅ Welcome, {user['name']}!")
+            expected = st.session_state.captcha_num1 + st.session_state.captcha_num2
+            try:
+                given = int(captcha_answer.strip())
+            except (ValueError, AttributeError):
+                given = None
+
+            if given != expected:
+                st.error("❌ Incorrect answer to the human check. Please try again.")
+                new_captcha()
                 st.rerun()
             else:
-                st.error("❌ Invalid email or password.")
+                user = login(email, password)
+                if user:
+                    st.session_state.logged_in = True
+                    st.session_state.user = user
+                    st.success(f"✅ Welcome, {user['name']}!")
+                    st.rerun()
+                else:
+                    st.error("❌ Invalid email or password.")
+                    new_captcha()
+                    st.rerun()
     st.stop()
 
 # ---------- ACKNOWLEDGMENT ----------
