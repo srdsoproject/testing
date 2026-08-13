@@ -526,6 +526,8 @@ def load_data():
         st.warning("Returning empty DataFrame to prevent crashes.")
         return pd.DataFrame(columns=REQUIRED_COLS)
 
+if "df" not in st.session_state:
+    st.session_state.df = None
 if st.session_state.df is None:
     st.session_state.df = load_data()
 
