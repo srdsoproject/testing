@@ -1169,6 +1169,22 @@ with tabs[0]:
     filtered = filtered.apply(lambda x: x.str.replace("\n", " ") if x.dtype == "object" else x)
     filtered = filtered.sort_values("Date of Inspection")
 
+    # Use the user-selected date range from filters (not full dataset min/max)
+    sel_from = st.session_state.get("view_from_date")
+    sel_to = st.session_state.get("view_to_date")
+    if sel_from and sel_to:
+        if sel_from > sel_to:
+            sel_from, sel_to = sel_to, sel_from
+        dr = f"{sel_from.strftime('%d-%m-%Y')} to {sel_to.strftime('%d-%m-%Y')}"
+    elif not filtered.empty and not filtered["Date of Inspection"].isna().all():
+        # Fallback: actual span of rows currently shown
+        dr = (
+            f"{filtered['Date of Inspection'].min().strftime('%d-%m-%Y')} to "
+            f"{filtered['Date of Inspection'].max().strftime('%d-%m-%Y')}"
+        )
+    else:
+        dr = "N/A"
+
     # Metrics – 2×2 on mobile, 4 across on desktop
     col_a, col_b, col_c, col_d = st.columns(4)
     pending_count = (filtered["Status"] == "Pending").sum()
@@ -1182,7 +1198,6 @@ with tabs[0]:
     # ---- Department-wise (Head) breakdown when Location is selected ----
     if st.session_state.view_location_filter and not filtered.empty:
         st.markdown("### 📊 Department-wise Distribution")
-        dr = f"{start_date.strftime('%d-%m-%Y')} to {end_date.strftime('%d-%m-%Y')}"
         locations = ", ".join(st.session_state.view_location_filter)
         type_display = ", ".join(st.session_state.view_type_filter) if st.session_state.view_type_filter else "All Types"
         render_pie_breakdown(
@@ -1193,7 +1208,6 @@ with tabs[0]:
     # ---- Sub Head breakdown when Head is selected ----
     if st.session_state.view_head_filter and not filtered.empty:
         st.markdown("### Sub Head Distribution")
-        dr = f"{start_date.strftime('%d-%m-%Y')} to {end_date.strftime('%d-%m-%Y')}"
         heads = ", ".join(st.session_state.view_head_filter)
         type_display = ", ".join(st.session_state.view_type_filter) if st.session_state.view_type_filter else "All Types"
         location_display = ", ".join(st.session_state.view_location_filter) if st.session_state.view_location_filter else "All Locations"
