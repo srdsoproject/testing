@@ -969,6 +969,15 @@ def render_pie_breakdown(df, group_col, chart_title, caption_parts, threshold=0.
         use_container_width=True,
     )
 
+    # Distribution table (counts + %) — full breakdown, not only major slices
+    table_df = summary.copy()
+    table_df["Percent"] = (table_df["Count"] / total * 100).round(1).astype(str) + "%"
+    table_df = table_df.rename(columns={group_col: group_col, "Count": "Count", "Percent": "%"})
+    table_df = table_df[[group_col, "Count", "%"]]
+    st.markdown(f"**{group_col} distribution (counts)**")
+    st.dataframe(table_df, use_container_width=True, hide_index=True)
+    st.caption(f"Total records in this breakdown: **{total}**")
+
 
 # =========================================================================
 # HEADER
