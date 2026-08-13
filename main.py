@@ -141,25 +141,26 @@ if not st.session_state.logged_in:
         )
         st.stop()
 
-    img_col, refresh_col = st.columns([3, 1])
-    with img_col:
-        st.image(
-            generate_captcha_image(st.session_state.captcha_text),
-            caption="Enter the characters shown above (not case-sensitive)",
-        )
-    with refresh_col:
-        st.write("")
-        st.write("")
-        if st.button("🔄 New Image", key="captcha_refresh_btn"):
-            new_captcha()
-            st.rerun()
-
     with st.form("login_form", clear_on_submit=False):
         email = st.text_input("📧 Email")
         password = st.text_input("🔒 Password", type="password")
-        captcha_answer = st.text_input("🤖 Type the characters shown in the image above", key="captcha_input")
 
-        submitted = st.form_submit_button("Login")
+        st.markdown("**🤖 Human check:**")
+        st.image(
+            generate_captcha_image(st.session_state.captcha_text),
+            caption="Type the characters shown above (not case-sensitive)",
+        )
+        captcha_answer = st.text_input("Enter the characters shown in the image", key="captcha_input")
+
+        btn_col1, btn_col2 = st.columns([2, 1])
+        with btn_col1:
+            submitted = st.form_submit_button("Login", use_container_width=True)
+        with btn_col2:
+            refresh_clicked = st.form_submit_button("🔄 New Image", use_container_width=True)
+
+        if refresh_clicked:
+            new_captcha()
+            st.rerun()
 
         if submitted:
             given = (captcha_answer or "").strip().upper()
