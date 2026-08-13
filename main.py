@@ -44,7 +44,7 @@ if not st.session_state.logged_in:
     st.title("🔐 Login to S.A.R.A.L (Safety Abnormality Report & Action List)")
 
     with st.form("login_form", clear_on_submit=False):
-        email = st.text_input("📧 User Id")
+        email = st.text_input("📧 Email")
         password = st.text_input("🔒 Password", type="password")
 
         st.markdown(f"**Verify Captcha:** What is {st.session_state.captcha_num1} + {st.session_state.captcha_num2}?")
