@@ -47,7 +47,7 @@ if not st.session_state.logged_in:
         email = st.text_input("📧 Email")
         password = st.text_input("🔒 Password", type="password")
 
-        st.markdown(f"**Verify Captcha:** What is {st.session_state.captcha_num1} + {st.session_state.captcha_num2}?")
+        st.markdown(f"**🤖 Human check:** What is {st.session_state.captcha_num1} + {st.session_state.captcha_num2}?")
         captcha_answer = st.text_input("Your answer", key="captcha_input")
 
         submitted = st.form_submit_button("Login")
@@ -75,7 +75,6 @@ if not st.session_state.logged_in:
                     new_captcha()
                     st.rerun()
     st.stop()
-
 # ---------- ACKNOWLEDGMENT ----------
 user_id = st.session_state.user["email"]  # use email as unique ID
 
