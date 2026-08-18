@@ -1944,23 +1944,6 @@ with tabs[3]:
     SHEET_NAME = st.secrets["google_sheets"]["sheet_name"]
 
     # ============================================================
-    # DEPARTMENT → SUB HEAD MAPPING
-    # ============================================================
-    SUBHEAD_LIST = {
-        "ELECT/TRD": ["T/W WAGON", "TSS/SP/SSP", "OHE SECTION", "OHE STATION", "MISC"],
-        "ELECT/G": ["TL/AC COACH", "POWER/PANTRY CAR", "WIRING/EQUIPMENT", "UPS", "AC", "DG", "SOLAR LIGHT", "MISC", 'LIGHT/ILLUMINATION'],
-        "ELECT/TRO": ["LOCO DEFECTS", "RUNNING ROOM DEFICIENCIES", "LOBBY DEFICIENCIES", "LRD RELATED", "PERSONAL STORE", "PR RELATED",
-                      "CMS", "FSD","MISC"],
-        "MECHANICAL": ['ART/ARME', "CCTV related", "Coaching related (Other)", "MISC", 'Coaching related (Primary)', 'Depot infrastructure (KLBG)', 'Depot infrastructure (KWV)', 'Depot infrastructure (LUR)', 'Depot infrastructure (SUR)', 'Depot infrastructure (WADI', 'HABD related', 'Staff working', 'Wagon related (SUR DIV examined)', 'Wagon related (Other)'],
-        "SIGNAL & TELECOM": ["ART/ARME", 'CABLES/EARTHING/KAVACH', 'FIRE ALARM/EXTINGUISHER', 'JOINT INSPECTION (P&C/TC/TRD)', 'LC GATE DEFICIENCIES', 'PANEL/VDU/BI/BPAC/DOCUMENTS', 'PASSENGER AMENITIES/CCTV', 'RELAY ROOM/DL', 'SIGNAL/BOARDS/VEGETATION', 'TRACK CIRCUIT/POINTS', 'WALKIE-TALKIE/COMMUNICATION', 'MISC'],
-        "OPTG": ["SWR/CSR/CSL/TWRD", "STATION RECORDS", "STATION DEFICIENCIES", "TRAIN O/P RELATED", "LC GATE DEFICIENCIES", "CIRCULAR/KNOWLEDGE/STAFF", "SIGNAL EXCHANGE", 'WALKIE-TALKIE/PHONE',
-                 "SM OFFICE DEFICIENCIES/ASSETS", "MISC"],
-        "ENGINEERING": ["IOW WORKS (Other)", "IOW WORKS (Safety Related)", "PWI (Track Related)", 'LC GATE DEFICIENCIES', 'P&C', 'WORKSITE'],
-        "COMMERCIAL": ["REQUIREMENT/ASSETS", "CLEANLINESS/COAL BAGS", "PASSENGER AMENITIES", "STAFF (RAILWAY/CONTRACT)", "MISC"],
-        "FINANCE": ["MISC"], "MEDICAL": ["MISC"], "STORE": ["MISC"], "GSU": ["IOW WORKS (Other)", "IOW WORKS (Safety Related)"]
-    }
-
-    # ============================================================
     # CUSTOM CSS
     # ============================================================
     st.markdown("""
@@ -2346,7 +2329,6 @@ with tabs[3]:
                 adste[m] = 0
         adste["Total"] = adste[month_order].sum(axis=1)
         adste["Share"] = (adste["Total"] / total * 100).round(2)
-
         adste_display = adste.copy()
         adste_display = adste_display.rename(columns=month_names)
         adste_display = adste_display.reset_index()
