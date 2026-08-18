@@ -1942,7 +1942,32 @@ with tabs[3]:
     SHEET_NAME = st.secrets["google_sheets"]["sheet_name"]
 
     # ============================================================
-    # CUSTOM CSS (safe to keep)
+    # DEPARTMENT → SUB HEAD MAPPING
+    # ============================================================
+    SUBHEAD_LIST = {
+        "ELECT/TRD": ["T/W WAGON", "TSS/SP/SSP", "OHE SECTION", "OHE STATION", "MISC"],
+        "ELECT/G": ["TL/AC COACH", "POWER/PANTRY CAR", "WIRING/EQUIPMENT", "UPS", "AC", "DG", "SOLAR LIGHT", "MISC"],
+        "ELECT/TRO": ["LOCO DEFECTS", "RUNNING ROOM DEFICIENCIES", "LOBBY DEFICIENCIES", "LRD RELATED",
+                      "PERSONAL STORE", "PR RELATED", "CMS", "FSD", "MISC"],
+        "MECHANICAL": ['C&W RELATED', "DEMU RELATED", "VANDE BHARAT RELATED", "MISC",
+                       'MECHANICAL RELATED', 'HABD'],
+        "SIGNAL & TELECOM": ["S&T ASSETS", 'WALKIE-TALKIE/PHONE', 'VDU/BPAC/BLOCK INST./PANEL',
+                             'PASSENGER AMENITIES', 'SIGNAL RELATED', 'P&C', 'TRACK CIRCUIT',
+                             'RELAY ROOM', 'MISC'],
+        "OPTG": ["SWR/CSR/CSL/TWRD", "STATION RECORDS", "STATION DEFICIENCIES", "TRAIN O/P RELATED",
+                 "LC GATE DEFICIENCIES", "CIRCULAR/KNOWLEDGE/STAFF", "SIGNAL EXCHANGE",
+                 'WALKIE-TALKIE/PHONE', "SM OFFICE DEFICIENCIES/ASSETS", "MISC"],
+        "ENGINEERING": ["IOW WORKS (Other)", "IOW WORKS (Safety Related)", "PWI (Track Related)",
+                        'LC GATE DEFICIENCIES', 'P&C', 'WORKSITE'],
+        "COMMERCIAL": ["REQUIREMENT/ASSETS", "CLEANLINESS/COAL BAGS", "PASSENGER AMENITIES",
+                       "STAFF (RAILWAY/CONTRACT)", "MISC"],
+        "FINANCE": ["MISC"],
+        "MEDICAL": ["MISC"],
+        "STORE": ["MISC"],
+    }
+
+    # ============================================================
+    # CUSTOM CSS
     # ============================================================
     st.markdown("""
     <style>
@@ -2056,7 +2081,7 @@ with tabs[3]:
         return "Pending"
 
     # ============================================================
-    # ADSTE LOCATION MAPPING
+    # ADSTE LOCATION MAPPING (currently only for S&T)
     # ============================================================
     KLBG = {
         "WADI", "SDB", "MR", "HQR", "KLBG", "BBD", "SVG", "HHD", "GUR", "KUI",
@@ -2105,7 +2130,6 @@ with tabs[3]:
     def load_google_sheet(sheet_id: str, sheet_name: str):
         if not sheet_id or not sheet_name:
             return None
-
         try:
             url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={sheet_name}"
             df = pd.read_csv(url)
@@ -2114,7 +2138,6 @@ with tabs[3]:
             try:
                 import gspread
                 from google.oauth2.service_account import Credentials
-
                 scopes = [
                     "https://www.googleapis.com/auth/spreadsheets.readonly",
                     "https://www.googleapis.com/auth/drive.readonly"
@@ -2132,11 +2155,12 @@ with tabs[3]:
                 return None
 
     # ============================================================
-    # PREPROCESS DATA
+    # PREPROCESS DATA + DEPARTMENT FILTER
     # ============================================================
     def preprocess_data(df: pd.DataFrame, date_from: date, date_to: date, department: str):
         df = df.copy()
 
+        # Normalize column names
         col_map = {}
         for c in df.columns:
             cl = str(c).strip().lower()
@@ -2161,21 +2185,33 @@ with tabs[3]:
         required = ["Date of Inspection", "Sub Head", "Location"]
         for col in required:
             if col not in df.columns:
-                st.warning(f"Column '{col}' not found in the sheet. Available columns: {list(df.columns)}")
+                st.warning(f"Column '{col}' not found. Available columns: {list(df.columns)}")
                 return pd.DataFrame()
 
+        # Date parsing & filtering
         df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce", dayfirst=True)
         df = df.dropna(subset=["Date of Inspection"])
 
         mask = (df["Date of Inspection"].dt.date >= date_from) & (df["Date of Inspection"].dt.date <= date_to)
         df = df[mask].copy()
 
-        if "Department" in df.columns and department:
-            df = df[df["Department"].astype(str).str.contains(department, case=False, na=False)]
-
+        # Clean text columns
         for col in ["Sub Head", "Location"]:
             df[col] = df[col].fillna("").astype(str).str.strip()
 
+        # --------------------------------------------------------
+        # FILTER BY DEPARTMENT SUB-HEADS (important)
+        # --------------------------------------------------------
+        allowed_subheads = SUBHEAD_LIST.get(department, [])
+        if allowed_subheads:
+            # Case-insensitive matching
+            allowed_upper = {s.upper().strip() for s in allowed_subheads}
+            df = df[df["Sub Head"].str.upper().str.strip().isin(allowed_upper)].copy()
+
+        if df.empty:
+            return df
+
+        # Apply classification
         feedback_col = "Feedback" if "Feedback" in df.columns else None
         remark_col = "User Remark" if "User Remark" in df.columns else None
 
@@ -2192,6 +2228,7 @@ with tabs[3]:
             else:
                 df["Status"] = df["Status"].fillna("Pending").astype(str)
 
+        # ADSTE mapping
         adste_map = build_adste_map()
         df["ADSTE"] = df["Location"].map(adste_map)
 
@@ -2213,7 +2250,7 @@ with tabs[3]:
     </div>
     """, unsafe_allow_html=True)
 
-    # Filters (use unique keys because we are inside a tab)
+    # Filters
     st.subheader("Filters")
     col1, col2, col3 = st.columns([1, 1, 1.2])
 
@@ -2222,9 +2259,11 @@ with tabs[3]:
     with col2:
         date_to = st.date_input("To", value=date(2026, 6, 30), key="snt_date_to")
     with col3:
+        # Currently only Signal & Telecom is enabled.
+        # Later you can expand this list.
         department = st.selectbox(
             "Department / Jurisdiction",
-            options=["Signal & Telecom", "S&T"],
+            options=["SIGNAL & TELECOM"],          # ← only this for now
             index=0,
             key="snt_department"
         )
@@ -2244,7 +2283,7 @@ with tabs[3]:
     df = preprocess_data(raw_df, date_from, date_to, department)
 
     if df.empty:
-        st.warning("No records found for the selected date range and department.")
+        st.warning(f"No records found for **{department}** in the selected date range.")
         st.stop()
 
     # ============================================================
@@ -2417,7 +2456,8 @@ with tabs[3]:
             <b>Source:</b> SARAL System &nbsp;|&nbsp;
             <b>Reporting Department:</b> Safety Department, SUR DIVN, CR &nbsp;|&nbsp;
             <b>Analysis Type:</b> Deficiency Analysis &nbsp;|&nbsp;
-            <b>Period:</b> {date_from.strftime('%d %b %Y')} to {date_to.strftime('%d %b %Y')}
+            <b>Period:</b> {date_from.strftime('%d %b %Y')} to {date_to.strftime('%d %b %Y')} &nbsp;|&nbsp;
+            <b>Department:</b> {department}
         </div>
         """,
         unsafe_allow_html=True
