@@ -1894,20 +1894,18 @@ with tabs[2]:
                                 key=f"insp_msg_{g_name}_{g_phone}_{g_date}",
                             )
 
-                            digits_only = re.sub(r"[^0-9]", "", str(g_phone))
                             b1, b2 = st.columns(2)
                             with b1:
-                                if digits_only:
-                                    wa_url = f"https://wa.me/{digits_only}?text={quote(message)}"
-                                    st.markdown(
-                                        f'<a href="{wa_url}" target="_blank" rel="noopener noreferrer">'
-                                        f'<button style="width:100%;min-height:44px;background-color:#25D366;'
-                                        f'color:white;border:none;border-radius:10px;font-weight:600;">'
-                                        f'📤 Send via WhatsApp</button></a>',
-                                        unsafe_allow_html=True,
-                                    )
-                                else:
-                                    st.caption("No phone number available for this record.")
+                                # No phone number in the link — this opens WhatsApp's own
+                                # share screen and lets the user pick the contact/group manually.
+                                wa_url = f"https://wa.me/?text={quote(message)}"
+                                st.markdown(
+                                    f'<a href="{wa_url}" target="_blank" rel="noopener noreferrer">'
+                                    f'<button style="width:100%;min-height:44px;background-color:#25D366;'
+                                    f'color:white;border:none;border-radius:10px;font-weight:600;">'
+                                    f'📤 Share via WhatsApp</button></a>',
+                                    unsafe_allow_html=True,
+                                )
                             with b2:
                                 safe_name = re.sub(r"[^A-Za-z0-9_-]+", "_", str(g_name) or "unknown")
                                 st.download_button(
