@@ -1219,7 +1219,7 @@ if st.session_state.df is None:
 # =========================================================================
 # MAIN TABS
 # =========================================================================
-tabs = st.tabs(["📝 View Records", "📊 Analytics", "📨 Inspections", "Smart Analysis"])
+tabs = st.tabs(["📝 View Records", "📊 Analytics", "📨 Inspections", " 💡Smart Analysis"])
 
 with tabs[0]:
     df = st.session_state.df
@@ -1931,3 +1931,565 @@ with tabs[2]:
                                     use_container_width=True,
                                     key=f"insp_dl_{g_name}_{g_phone}_{g_date}",
                                 )
+with tabs[3]:
+    # ============================================================
+    # GOOGLE SHEET CONFIGURATION (FILL THESE LATER)
+    # ============================================================
+    SHEET_ID = st.secrets["google_sheets"]["sheet_id"]
+    SHEET_NAME = st.secrets["google_sheets"]["sheet_name"]
+    
+    # ============================================================
+    # PAGE CONFIG
+    # ============================================================
+    st.set_page_config(
+        page_title="Safety Deficiencies Dashboard | Solapur Division",
+        page_icon="🚂",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
+    
+    # ============================================================
+    # CUSTOM CSS
+    # ============================================================
+    st.markdown("""
+    <style>
+        .main-header {
+            background: linear-gradient(90deg, #0C2F67 0%, #123A7A 100%);
+            padding: 1.2rem 1.5rem;
+            border-radius: 10px;
+            color: white;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+        .kpi-card {
+            background: white;
+            border: 1px solid #D4DDE8;
+            border-radius: 10px;
+            padding: 1rem;
+            text-align: center;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+        }
+        .kpi-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin: 0.3rem 0;
+        }
+        .kpi-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        .section-header {
+            background: #123A7A;
+            color: white;
+            padding: 0.55rem 1rem;
+            border-radius: 8px 8px 0 0;
+            font-weight: 600;
+            font-size: 0.95rem;
+            margin-bottom: 0;
+        }
+        .stDataFrame {
+            border: 1px solid #D4DDE8;
+            border-radius: 0 0 8px 8px;
+        }
+        div[data-testid="stMetricValue"] {
+            font-size: 1.6rem;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # ============================================================
+    # CLASSIFICATION LOGIC (from your provided function)
+    # ============================================================
+    def normalize_str(text):
+        if not isinstance(text, str):
+            return ""
+        return re.sub(r'\s+', ' ', text.lower()).strip()
+    
+    def classify_feedback(feedback, user_remark=""):
+        if isinstance(feedback, str) and feedback.strip() == "`":
+            return ""
+    
+        def _classify(text_normalized):
+            if not text_normalized:
+                return None
+    
+            date_found = bool(re.search(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', text_normalized))
+    
+            resolved_kw = [
+                "attended", "solved", "done", "completed", "confirmed by",
+                "message given", "tdc work completed", "replaced", "msg given",
+                "msg sent", "counseled", "info shared", "communicated",
+                "sent successfully", "counselled", "gate will be closed soon",
+                "attending at the time", "handled", "resolved", "action taken",
+                "spoken to", "warned", "counselling", "hubli", "working normal",
+                "met", "discussion held", "report sent", "notified", "explained",
+                "nil", "na", "tlc", "work completed", "acknowledged", "visited",
+                "briefed", "guided", "handover", "working properly",
+                "checked found working", "supply restored",
+                "this is not a deficiency.", "this is not a deficiency",
+                "not a deficiency", "this is observation", "it is observation",
+                "updated by", "adv to", "counselled the staff", "complied",
+                "checked and found", "maintained", "for needful action",
+                "provided at", "in working condition", "is working",
+                "found working", "equipment is working", "item is working",
+                "as per plan", "putright", "put right", 'attend dt', 'attend dt.',
+                "operational feasibility", "will be provided",
+                "will be supplied shortly", "advised to ubl", "updated"
+            ]
+    
+            pending_kw = [
+                "work is going on", "tdc given", "target date", "expected by",
+                "likely by", "planned by", "will be", "needful", "to be",
+                "pending", "not done", "awaiting", "waiting", "yet to",
+                "next time", "follow up", "tdc.", "tdc", "t d c",
+                "will attend", "will be attended", "scheduled", "reminder",
+                "to inform", "to counsel", "to submit", "to do", "to replace",
+                "prior", "remains", "still", "under process", "not yet",
+                "to be done", "will ensure", "during next", "action will be taken",
+                'noted please tdc', "will be supplied shortly", "not available",
+                "not updated", "progress", "under progress", "to arrange",
+                "awaited", "material awaited", "approval awaited", "to procure",
+                "yet pending", "incomplete", "tentative", "ongoing", "in progress",
+                "being done", "arranging", "waiting for", "subject to",
+                "awaiting approval", "awaiting material", "awaiting confirmation",
+                "next schedule", "planned for", "will arrange", "proposed date",
+                "to complete", "to be completed", "likely completion",
+                "expected completion", "not received", "awaiting response"
+            ]
+    
+            if "tdc" in text_normalized and any(k in text_normalized for k in resolved_kw):
+                return "Resolved"
+            if any(k in text_normalized for k in pending_kw):
+                return "Pending"
+            if date_found:
+                return "Pending" if "tdc" in text_normalized else "Resolved"
+            if any(k in text_normalized for k in resolved_kw):
+                return "Resolved"
+            return None
+    
+        fb = normalize_str(feedback)
+        rm = normalize_str(user_remark)
+    
+        m = re.findall(r"[!#]", f"{fb} {rm}".strip())
+        if m:
+            return "Resolved" if m[-1] == "#" else "Pending"
+    
+        a = _classify(fb)
+        b = _classify(rm)
+    
+        if a == "Resolved" or b == "Resolved":
+            return "Resolved"
+        if a == "Pending" or b == "Pending":
+            return "Pending"
+        return "Pending"
+    
+    # ============================================================
+    # ADSTE LOCATION MAPPING (Signal & Telecom jurisdiction)
+    # ============================================================
+    KLBG = {
+        "WADI", "SDB", "MR", "HQR", "KLBG", "BBD", "SVG", "HHD", "GUR", "KUI",
+        "DUD", "BOT", "AKOR", "TLT", "HG", "TJSP", "WADI-SUR", "SUR-WADI",
+        "WADI-KLBG", "SUR-SDB", "SUR-HG", "SUR-NGS"
+    }
+    SUR = {
+        "TKWD", "SUR", "BALE", "PK", "MVE", "MO", "MKPT", "AAG", "WKA", "MLB",
+        "PVR", "SGLA", "MSDG", "JTRD", "DLGN", "KVK", "SGRE", "ARAG", "MRJ",
+        "SUR-KWV", "KWV-MLB", "MLB-MRJ", "TKWD-MKPT"
+    }
+    KWV_I = {
+        "KWV", "DHS", "KEM", "BLNI", "JEUR", "PPJ", "WSB", "KEU", "JNTR",
+        "BGVN", "MLM", "BRB", "WDS", "MLM-BRB", "DD-KWV", "BGVN-JNTR",
+        "SUR-KEM", "JEUR-SUR", "SUR-JEUR", "WSD", "KWV-BRB"
+    }
+    KWV_II = {
+        "SEI", "BTW", "PJR", "UMD", "YSI", "MRX", "OSA", "HGL", "LUR", "KMRD",
+        "LC-10", "LC-34", "LC-6", "LC-22", "LC-31", "LC-42", "LC-61", "LC-70",
+        "LC-91", "KWV-LUR", "KWV-SEI", "LC-3", "DRSV", "DKY", "LC-34(DKY)-LUR"
+    }
+    
+    ADSTE_ORDER = [
+        "ADSTE/KLBG (WADI-HG)",
+        "ADSTE/SUR (TKWD-MKPT & MLB-MRJ)",
+        "ADSTE/KWV-I (KWV-BRB)",
+        "ADSTE/KWV-II (LC-34(DKY)-LUR)"
+    ]
+    
+    def build_adste_map():
+        adste_map = {}
+        for loc in KLBG:
+            adste_map[loc] = "ADSTE/KLBG (WADI-HG)"
+        for loc in SUR:
+            adste_map[loc] = "ADSTE/SUR (TKWD-MKPT & MLB-MRJ)"
+        for loc in KWV_I:
+            adste_map[loc] = "ADSTE/KWV-I (KWV-BRB)"
+        for loc in KWV_II:
+            adste_map[loc] = "ADSTE/KWV-II (LC-34(DKY)-LUR)"
+        return adste_map
+    
+    # ============================================================
+    # LOAD DATA FROM GOOGLE SHEET
+    # ============================================================
+    @st.cache_data(ttl=300)
+    def load_google_sheet(sheet_id: str, sheet_name: str):
+        """
+        Load data from Google Sheet.
+        Requires either:
+          - Public sheet (anyone with link can view), OR
+          - Service account credentials in st.secrets
+        """
+        if not sheet_id or not sheet_name:
+            return None
+    
+        try:
+            # Method 1: Public CSV export (works if sheet is shared as "Anyone with the link can view")
+            url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={sheet_name}"
+            df = pd.read_csv(url)
+            return df
+        except Exception as e1:
+            try:
+                # Method 2: gspread + service account (recommended for private sheets)
+                import gspread
+                from google.oauth2.service_account import Credentials
+    
+                scopes = [
+                    "https://www.googleapis.com/auth/spreadsheets.readonly",
+                    "https://www.googleapis.com/auth/drive.readonly"
+                ]
+                creds = Credentials.from_service_account_info(
+                    st.secrets["gcp_service_account"],
+                    scopes=scopes
+                )
+                client = gspread.authorize(creds)
+                sheet = client.open_by_key(sheet_id).worksheet(sheet_name)
+                data = sheet.get_all_records()
+                return pd.DataFrame(data)
+            except Exception as e2:
+                st.error(f"Failed to load Google Sheet.\nCSV method: {e1}\nService account method: {e2}")
+                return None
+    
+    # ============================================================
+    # PREPROCESS DATA
+    # ============================================================
+    def preprocess_data(df: pd.DataFrame, date_from: date, date_to: date, department: str):
+        df = df.copy()
+    
+        # Normalize column names (handle possible variations)
+        col_map = {}
+        for c in df.columns:
+            cl = str(c).strip().lower()
+            if "date" in cl and "inspection" in cl:
+                col_map[c] = "Date of Inspection"
+            elif cl in ["sub head", "subhead", "sub_head"]:
+                col_map[c] = "Sub Head"
+            elif cl in ["location", "loc"]:
+                col_map[c] = "Location"
+            elif "feedback" in cl or "remark" in cl or "response" in cl:
+                if "user" in cl or "officer" in cl:
+                    col_map[c] = "User Remark"
+                else:
+                    col_map[c] = "Feedback"
+            elif cl == "status":
+                col_map[c] = "Status"
+            elif "department" in cl or "dept" in cl:
+                col_map[c] = "Department"
+    
+        df = df.rename(columns=col_map)
+    
+        # Ensure required columns exist
+        required = ["Date of Inspection", "Sub Head", "Location"]
+        for col in required:
+            if col not in df.columns:
+                st.warning(f"Column '{col}' not found in the sheet. Available columns: {list(df.columns)}")
+                return pd.DataFrame()
+    
+        # Parse date
+        df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce", dayfirst=True)
+        df = df.dropna(subset=["Date of Inspection"])
+    
+        # Filter by date range
+        mask = (df["Date of Inspection"].dt.date >= date_from) & (df["Date of Inspection"].dt.date <= date_to)
+        df = df[mask].copy()
+    
+        # Filter by department (if column exists)
+        if "Department" in df.columns and department:
+            df = df[df["Department"].astype(str).str.contains(department, case=False, na=False)]
+    
+        # Clean text columns
+        for col in ["Sub Head", "Location"]:
+            df[col] = df[col].fillna("").astype(str).str.strip()
+    
+        # Apply classification for Status
+        feedback_col = "Feedback" if "Feedback" in df.columns else None
+        remark_col = "User Remark" if "User Remark" in df.columns else None
+    
+        if feedback_col or remark_col:
+            statuses = []
+            for _, row in df.iterrows():
+                fb = row.get(feedback_col, "") if feedback_col else ""
+                rm = row.get(remark_col, "") if remark_col else ""
+                statuses.append(classify_feedback(fb, rm))
+            df["Status"] = statuses
+        else:
+            # Fallback: use existing Status column if present, else mark Pending
+            if "Status" not in df.columns:
+                df["Status"] = "Pending"
+            else:
+                df["Status"] = df["Status"].fillna("Pending").astype(str)
+    
+        # Map ADSTE
+        adste_map = build_adste_map()
+        df["ADSTE"] = df["Location"].map(adste_map)
+    
+        # Month helper
+        df["Month"] = df["Date of Inspection"].dt.month
+        df["Month Name"] = df["Date of Inspection"].dt.strftime("%B-%Y")
+    
+        return df
+    
+    # ============================================================
+    # MAIN APP
+    # ============================================================
+    def main():
+        # Header
+        st.markdown("""
+        <div class="main-header">
+            <h2 style="margin:0; font-size:1.6rem;">INDIAN RAILWAYS — SOLAPUR DIVISION — CENTRAL RAILWAY</h2>
+            <h3 style="margin:0.3rem 0 0 0; font-weight:500; font-size:1.25rem;">
+                SAFETY DEFICIENCIES ANALYSIS OF S&T DEPARTMENT
+            </h3>
+            <p style="margin:0.4rem 0 0 0; font-size:0.9rem; opacity:0.9;">Source: SARAL System</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+        # Sidebar filters
+        st.sidebar.header("Filters")
+        st.sidebar.markdown("---")
+    
+        # Date range
+        st.sidebar.subheader("📅 Date Range")
+        col1, col2 = st.sidebar.columns(2)
+        with col1:
+            date_from = st.date_input("From", value=date(2026, 4, 1), key="date_from")
+        with col2:
+            date_to = st.date_input("To", value=date(2026, 6, 30), key="date_to")
+    
+        if date_from > date_to:
+            st.sidebar.error("From date cannot be after To date.")
+            return
+    
+        # Department (currently only S&T; more can be added later)
+        st.sidebar.subheader("🏢 Department / Jurisdiction")
+        department = st.sidebar.selectbox(
+            "Select Department",
+            options=["Signal & Telecom", "S&T"],
+            index=0,
+            help="Currently limited to Signal & Telecom jurisdiction. More departments can be added later."
+        )
+    
+        st.sidebar.markdown("---")
+        st.sidebar.info(
+            "Sheet ID and Sheet Name are currently blank.\n"
+            "Fill `SHEET_ID` and `SHEET_NAME` at the top of the code."
+        )
+    
+        # Load data
+        if not SHEET_ID or not SHEET_NAME:
+            st.warning("⚠️ Please fill **SHEET_ID** and **SHEET_NAME** in the code before running.")
+            st.stop()
+    
+        with st.spinner("Loading data from Google Sheet..."):
+            raw_df = load_google_sheet(SHEET_ID, SHEET_NAME)
+    
+        if raw_df is None or raw_df.empty:
+            st.error("No data loaded. Check Sheet ID, Sheet Name, and sharing permissions.")
+            st.stop()
+    
+        df = preprocess_data(raw_df, date_from, date_to, department)
+    
+        if df.empty:
+            st.warning("No records found for the selected date range and department.")
+            st.stop()
+    
+        # ============================================================
+        # KPI CALCULATIONS
+        # ============================================================
+        total = len(df)
+        resolved = df["Status"].str.contains("Resolved", case=False, na=False).sum()
+        pending = df["Status"].str.contains("Pending", case=False, na=False).sum()
+        no_response = df["Status"].str.contains("No Response", case=False, na=False).sum()
+        # Also catch empty / unclassified as No Response if desired
+        if no_response == 0:
+            no_response = (df["Status"].isna() | (df["Status"] == "")).sum()
+    
+        resolution_rate = (resolved / total * 100) if total else 0.0
+    
+        # ============================================================
+        # KPI CARDS
+        # ============================================================
+        st.markdown("### Key Performance Indicators")
+        k1, k2, k3, k4, k5 = st.columns(5)
+    
+        with k1:
+            st.metric("TOTAL RECORDS", f"{total}", "100% of Total")
+        with k2:
+            st.metric("RESOLVED", f"{resolved}", f"{resolution_rate:.2f}%")
+        with k3:
+            st.metric("NO RESPONSE", f"{no_response}", f"{(no_response/total*100) if total else 0:.2f}%")
+        with k4:
+            st.metric("PENDING", f"{pending}", f"{(pending/total*100) if total else 0:.2f}%")
+        with k5:
+            st.metric("OVERALL RESOLUTION RATE", f"{resolution_rate:.2f}%", "(Resolved / Total)")
+    
+        st.markdown("---")
+    
+        # ============================================================
+        # SECTION II — SUB HEAD DISTRIBUTION
+        # ============================================================
+        st.markdown('<div class="section-header">II — CLASSIFICATION SUB HEAD DISTRIBUTION</div>', unsafe_allow_html=True)
+    
+        # Prepare sub-head pivot
+        month_order = sorted(df["Month"].unique())
+        sub = (
+            df.groupby(["Sub Head", "Month"])
+            .size()
+            .unstack(fill_value=0)
+        )
+        for m in month_order:
+            if m not in sub.columns:
+                sub[m] = 0
+        sub["Total"] = sub[month_order].sum(axis=1)
+        sub["Share"] = (sub["Total"] / total * 100).round(2)
+        sub = sub.sort_values("Total", ascending=False)
+    
+        # Display table
+        display_sub = sub.copy()
+        # Rename month columns to readable names
+        month_names = {m: datetime(2026, m, 1).strftime("%B-%Y") for m in month_order}
+        display_sub = display_sub.rename(columns=month_names)
+        display_sub = display_sub.reset_index()
+    
+        col_table, col_chart = st.columns([1.1, 1])
+    
+        with col_table:
+            st.dataframe(
+                display_sub,
+                use_container_width=True,
+                height=420,
+                hide_index=True
+            )
+    
+        with col_chart:
+            top_n = min(10, len(sub))
+            plot_df = sub.head(top_n).reset_index()
+            fig_bar = px.bar(
+                plot_df,
+                x="Total",
+                y="Sub Head",
+                orientation="h",
+                text="Total",
+                color_discrete_sequence=["#123A7A"],
+                title="Sub Head Wise Distribution (Top 10)"
+            )
+            fig_bar.update_layout(
+                yaxis={"categoryorder": "total ascending"},
+                height=420,
+                margin=dict(l=10, r=10, t=40, b=10),
+                showlegend=False
+            )
+            fig_bar.update_traces(textposition="outside")
+            st.plotly_chart(fig_bar, use_container_width=True)
+    
+        st.markdown("---")
+    
+        # ============================================================
+        # SECTION III — ADSTE WISE
+        # ============================================================
+        st.markdown('<div class="section-header">III — CLASSIFICATION ADSTE WISE</div>', unsafe_allow_html=True)
+    
+        adste_df = df.dropna(subset=["ADSTE"])
+        if adste_df.empty:
+            st.info("No locations matched the current ADSTE mapping for the selected period.")
+        else:
+            adste = (
+                adste_df.groupby(["ADSTE", "Month"])
+                .size()
+                .unstack(fill_value=0)
+                .reindex(ADSTE_ORDER)
+            )
+            for m in month_order:
+                if m not in adste.columns:
+                    adste[m] = 0
+            adste["Total"] = adste[month_order].sum(axis=1)
+            adste["Share"] = (adste["Total"] / total * 100).round(2)
+    
+            # Table
+            adste_display = adste.copy()
+            adste_display = adste_display.rename(columns=month_names)
+            adste_display = adste_display.reset_index()
+    
+            col_adste_table, col_donut = st.columns([1.2, 1])
+    
+            with col_adste_table:
+                st.dataframe(
+                    adste_display,
+                    use_container_width=True,
+                    height=320,
+                    hide_index=True
+                )
+    
+            with col_donut:
+                donut_values = adste["Total"].fillna(0).values
+                donut_labels = ADSTE_ORDER
+                colors = ["#1D4FA3", "#159447", "#D91F2D", "#E58A00"]
+    
+                fig_donut = go.Figure(data=[go.Pie(
+                    labels=donut_labels,
+                    values=donut_values,
+                    hole=0.55,
+                    marker=dict(colors=colors, line=dict(color="white", width=2)),
+                    textinfo="none",
+                    hovertemplate="%{label}<br>%{value} (%{percent})<extra></extra>"
+                )])
+                fig_donut.update_layout(
+                    title="ADSTE Wise Distribution",
+                    height=320,
+                    margin=dict(l=20, r=20, t=40, b=20),
+                    annotations=[dict(
+                        text=f"TOTAL<br><b>{int(total)}</b>",
+                        x=0.5, y=0.5,
+                        font_size=14,
+                        showarrow=False
+                    )],
+                    showlegend=True,
+                    legend=dict(orientation="v", yanchor="middle", y=0.5, x=1.05)
+                )
+                st.plotly_chart(fig_donut, use_container_width=True)
+    
+                # Legend with values
+                st.markdown("**Legend**")
+                for i, name in enumerate(ADSTE_ORDER):
+                    val = int(adste.loc[name, "Total"]) if name in adste.index else 0
+                    pct = (val / total * 100) if total else 0
+                    st.markdown(
+                        f"<span style='color:{colors[i]}; font-size:1.2rem;'>■</span> "
+                        f"**{name}** — {val} ({pct:.2f}%)",
+                        unsafe_allow_html=True
+                    )
+    
+        # ============================================================
+        # FOOTER
+        # ============================================================
+        st.markdown("---")
+        st.markdown(
+            f"""
+            <div style="background:#0C2F67; color:white; padding:0.7rem 1.2rem; border-radius:8px; font-size:0.85rem;">
+                <b>Source:</b> SARAL System &nbsp;|&nbsp;
+                <b>Reporting Department:</b> Safety Department, SUR DIVN, CR &nbsp;|&nbsp;
+                <b>Analysis Type:</b> Deficiency Analysis &nbsp;|&nbsp;
+                <b>Period:</b> {date_from.strftime('%d %b %Y')} to {date_to.strftime('%d %b %Y')}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
