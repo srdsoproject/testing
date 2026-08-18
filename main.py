@@ -1847,11 +1847,26 @@ with tabs[2]:
                 st.info("No inspections found in the selected date range.")
             else:
                 official_names = sorted(n for n in ranged["Name"].dropna().unique() if str(n).strip())
-                selected_officials = st.multiselect(
-                    "👤 Filter by Inspecting Official (optional)", official_names, key="insp_name_filter"
+                locations = sorted(l for l in ranged["Location"].dropna().unique() if str(l).strip())
+                designations = sorted(d for d in ranged["InspectionBy"].dropna().unique() if str(d).strip())
+
+                ff1, ff2, ff3 = st.columns(3)
+                selected_officials = ff1.multiselect(
+                    "👤 Inspecting Official", official_names, key="insp_name_filter"
                 )
+                selected_locations = ff2.multiselect(
+                    "📍 Location", locations, key="insp_location_filter"
+                )
+                selected_designations = ff3.multiselect(
+                    "🎖️ Designation & HQ", designations, key="insp_designation_filter"
+                )
+
                 if selected_officials:
                     ranged = ranged[ranged["Name"].isin(selected_officials)]
+                if selected_locations:
+                    ranged = ranged[ranged["Location"].isin(selected_locations)]
+                if selected_designations:
+                    ranged = ranged[ranged["InspectionBy"].isin(selected_designations)]
 
                 ranged["Date_str"] = ranged["Date_parsed"].dt.strftime("%Y-%m-%d")
                 grouped = ranged.groupby(["Name", "Phone", "Date_str"], sort=True)
