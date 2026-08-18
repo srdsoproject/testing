@@ -18,6 +18,7 @@ from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from st_aggrid.shared import JsCode
 import pytz
 from datetime import datetime, date, timedelta
+from urllib.parse import quote
 
 # =========================================================================
 # CONFIG
@@ -33,6 +34,21 @@ st.set_page_config(
 )
 
 TIMESTAMP_COL_NAME = "Timestamp of Compliance"
+
+# ---- "Inspections" sheet config (used by the WhatsApp report generator tab) ----
+INSPECTIONS_SHEET_ID = "1WtNy5EYMFEFI0gWcipqFse_aaBT6fwB3erVDYLVNAGY"
+INSPECTIONS_SHEET_NAME = "Inspections"
+# Field name -> 0-indexed column position (A=0, B=1, C=2, ...) as specified.
+INSPECTIONS_COL_MAP = {
+    "Name": 1,           # Column B - Inspecting Official's name
+    "Phone": 3,           # Column D - phone number
+    "Type": 4,            # Column E - Type of Inspection
+    "Location": 5,        # Column F - Location
+    "Date": 6,             # Column G - Date of Inspection
+    "Deficiency": 9,        # Column J - Deficiency noted
+    "InspectionBy": 10,      # Column K - Inspection By / Designation & HQ
+    "ActionBy": 11,           # Column L - Action By
+}
 
 # Characters used for the CAPTCHA text. Visually-confusable characters
 # (0/O, 1/I/l) are excluded so a genuine human isn't penalised for a
@@ -546,6 +562,94 @@ try:
 except Exception as e:
     st.error(f"❌ Could not connect to Google Sheets: {e}")
     st.stop()
+
+
+# =========================================================================
+# INSPECTIONS SHEET CONNECTION (separate sheet, used for WhatsApp reports)
+# =========================================================================
+@st.cache_resource
+def connect_to_inspections_sheet():
+    SCOPES = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive",
+    ]
+    service_account_info = dict(st.secrets["gcp_service_account"])
+    if "private_key" in service_account_info:
+        service_account_info["private_key"] = service_account_info["private_key"].replace("\\n", "\n")
+    creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPES)
+    gc = gspread.authorize(creds)
+    return gc.open_by_key(INSPECTIONS_SHEET_ID).worksheet(INSPECTIONS_SHEET_NAME)
+
+
+@st.cache_data(ttl=30)
+def load_inspections_data():
+    """Load the 'Inspections' sheet using fixed column letters (see INSPECTIONS_COL_MAP)
+    rather than header names, since the sheet header text may not match exactly."""
+    cols = list(INSPECTIONS_COL_MAP.keys())
+    try:
+        ws = connect_to_inspections_sheet()
+        values = ws.get_all_values()
+        if not values or len(values) < 2:
+            return pd.DataFrame(columns=cols + ["Date_parsed"])
+
+        max_idx = max(INSPECTIONS_COL_MAP.values())
+        records = []
+        for row in values[1:]:  # skip header row
+            if len(row) <= max_idx:
+                row = row + [""] * (max_idx + 1 - len(row))
+            records.append({name: row[idx].strip() for name, idx in INSPECTIONS_COL_MAP.items()})
+
+        df = pd.DataFrame(records)
+        # Drop fully blank rows
+        df = df[df[cols].apply(lambda r: any(str(v).strip() for v in r), axis=1)].reset_index(drop=True)
+
+        # Parse dates - try the default parser first, then fall back to day-first
+        df["Date_parsed"] = pd.to_datetime(df["Date"], errors="coerce")
+        mask = df["Date_parsed"].isna() & (df["Date"].astype(str).str.strip() != "")
+        if mask.any():
+            df.loc[mask, "Date_parsed"] = pd.to_datetime(df.loc[mask, "Date"], errors="coerce", dayfirst=True)
+
+        return df
+    except Exception as e:
+        st.error(f"❌ Error loading Inspections sheet: {str(e)}")
+        return pd.DataFrame(columns=cols + ["Date_parsed"])
+
+
+def build_whatsapp_message(name, phone, designation_hq, insp_date_str, sections, submitted_dt=None):
+    """Build a WhatsApp-formatted Safety Inspection Report matching the S.A.R.A.L template.
+
+    sections: list of (type_of_inspection, location, deficiencies) tuples, where
+              deficiencies is a list of (deficiency_text, action_by) tuples.
+    """
+    lines = [
+        "*SAFETY INSPECTION REPORT*",
+        "_Solapur Division • Central Railway_",
+        f"*Inspecting Official(s):* {name or 'N/A'}",
+        f"*Designation & HQ:* {designation_hq or 'N/A'}",
+        f"*Date of Inspection:* {insp_date_str}",
+    ]
+
+    for i, (sec_type, sec_location, deficiencies) in enumerate(sections, start=1):
+        lines.append(f"*{i}. {str(sec_type).strip().upper()}*")
+        lines.append(str(sec_location).strip())
+        lines.append("*Deficiencies:*")
+        for j, (defect_text, action_by) in enumerate(deficiencies, start=1):
+            lines.append(f"{j}. {defect_text}")
+            lines.append(f"   Action By: {action_by if str(action_by).strip() else 'Not Assigned'}")
+
+    lines.append("Photos: 0")
+    lines.append(f"*Division:* Solapur • {phone or 'N/A'}")
+
+    submitted_dt = submitted_dt or datetime.now(pytz.timezone("Asia/Kolkata"))
+    time_part = submitted_dt.strftime("%I:%M:%S %p").lstrip("0").lower()
+    submitted_str = f"{submitted_dt.day}/{submitted_dt.month}/{submitted_dt.year}, {time_part}"
+    lines.append(f"*Submitted on:* {submitted_str}")
+    lines.append(f"*Total Inspections:* {len(sections)}")
+    lines.append("_Auto-generated via Safety Inspection App_")
+    lines.append("Safety Department • Solapur Division")
+
+    return "\n".join(lines)
+
 
 # ---------- SIDEBAR ----------
 st.sidebar.markdown(f"👤 Logged in as: **{st.session_state.user['name']}**")
@@ -1115,7 +1219,7 @@ if st.session_state.df is None:
 # =========================================================================
 # MAIN TABS
 # =========================================================================
-tabs = st.tabs(["📝 View Records", "📊 Analytics"])
+tabs = st.tabs(["📝 View Records", "📊 Analytics", "📨 Inspections"])
 
 with tabs[0]:
     df = st.session_state.df
@@ -1690,5 +1794,127 @@ with tabs[1]:
                     f"**Pending:** {row['PendingCount']:,} | "
                     f"**Resolved:** {row['ResolvedCount']:,}"
                 )
+
+# =========================================================================
+# INSPECTIONS TAB — WhatsApp report generator
+# =========================================================================
+with tabs[2]:
+    st.markdown("### 📨 Inspection WhatsApp Report Generator")
+    st.caption(
+        "Generates a WhatsApp-style Safety Inspection Report from the **Inspections** Google Sheet, "
+        "grouped by Inspecting Official and Date — matching the S.A.R.A.L report format."
+    )
+
+    refresh_col, _sp = st.columns([1, 5])
+    with refresh_col:
+        if st.button("🔄 Refresh", key="insp_refresh_btn", use_container_width=True):
+            load_inspections_data.clear()
+            st.rerun()
+
+    insp_df = load_inspections_data()
+
+    if insp_df.empty:
+        st.warning(
+            "No data available from the Inspections sheet. Please check the sheet ID/name, "
+            "and that it is shared with the service account."
+        )
+    else:
+        valid_dates = insp_df["Date_parsed"].dropna()
+        if valid_dates.empty:
+            st.warning("No valid inspection dates could be parsed from column G of the Inspections sheet.")
         else:
-            st.info("Please select at least one location to view the breakdown.")
+            min_d = valid_dates.min().date()
+            max_d = valid_dates.max().date()
+
+            fc1, fc2 = st.columns(2)
+            insp_from_date = fc1.date_input(
+                "📅 From Date", value=max_d, min_value=min_d, max_value=max_d, key="insp_from_date"
+            )
+            insp_to_date = fc2.date_input(
+                "📅 To Date", value=max_d, min_value=min_d, max_value=max_d, key="insp_to_date"
+            )
+
+            if insp_from_date > insp_to_date:
+                st.warning("From Date cannot be after To Date. Swapping them.")
+                insp_from_date, insp_to_date = insp_to_date, insp_from_date
+
+            ranged = insp_df[
+                (insp_df["Date_parsed"] >= pd.Timestamp(insp_from_date)) &
+                (insp_df["Date_parsed"] <= pd.Timestamp(insp_to_date))
+            ].copy()
+
+            if ranged.empty:
+                st.info("No inspections found in the selected date range.")
+            else:
+                official_names = sorted(n for n in ranged["Name"].dropna().unique() if str(n).strip())
+                selected_officials = st.multiselect(
+                    "👤 Filter by Inspecting Official (optional)", official_names, key="insp_name_filter"
+                )
+                if selected_officials:
+                    ranged = ranged[ranged["Name"].isin(selected_officials)]
+
+                ranged["Date_str"] = ranged["Date_parsed"].dt.strftime("%Y-%m-%d")
+                grouped = ranged.groupby(["Name", "Phone", "Date_str"], sort=True)
+
+                if len(grouped) == 0:
+                    st.info("No matching inspections to build a report for.")
+                else:
+                    st.markdown(f"**{len(grouped)} report(s) found for the selected filters.**")
+
+                    for (g_name, g_phone, g_date), sub in grouped:
+                        designation_series = sub["InspectionBy"].dropna()
+                        designation_series = designation_series[designation_series.str.strip() != ""]
+                        designation_hq = designation_series.iloc[0] if not designation_series.empty else ""
+
+                        # Sub-group into individual numbered inspections (Type + Location)
+                        sections = []
+                        for (sec_type, sec_location), sec_rows in sub.groupby(["Type", "Location"], sort=False):
+                            deficiencies = [
+                                (str(row["Deficiency"]).strip(), str(row["ActionBy"]).strip())
+                                for _, row in sec_rows.iterrows()
+                                if str(row["Deficiency"]).strip()
+                            ]
+                            if deficiencies:
+                                sections.append((sec_type, sec_location, deficiencies))
+
+                        if not sections:
+                            continue
+
+                        message = build_whatsapp_message(g_name, g_phone, designation_hq, g_date, sections)
+                        n_deficiencies = sum(len(d) for _, _, d in sections)
+
+                        with st.expander(
+                            f"📋 {g_name or 'Unknown'} • {g_date} • {len(sections)} inspection(s), "
+                            f"{n_deficiencies} deficiencies"
+                        ):
+                            st.text_area(
+                                "Message Preview (tap inside, select all, copy)",
+                                value=message,
+                                height=420,
+                                key=f"insp_msg_{g_name}_{g_phone}_{g_date}",
+                            )
+
+                            digits_only = re.sub(r"[^0-9]", "", str(g_phone))
+                            b1, b2 = st.columns(2)
+                            with b1:
+                                if digits_only:
+                                    wa_url = f"https://wa.me/{digits_only}?text={quote(message)}"
+                                    st.markdown(
+                                        f'<a href="{wa_url}" target="_blank" rel="noopener noreferrer">'
+                                        f'<button style="width:100%;min-height:44px;background-color:#25D366;'
+                                        f'color:white;border:none;border-radius:10px;font-weight:600;">'
+                                        f'📤 Send via WhatsApp</button></a>',
+                                        unsafe_allow_html=True,
+                                    )
+                                else:
+                                    st.caption("No phone number available for this record.")
+                            with b2:
+                                safe_name = re.sub(r"[^A-Za-z0-9_-]+", "_", str(g_name) or "unknown")
+                                st.download_button(
+                                    "📥 Download as .txt",
+                                    data=message.encode("utf-8"),
+                                    file_name=f"inspection_report_{safe_name}_{g_date}.txt",
+                                    mime="text/plain",
+                                    use_container_width=True,
+                                    key=f"insp_dl_{g_name}_{g_phone}_{g_date}",
+                                )
