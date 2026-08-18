@@ -6,7 +6,6 @@ from google.oauth2.service_account import Credentials
 from io import BytesIO
 from matplotlib import pyplot as plt
 import altair as alt
-import re
 import random
 import string
 import numpy as np
@@ -19,7 +18,11 @@ from st_aggrid.shared import JsCode
 import pytz
 from datetime import datetime, date, timedelta
 from urllib.parse import quote
-
+import re
+from datetime import date, datetime
+import plotly.express as px
+import plotly.graph_objects as go
+# ... any other imports you already have
 # =========================================================================
 # CONFIG
 # =========================================================================
