@@ -2115,13 +2115,21 @@ with tabs[3]:
             df[col] = df[col].fillna("").astype(str).str.strip()
     
         # --------------------------------------------------------
-        # 4. FILTER BY HEAD = "SIGNAL & TELECOM"   ← FIXED
+        # 4. FILTER BY HEAD = "SIGNAL & TELECOM"   ← ROBUST FIX
         # --------------------------------------------------------
         if "Head" in df.columns:
-            head_series = df["Head"].fillna("").astype(str).str.upper().str.strip()
+            head_col = df["Head"]
+    
+            # Handle duplicate column names
+            if isinstance(head_col, pd.DataFrame):
+                head_series = head_col.iloc[:, 0]   # take first occurrence
+            else:
+                head_series = head_col
+    
+            head_series = head_series.fillna("").astype(str).str.upper().str.strip()
             df = df[head_series == department.upper().strip()].copy()
         else:
-            # Fallback to Sub Head list if Head column not found
+            # Fallback to Sub Head list
             allowed_subheads = SUBHEAD_LIST.get(department, [])
             if allowed_subheads:
                 allowed_upper = {s.upper().strip() for s in allowed_subheads}
