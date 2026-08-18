@@ -1947,17 +1947,18 @@ with tabs[3]:
     # DEPARTMENT → SUB HEAD MAPPING
     # ============================================================
     SUBHEAD_LIST = {
-    "ELECT/TRD": ["T/W WAGON", "TSS/SP/SSP", "OHE SECTION", "OHE STATION", "MISC"],
-    "ELECT/G": ["TL/AC COACH", "POWER/PANTRY CAR", "WIRING/EQUIPMENT", "UPS", "AC", "DG", "SOLAR LIGHT", "MISC", 'LIGHT/ILLUMINATION'],
-    "ELECT/TRO": ["LOCO DEFECTS", "RUNNING ROOM DEFICIENCIES", "LOBBY DEFICIENCIES", "LRD RELATED", "PERSONAL STORE", "PR RELATED",
-                  "CMS", "FSD","MISC"],
-    "MECHANICAL": ['ART/ARME', "CCTV related", "Coaching related (Other)", "MISC", 'Coaching related (Primary)', 'Depot infrastructure (KLBG)', 'Depot infrastructure (KWV)', 'Depot infrastructure (LUR)', 'Depot infrastructure (SUR)', 'Depot infrastructure (WADI', 'HABD related', 'Staff working', 'Wagon related (SUR DIV examined)', 'Wagon related (Other)'],
-    "SIGNAL & TELECOM": ["ART/ARME", 'CABLES/EARTHING/KAVACH', 'FIRE ALARM/EXTINGUISHER', 'JOINT INSPECTION (P&C/TC/TRD)', 'LC GATE DEFICIENCIES', 'PANEL/VDU/BI/BPAC/DOCUMENTS', 'PASSENGER AMENITIES/CCTV', 'RELAY ROOM/DL', 'SIGNAL/BOARDS/VEGETATION', 'TRACK CIRCUIT/POINTS', 'WALKIE-TALKIE/COMMUNICATION', 'MISC'],
-    "OPTG": ["SWR/CSR/CSL/TWRD", "STATION RECORDS", "STATION DEFICIENCIES", "TRAIN O/P RELATED", "LC GATE DEFICIENCIES", "CIRCULAR/KNOWLEDGE/STAFF", "SIGNAL EXCHANGE", 'WALKIE-TALKIE/PHONE',
-             "SM OFFICE DEFICIENCIES/ASSETS", "MISC"],
-    "ENGINEERING": ["IOW WORKS (Other)", "IOW WORKS (Safety Related)", "PWI (Track Related)", 'LC GATE DEFICIENCIES', 'P&C', 'WORKSITE'],
-    "COMMERCIAL": ["REQUIREMENT/ASSETS", "CLEANLINESS/COAL BAGS", "PASSENGER AMENITIES", "STAFF (RAILWAY/CONTRACT)", "MISC"],
-    "FINANCE": ["MISC"], "MEDICAL": ["MISC"], "STORE": ["MISC"], "GSU": ["IOW WORKS (Other)", "IOW WORKS (Safety Related)"]}
+        "ELECT/TRD": ["T/W WAGON", "TSS/SP/SSP", "OHE SECTION", "OHE STATION", "MISC"],
+        "ELECT/G": ["TL/AC COACH", "POWER/PANTRY CAR", "WIRING/EQUIPMENT", "UPS", "AC", "DG", "SOLAR LIGHT", "MISC", 'LIGHT/ILLUMINATION'],
+        "ELECT/TRO": ["LOCO DEFECTS", "RUNNING ROOM DEFICIENCIES", "LOBBY DEFICIENCIES", "LRD RELATED", "PERSONAL STORE", "PR RELATED",
+                      "CMS", "FSD","MISC"],
+        "MECHANICAL": ['ART/ARME', "CCTV related", "Coaching related (Other)", "MISC", 'Coaching related (Primary)', 'Depot infrastructure (KLBG)', 'Depot infrastructure (KWV)', 'Depot infrastructure (LUR)', 'Depot infrastructure (SUR)', 'Depot infrastructure (WADI', 'HABD related', 'Staff working', 'Wagon related (SUR DIV examined)', 'Wagon related (Other)'],
+        "SIGNAL & TELECOM": ["ART/ARME", 'CABLES/EARTHING/KAVACH', 'FIRE ALARM/EXTINGUISHER', 'JOINT INSPECTION (P&C/TC/TRD)', 'LC GATE DEFICIENCIES', 'PANEL/VDU/BI/BPAC/DOCUMENTS', 'PASSENGER AMENITIES/CCTV', 'RELAY ROOM/DL', 'SIGNAL/BOARDS/VEGETATION', 'TRACK CIRCUIT/POINTS', 'WALKIE-TALKIE/COMMUNICATION', 'MISC'],
+        "OPTG": ["SWR/CSR/CSL/TWRD", "STATION RECORDS", "STATION DEFICIENCIES", "TRAIN O/P RELATED", "LC GATE DEFICIENCIES", "CIRCULAR/KNOWLEDGE/STAFF", "SIGNAL EXCHANGE", 'WALKIE-TALKIE/PHONE',
+                 "SM OFFICE DEFICIENCIES/ASSETS", "MISC"],
+        "ENGINEERING": ["IOW WORKS (Other)", "IOW WORKS (Safety Related)", "PWI (Track Related)", 'LC GATE DEFICIENCIES', 'P&C', 'WORKSITE'],
+        "COMMERCIAL": ["REQUIREMENT/ASSETS", "CLEANLINESS/COAL BAGS", "PASSENGER AMENITIES", "STAFF (RAILWAY/CONTRACT)", "MISC"],
+        "FINANCE": ["MISC"], "MEDICAL": ["MISC"], "STORE": ["MISC"], "GSU": ["IOW WORKS (Other)", "IOW WORKS (Safety Related)"]
+    }
 
     # ============================================================
     # CUSTOM CSS
@@ -2010,7 +2011,6 @@ with tabs[3]:
         "LC-10", "LC-34", "LC-6", "LC-22", "LC-31", "LC-42", "LC-61", "LC-70",
         "LC-91", "KWV-LUR", "KWV-SEI", "LC-3", "DRSV", "DKY", "LC-34(DKY)-LUR"
     }
-
     ADSTE_ORDER = [
         "ADSTE/KLBG (WADI-HG)",
         "ADSTE/SUR (TKWD-MKPT & MLB-MRJ)",
@@ -2107,11 +2107,10 @@ with tabs[3]:
             df[col] = df[col].fillna("").astype(str).str.strip()
 
         # --------------------------------------------------------
-        # FILTER BY DEPARTMENT SUB-HEADS (important)
+        # FILTER BY DEPARTMENT SUB-HEADS
         # --------------------------------------------------------
         allowed_subheads = SUBHEAD_LIST.get(department, [])
         if allowed_subheads:
-            # Case-insensitive matching
             allowed_upper = {s.upper().strip() for s in allowed_subheads}
             df = df[df["Sub Head"].str.upper().str.strip().isin(allowed_upper)].copy()
 
@@ -2166,11 +2165,9 @@ with tabs[3]:
     with col2:
         date_to = st.date_input("To", value=date(2026, 6, 30), key="snt_date_to")
     with col3:
-        # Currently only Signal & Telecom is enabled.
-        # Later you can expand this list.
         department = st.selectbox(
             "Department / Jurisdiction",
-            options=["SIGNAL & TELECOM"],          # ← only this for now
+            options=["SIGNAL & TELECOM"],
             index=0,
             key="snt_department"
         )
@@ -2188,6 +2185,55 @@ with tabs[3]:
         st.stop()
 
     df = preprocess_data(raw_df, date_from, date_to, department)
+
+    # ============================================================
+    # ==================== TEMPORARY DEBUG =======================
+    # ============================================================
+    st.write("### Debug Info (remove later)")
+
+    # 1. Total rows after date filter only (before Sub Head filter)
+    temp = raw_df.copy()
+
+    # Find date column
+    date_col = None
+    for c in temp.columns:
+        if "date" in str(c).lower() and "inspection" in str(c).lower():
+            date_col = c
+            break
+    if date_col is None:
+        date_col = temp.columns[0]   # fallback
+
+    temp[date_col] = pd.to_datetime(temp[date_col], errors="coerce", dayfirst=True)
+    temp = temp.dropna(subset=[date_col])
+    temp = temp[(temp[date_col].dt.date >= date_from) & (temp[date_col].dt.date <= date_to)]
+
+    st.write(f"**1. Total rows after Date filter only:** `{len(temp)}`")
+
+    # 2. Unique Sub Heads present in the selected date range
+    sub_col = None
+    for c in temp.columns:
+        if "sub" in str(c).lower() and "head" in str(c).lower():
+            sub_col = c
+            break
+
+    if sub_col:
+        st.write("**2. All unique Sub Heads present in the selected date range:**")
+        st.write(temp[sub_col].astype(str).str.strip().value_counts())
+    else:
+        st.write("Could not find Sub Head column for debug.")
+
+    # 3. What is kept after Sub Head filter
+    if not df.empty:
+        st.write(f"**3. Rows kept after Sub Head filter:** `{len(df)}`")
+        st.write("**Sub Heads currently kept:**")
+        st.write(df["Sub Head"].value_counts())
+    else:
+        st.write("**3. No rows left after Sub Head filter**")
+
+    st.markdown("---")
+    # ============================================================
+    # ==================== END DEBUG =============================
+    # ============================================================
 
     if df.empty:
         st.warning(f"No records found for **{department}** in the selected date range.")
