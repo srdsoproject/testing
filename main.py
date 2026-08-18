@@ -2066,14 +2066,14 @@ with tabs[3]:
     # ============================================================
     def preprocess_data(df: pd.DataFrame, date_from: date, date_to: date, department: str):
         df = df.copy()
-
+    
         # --------------------------------------------------------
         # 1. Normalize column names
         # --------------------------------------------------------
         col_map = {}
         for c in df.columns:
             cl = str(c).strip().lower()
-
+    
             if "date" in cl and "inspection" in cl:
                 col_map[c] = "Date of Inspection"
             elif cl in ["sub head", "subhead", "sub_head"]:
@@ -2089,9 +2089,9 @@ with tabs[3]:
                 col_map[c] = "Status"
             elif cl in ["head", "department", "dept", "action by", "action_by"]:
                 col_map[c] = "Head"
-
+    
         df = df.rename(columns=col_map)
-
+    
         # --------------------------------------------------------
         # 2. Required columns check
         # --------------------------------------------------------
@@ -2100,41 +2100,42 @@ with tabs[3]:
             if col not in df.columns:
                 st.warning(f"Column '{col}' not found. Available columns: {list(df.columns)}")
                 return pd.DataFrame()
-
+    
         # --------------------------------------------------------
         # 3. Date filter
         # --------------------------------------------------------
         df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce", dayfirst=True)
         df = df.dropna(subset=["Date of Inspection"])
-
+    
         mask = (df["Date of Inspection"].dt.date >= date_from) & (df["Date of Inspection"].dt.date <= date_to)
         df = df[mask].copy()
-
+    
         # Clean text columns
         for col in ["Sub Head", "Location"]:
             df[col] = df[col].fillna("").astype(str).str.strip()
-
+    
         # --------------------------------------------------------
-        # 4. FILTER BY HEAD = "SIGNAL & TELECOM"   ← MAIN FIX
+        # 4. FILTER BY HEAD = "SIGNAL & TELECOM"   ← FIXED
         # --------------------------------------------------------
         if "Head" in df.columns:
-            df = df[df["Head"].astype(str).str.upper().str.strip() == department.upper().strip()].copy()
+            head_series = df["Head"].fillna("").astype(str).str.upper().str.strip()
+            df = df[head_series == department.upper().strip()].copy()
         else:
             # Fallback to Sub Head list if Head column not found
             allowed_subheads = SUBHEAD_LIST.get(department, [])
             if allowed_subheads:
                 allowed_upper = {s.upper().strip() for s in allowed_subheads}
                 df = df[df["Sub Head"].str.upper().str.strip().isin(allowed_upper)].copy()
-
+    
         if df.empty:
             return df
-
+    
         # --------------------------------------------------------
         # 5. Classification
         # --------------------------------------------------------
         feedback_col = "Feedback" if "Feedback" in df.columns else None
         remark_col = "User Remark" if "User Remark" in df.columns else None
-
+    
         if feedback_col or remark_col:
             statuses = []
             for _, row in df.iterrows():
@@ -2147,18 +2148,17 @@ with tabs[3]:
                 df["Status"] = "Pending"
             else:
                 df["Status"] = df["Status"].fillna("Pending").astype(str)
-
+    
         # --------------------------------------------------------
         # 6. ADSTE mapping
         # --------------------------------------------------------
         adste_map = build_adste_map()
         df["ADSTE"] = df["Location"].map(adste_map)
-
+    
         df["Month"] = df["Date of Inspection"].dt.month
         df["Month Name"] = df["Date of Inspection"].dt.strftime("%B-%Y")
-
+    
         return df
-
     # ============================================================
     # DASHBOARD CONTENT
     # ============================================================
