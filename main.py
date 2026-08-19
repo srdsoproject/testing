@@ -1804,10 +1804,9 @@ with tabs[1]:
 # INSPECTIONS TAB — WhatsApp report generator
 # =========================================================================
 with tabs[2]:
-    st.markdown("### 📨 Inspection WhatsApp Report Generator")
+    st.markdown("### 📨 Safety Inspection Report")
     st.caption(
-        "Generates a WhatsApp-style Safety Inspection Report from the **Inspections** Google Sheet, "
-        "grouped by Inspecting Official and Date — matching the S.A.R.A.L report format."
+        "Safety Inspections Reports"
     )
 
     refresh_col, _sp = st.columns([1, 5])
