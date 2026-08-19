@@ -1806,7 +1806,7 @@ with tabs[1]:
 with tabs[2]:
     st.markdown("### 📨 Safety Inspection Report")
     st.caption(
-        "Safety Inspections Reports"
+        "Safety Inspections by inspecting officials:"
     )
 
     refresh_col, _sp = st.columns([1, 5])
