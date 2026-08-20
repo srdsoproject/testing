@@ -2234,53 +2234,86 @@ with tabs[3]:
     # ============================================================
     # LOAD DATA FROM GOOGLE SHEET
     # ============================================================
-    @st.cache_data(ttl=300)
+    @st.cache_data(ttl=60)
     def load_google_sheet(sheet_id: str, sheet_name: str):
+        """Load sheet the same reliable way as the main app (service account first).
+        Public gviz CSV is only a last-resort fallback and often returns incomplete
+        or zero rows for private sheets.
+        """
         if not sheet_id or not sheet_name:
             return None
+        # 1) Prefer service account (identical path to connect_to_gsheet / load_data)
         try:
-            url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={sheet_name}"
-            df = pd.read_csv(url)
+            service_account_info = dict(st.secrets["gcp_service_account"])
+            if "private_key" in service_account_info:
+                service_account_info["private_key"] = service_account_info["private_key"].replace("\\n", "\n")
+            scopes = [
+                "https://www.googleapis.com/auth/spreadsheets",
+                "https://www.googleapis.com/auth/drive",
+            ]
+            creds = Credentials.from_service_account_info(service_account_info, scopes=scopes)
+            gc = gspread.authorize(creds)
+            ws = gc.open_by_key(sheet_id).worksheet(sheet_name)
+            data = ws.get_all_values()
+            if not data or len(data) < 2:
+                return pd.DataFrame()
+            headers = [str(c).strip() for c in data[0]]
+            df = pd.DataFrame(data[1:], columns=headers)
             return df
         except Exception as e1:
+            # 2) Fallback: public CSV export (only works if sheet is shared publicly)
             try:
-                import gspread
-                from google.oauth2.service_account import Credentials
-                scopes = [
-                    "https://www.googleapis.com/auth/spreadsheets.readonly",
-                    "https://www.googleapis.com/auth/drive.readonly"
-                ]
-                creds = Credentials.from_service_account_info(
-                    st.secrets["gcp_service_account"],
-                    scopes=scopes
-                )
-                client = gspread.authorize(creds)
-                sheet = client.open_by_key(sheet_id).worksheet(sheet_name)
-                data = sheet.get_all_records()
-                return pd.DataFrame(data)
+                url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={sheet_name}"
+                df = pd.read_csv(url)
+                return df
             except Exception as e2:
-                st.error(f"Failed to load Google Sheet.\nCSV method: {e1}\nService account method: {e2}")
+                st.error(
+                    f"Failed to load Google Sheet for Smart Analysis.\n"
+                    f"Service account: {e1}\nCSV fallback: {e2}"
+                )
                 return None
 
     # ============================================================
     # PREPROCESS DATA + DEPARTMENT FILTER (FIXED)
     # ============================================================
+    def _normalize_dept(name: str) -> str:
+        """Normalize department / Head labels for reliable matching."""
+        if not isinstance(name, str):
+            return ""
+        s = name.upper().strip()
+        s = re.sub(r"\s+", " ", s)
+        # Common aliases → canonical
+        aliases = {
+            "S&T": "SIGNAL & TELECOM",
+            "S & T": "SIGNAL & TELECOM",
+            "SIGNAL AND TELECOM": "SIGNAL & TELECOM",
+            "SIGNAL & TELECOMMUNICATION": "SIGNAL & TELECOM",
+            "SIGNAL AND TELECOMMUNICATION": "SIGNAL & TELECOM",
+            "SIG & TELE": "SIGNAL & TELECOM",
+            "SIG&TELE": "SIGNAL & TELECOM",
+        }
+        return aliases.get(s, s)
+
     def preprocess_data(df: pd.DataFrame, date_from: date, date_to: date, department: str):
         df = df.copy()
-    
+        debug = {}  # row counts after each stage (shown in UI)
+
         # --------------------------------------------------------
-        # 1. Normalize column names
+        # 1. Normalize column names  (CRITICAL: never map Action By → Head)
         # --------------------------------------------------------
         col_map = {}
         for c in df.columns:
             cl = str(c).strip().lower()
-    
             if "date" in cl and "inspection" in cl:
                 col_map[c] = "Date of Inspection"
             elif cl in ["sub head", "subhead", "sub_head"]:
                 col_map[c] = "Sub Head"
             elif cl in ["location", "loc"]:
                 col_map[c] = "Location"
+            elif cl in ["head", "department", "dept"]:
+                col_map[c] = "Head"
+            elif cl in ["action by", "action_by", "actionby"]:
+                col_map[c] = "Action By"
             elif "feedback" in cl or "remark" in cl or "response" in cl:
                 if "user" in cl or "officer" in cl:
                     col_map[c] = "User Remark"
@@ -2288,11 +2321,24 @@ with tabs[3]:
                     col_map[c] = "Feedback"
             elif cl == "status":
                 col_map[c] = "Status"
-            elif cl in ["head", "department", "dept", "action by", "action_by"]:
-                col_map[c] = "Head"
-    
+
+        # Avoid duplicate target names if both Head and Action By existed
+        # and somehow collided (should not happen after the fix above)
         df = df.rename(columns=col_map)
-    
+        # If rename still produced duplicate "Head" columns, keep the first only
+        if df.columns.tolist().count("Head") > 1:
+            # keep first occurrence, drop the rest
+            cols = []
+            seen = set()
+            for c in df.columns:
+                if c == "Head" and c in seen:
+                    continue
+                cols.append(c)
+                seen.add(c)
+            df = df[cols]
+
+        debug["raw_rows"] = len(df)
+
         # --------------------------------------------------------
         # 2. Required columns check
         # --------------------------------------------------------
@@ -2301,48 +2347,60 @@ with tabs[3]:
             if col not in df.columns:
                 st.warning(f"Column '{col}' not found. Available columns: {list(df.columns)}")
                 return pd.DataFrame()
-    
+
         # --------------------------------------------------------
         # 3. Date filter
         # --------------------------------------------------------
-        df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce", dayfirst=True)
+        df["Date of Inspection"] = pd.to_datetime(
+            df["Date of Inspection"], errors="coerce", dayfirst=True
+        )
+        # Also try non-dayfirst for any remaining NaT (e.g. YYYY-MM-DD)
+        still_nat = df["Date of Inspection"].isna()
+        if still_nat.any():
+            df.loc[still_nat, "Date of Inspection"] = pd.to_datetime(
+                df.loc[still_nat, "Date of Inspection"], errors="coerce", dayfirst=False
+            )
         df = df.dropna(subset=["Date of Inspection"])
-    
-        mask = (df["Date of Inspection"].dt.date >= date_from) & (df["Date of Inspection"].dt.date <= date_to)
+        debug["after_date_parse"] = len(df)
+
+        mask = (
+            (df["Date of Inspection"].dt.date >= date_from)
+            & (df["Date of Inspection"].dt.date <= date_to)
+        )
         df = df[mask].copy()
-    
+        debug["after_date_filter"] = len(df)
+
         # Clean text columns
         df["Sub Head"] = df["Sub Head"].fillna("").astype(str).str.strip()
-        # Location must be UPPER-CASED, not just stripped: the ADSTE mapping
-        # dictionaries (KLBG / SUR / KWV_I / KWV_II) are all upper-case station
-        # codes. Previously this only did .str.strip(), so any location value
-        # that wasn't already upper-case in the sheet silently failed to match
-        # any ADSTE bucket and got dropped from Section III below — this was
-        # a major, easy-to-miss source of "missing" data.
         df["Location"] = df["Location"].fillna("").astype(str).str.strip().str.upper()
-    
+
         # --------------------------------------------------------
-        # 4. FILTER BY HEAD = "SIGNAL & TELECOM"   ← ROBUST FIX
+        # 4. FILTER BY HEAD = department  (robust matching)
         # --------------------------------------------------------
+        target = _normalize_dept(department)
         if "Head" in df.columns:
-            head_col = df["Head"]
-    
-            # Handle duplicate column names
-            if isinstance(head_col, pd.DataFrame):
-                head_series = head_col.iloc[:, 0]   # take first occurrence
-            else:
-                head_series = head_col
-    
-            head_series = head_series.fillna("").astype(str).str.upper().str.strip()
-            df = df[head_series == department.upper().strip()].copy()
+            head_series = df["Head"]
+            if isinstance(head_series, pd.DataFrame):
+                head_series = head_series.iloc[:, 0]
+            head_norm = head_series.fillna("").astype(str).map(_normalize_dept)
+            df = df[head_norm == target].copy()
+            debug["after_head_filter"] = len(df)
+            # Helpful diagnostic: unique Head values that were present before filter
+            debug["unique_heads_seen"] = sorted(
+                set(head_series.fillna("").astype(str).str.strip().unique()) - {""}
+            )[:30]
         else:
-            # Fallback to Sub Head list
+            # Fallback: keep rows whose Sub Head belongs to this department
             allowed_subheads = SUBHEAD_LIST.get(department, [])
             if allowed_subheads:
                 allowed_upper = {s.upper().strip() for s in allowed_subheads}
                 df = df[df["Sub Head"].str.upper().str.strip().isin(allowed_upper)].copy()
-    
+            debug["after_head_filter"] = len(df)
+            debug["unique_heads_seen"] = ["(no Head column — used Sub Head fallback)"]
+
         if df.empty:
+            # Attach debug so caller can show why
+            df.attrs["debug"] = debug
             return df
     
         # --------------------------------------------------------
@@ -2369,14 +2427,14 @@ with tabs[3]:
         # --------------------------------------------------------
         adste_map = build_adste_map()
         df["ADSTE"] = df["Location"].map(adste_map)
-    
-        # Use a Year-Month Period rather than a bare 1-12 month number: the
-        # month number alone can't tell April 2025 apart from April 2026, so
-        # it would silently merge different years into one column and the
-        # display below would then relabel everything with a hardcoded year.
+        debug["with_adste_mapped"] = int(df["ADSTE"].notna().sum())
+        debug["adste_unmapped"] = int(df["ADSTE"].isna().sum())
+
+        # Year-Month period (avoids merging same month across different years)
         df["Month"] = df["Date of Inspection"].dt.to_period("M")
         df["Month Name"] = df["Date of Inspection"].dt.strftime("%B-%Y")
-    
+
+        df.attrs["debug"] = debug
         return df
     # ============================================================
     # DASHBOARD CONTENT
@@ -2391,15 +2449,16 @@ with tabs[3]:
     </div>
     """, unsafe_allow_html=True)
 
-    # Load the sheet BEFORE drawing the date filters, purely so the filter
-    # widgets can default to the actual span of data in the sheet. The old
-    # code hardcoded the defaults to 1-Apr-2026 .. 30-Jun-2026, which meant
-    # any inspection outside that fixed 3-month window was invisible unless
-    # someone manually widened the date pickers — this is the main reason
-    # the dashboard looked like it had "limited"/predefined data rather
-    # than everything in the Google Sheet.
-    with st.spinner("Loading data from Google Sheet..."):
-        raw_df = load_google_sheet(SHEET_ID, SHEET_NAME)
+    # Prefer the DataFrame already loaded by the main app (same Google Sheet,
+    # same service-account path). This avoids a second, historically buggy
+    # loader that preferred the public CSV export and mapped "Action By" → "Head".
+    raw_df = None
+    if st.session_state.get("df") is not None and not st.session_state.df.empty:
+        raw_df = st.session_state.df.copy()
+        st.caption("📡 Using data already loaded by the main app (most reliable).")
+    else:
+        with st.spinner("Loading data from Google Sheet..."):
+            raw_df = load_google_sheet(SHEET_ID, SHEET_NAME)
 
     if raw_df is None or raw_df.empty:
         st.error("No data loaded. Check Sheet ID, Sheet Name, and sharing permissions.")
@@ -2439,10 +2498,25 @@ with tabs[3]:
         st.stop()
 
     df = preprocess_data(raw_df, date_from, date_to, department)
+    debug_info = getattr(df, "attrs", {}).get("debug", {})
 
     if df.empty:
         st.warning(f"No records found for **{department}** in the selected date range.")
+        if debug_info:
+            with st.expander("🔍 Why zero rows? (filter diagnostics)", expanded=True):
+                st.json(debug_info)
+                st.caption(
+                    "If `after_head_filter` is 0 but earlier stages have rows, the Head "
+                    "values in the sheet do not match 'SIGNAL & TELECOM' (check unique_heads_seen)."
+                )
         st.stop()
+    else:
+        with st.expander("🔍 Filter diagnostics (row counts)", expanded=False):
+            st.json(debug_info)
+            st.caption(
+                f"Showing **{len(df)}** rows for **{department}** "
+                f"between {date_from.strftime('%d-%m-%Y')} and {date_to.strftime('%d-%m-%Y')}."
+            )
 
     # ============================================================
     # KPI CALCULATIONS
