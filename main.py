@@ -2119,21 +2119,13 @@ with tabs[3]:
     SHEET_NAME = st.secrets["google_sheets"]["sheet_name"]
 
     # ============================================================
-    # DEPARTMENT → SUB HEAD MAPPING (kept for future use)
+    # DEPARTMENT → SUB HEAD MAPPING
+    # (reuses the single canonical SUBHEAD_LIST defined near the top of the
+    # file instead of redefining a second, slightly different copy here —
+    # the old copy here was missing the 'Trespass/CRO' entry under
+    # ENGINEERING, which is exactly the kind of silent drift redundant
+    # copies invite.)
     # ============================================================
-    SUBHEAD_LIST = {
-        "ELECT/TRD": ["T/W WAGON", "TSS/SP/SSP", "OHE SECTION", "OHE STATION", "MISC"],
-        "ELECT/G": ["TL/AC COACH", "POWER/PANTRY CAR", "WIRING/EQUIPMENT", "UPS", "AC", "DG", "SOLAR LIGHT", "MISC", 'LIGHT/ILLUMINATION'],
-        "ELECT/TRO": ["LOCO DEFECTS", "RUNNING ROOM DEFICIENCIES", "LOBBY DEFICIENCIES", "LRD RELATED", "PERSONAL STORE", "PR RELATED",
-                      "CMS", "FSD","MISC"],
-        "MECHANICAL": ['ART/ARME', "CCTV related", "Coaching related (Other)", "MISC", 'Coaching related (Primary)', 'Depot infrastructure (KLBG)', 'Depot infrastructure (KWV)', 'Depot infrastructure (LUR)', 'Depot infrastructure (SUR)', 'Depot infrastructure (WADI', 'HABD related', 'Staff working', 'Wagon related (SUR DIV examined)', 'Wagon related (Other)'],
-        "SIGNAL & TELECOM": ["ART/ARME", 'CABLES/EARTHING/KAVACH', 'FIRE ALARM/EXTINGUISHER', 'JOINT INSPECTION (P&C/TC/TRD)', 'LC GATE DEFICIENCIES', 'PANEL/VDU/BI/BPAC/DOCUMENTS', 'PASSENGER AMENITIES/CCTV', 'RELAY ROOM/DL', 'SIGNAL/BOARDS/VEGETATION', 'TRACK CIRCUIT/POINTS', 'WALKIE-TALKIE/COMMUNICATION', 'MISC'],
-        "OPTG": ["SWR/CSR/CSL/TWRD", "STATION RECORDS", "STATION DEFICIENCIES", "TRAIN O/P RELATED", "LC GATE DEFICIENCIES", "CIRCULAR/KNOWLEDGE/STAFF", "SIGNAL EXCHANGE", 'WALKIE-TALKIE/PHONE',
-                 "SM OFFICE DEFICIENCIES/ASSETS", "MISC"],
-        "ENGINEERING": ["IOW WORKS (Other)", "IOW WORKS (Safety Related)", "PWI (Track Related)", 'LC GATE DEFICIENCIES', 'P&C', 'WORKSITE'],
-        "COMMERCIAL": ["REQUIREMENT/ASSETS", "CLEANLINESS/COAL BAGS", "PASSENGER AMENITIES", "STAFF (RAILWAY/CONTRACT)", "MISC"],
-        "FINANCE": ["MISC"], "MEDICAL": ["MISC"], "STORE": ["MISC"], "GSU": ["IOW WORKS (Other)", "IOW WORKS (Safety Related)"]
-    }
 
     # ============================================================
     # CUSTOM CSS
@@ -2332,8 +2324,14 @@ with tabs[3]:
         df = df[mask].copy()
     
         # Clean text columns
-        for col in ["Sub Head", "Location"]:
-            df[col] = df[col].fillna("").astype(str).str.strip()
+        df["Sub Head"] = df["Sub Head"].fillna("").astype(str).str.strip()
+        # Location must be UPPER-CASED, not just stripped: the ADSTE mapping
+        # dictionaries (KLBG / SUR / KWV_I / KWV_II) are all upper-case station
+        # codes. Previously this only did .str.strip(), so any location value
+        # that wasn't already upper-case in the sheet silently failed to match
+        # any ADSTE bucket and got dropped from Section III below — this was
+        # a major, easy-to-miss source of "missing" data.
+        df["Location"] = df["Location"].fillna("").astype(str).str.strip().str.upper()
     
         # --------------------------------------------------------
         # 4. FILTER BY HEAD = "SIGNAL & TELECOM"   ← ROBUST FIX
@@ -2384,7 +2382,11 @@ with tabs[3]:
         adste_map = build_adste_map()
         df["ADSTE"] = df["Location"].map(adste_map)
     
-        df["Month"] = df["Date of Inspection"].dt.month
+        # Use a Year-Month Period rather than a bare 1-12 month number: the
+        # month number alone can't tell April 2025 apart from April 2026, so
+        # it would silently merge different years into one column and the
+        # display below would then relabel everything with a hardcoded year.
+        df["Month"] = df["Date of Inspection"].dt.to_period("M")
         df["Month Name"] = df["Date of Inspection"].dt.strftime("%B-%Y")
     
         return df
@@ -2401,14 +2403,41 @@ with tabs[3]:
     </div>
     """, unsafe_allow_html=True)
 
+    # Load the sheet BEFORE drawing the date filters, purely so the filter
+    # widgets can default to the actual span of data in the sheet. The old
+    # code hardcoded the defaults to 1-Apr-2026 .. 30-Jun-2026, which meant
+    # any inspection outside that fixed 3-month window was invisible unless
+    # someone manually widened the date pickers — this is the main reason
+    # the dashboard looked like it had "limited"/predefined data rather
+    # than everything in the Google Sheet.
+    with st.spinner("Loading data from Google Sheet..."):
+        raw_df = load_google_sheet(SHEET_ID, SHEET_NAME)
+
+    if raw_df is None or raw_df.empty:
+        st.error("No data loaded. Check Sheet ID, Sheet Name, and sharing permissions.")
+        st.stop()
+
+    _date_col = None
+    for _c in raw_df.columns:
+        if "date" in str(_c).lower() and "inspection" in str(_c).lower():
+            _date_col = _c
+            break
+    if _date_col is None:
+        _date_col = raw_df.columns[0]
+    _all_dates = pd.to_datetime(raw_df[_date_col], errors="coerce", dayfirst=True).dropna()
+    if not _all_dates.empty:
+        _default_from, _default_to = _all_dates.min().date(), _all_dates.max().date()
+    else:
+        _default_from, _default_to = date.today() - timedelta(days=90), date.today()
+
     # Filters
     st.subheader("Filters")
     col1, col2, col3 = st.columns([1, 1, 1.2])
 
     with col1:
-        date_from = st.date_input("From", value=date(2026, 4, 1), key="snt_date_from")
+        date_from = st.date_input("From", value=_default_from, key="snt_date_from")
     with col2:
-        date_to = st.date_input("To", value=date(2026, 6, 30), key="snt_date_to")
+        date_to = st.date_input("To", value=_default_to, key="snt_date_to")
     with col3:
         department = st.selectbox(
             "Department / Jurisdiction",
@@ -2421,63 +2450,7 @@ with tabs[3]:
         st.error("From date cannot be after To date.")
         st.stop()
 
-    # Load data
-    with st.spinner("Loading data from Google Sheet..."):
-        raw_df = load_google_sheet(SHEET_ID, SHEET_NAME)
-
-    if raw_df is None or raw_df.empty:
-        st.error("No data loaded. Check Sheet ID, Sheet Name, and sharing permissions.")
-        st.stop()
-
     df = preprocess_data(raw_df, date_from, date_to, department)
-
-    # ============================================================
-    # ==================== TEMPORARY DEBUG =======================
-    # ============================================================
-    st.write("### Debug Info (remove later)")
-
-    # 1. Total rows after date filter only
-    temp = raw_df.copy()
-    date_col = None
-    for c in temp.columns:
-        if "date" in str(c).lower() and "inspection" in str(c).lower():
-            date_col = c
-            break
-    if date_col is None:
-        date_col = temp.columns[0]
-
-    temp[date_col] = pd.to_datetime(temp[date_col], errors="coerce", dayfirst=True)
-    temp = temp.dropna(subset=[date_col])
-    temp = temp[(temp[date_col].dt.date >= date_from) & (temp[date_col].dt.date <= date_to)]
-
-    st.write(f"**1. Total rows after Date filter only:** `{len(temp)}`")
-
-    # 2. Unique values in Head column (if exists)
-    head_col = None
-    for c in temp.columns:
-        cl = str(c).strip().lower()
-        if cl in ["head", "department", "dept", "action by", "action_by"]:
-            head_col = c
-            break
-
-    if head_col:
-        st.write(f"**2. Unique values in '{head_col}' column:**")
-        st.write(temp[head_col].astype(str).str.strip().value_counts())
-    else:
-        st.write("**2. No 'Head' / 'Department' column found**")
-
-    # 3. Final rows after filter
-    if not df.empty:
-        st.write(f"**3. Final rows after Head filter:** `{len(df)}`")
-        st.write("**Sub Heads in final data:**")
-        st.write(df["Sub Head"].value_counts())
-    else:
-        st.write("**3. No rows left after filter**")
-
-    st.markdown("---")
-    # ============================================================
-    # ==================== END DEBUG =============================
-    # ============================================================
 
     if df.empty:
         st.warning(f"No records found for **{department}** in the selected date range.")
@@ -2533,7 +2506,10 @@ with tabs[3]:
     sub = sub.sort_values("Total", ascending=False)
 
     display_sub = sub.copy()
-    month_names = {m: datetime(2026, m, 1).strftime("%B-%Y") for m in month_order}
+    # Month is now a Year-Month Period (see preprocess_data), so it already
+    # knows its own year - no more hardcoded "2026" mislabeling data from
+    # any other year.
+    month_names = {m: m.strftime("%B-%Y") for m in month_order}
     display_sub = display_sub.rename(columns=month_names)
     display_sub = display_sub.reset_index()
 
