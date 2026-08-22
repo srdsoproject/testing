@@ -714,7 +714,7 @@ FOOTPLATE_ROUTE_HIERARCHY = {
         "JEUR-DD", "PPJ-WSB", "PPJ-KEU", "PPJ-JNTR", "PPJ-BGVN", "PPJ-MLM", "PPJ-BRB", "PPJ-DD",
         "WSB-KEU", "WSB-JNTR", "WSB-BGVN", "WSB-MLM", "WSB-BRB", "WSB-DD", "KEU-JNTR", "KEU-BGVN",
         "KEU-MLM", "KEU-BRB", "KEU-DD", "JNTR-BGVN", "JNTR-MLM", "JNTR-BRB", "JNTR-DD", "BGVN-MLM",
-        "BGVN-BRB", "BGVN-DD", "MLM-BRB", "MLM-DD", "BRB-DD",
+        "BGVN-BRB", "BGVN-DD", "MLM-BRB", "MLM-DD", "BRB-DD", 'SUR', 'BALE', 'PK', 'MVE', 'MO', 'MKPT', 'WKA', 'ANG', 'MA', 'WDS', 'KWV', 'KEM', 'DHS', 'BLNI', 'JEUR', 'PPJ', 'WSB', 'KEU', 'JNTR', 'BGVN', 'MLM', 'BRB', 'DD', 'LC-40', 'LC-42', 'LC-21', 'LC-19'
     ],
     "DD-SUR": [
         "DD-BRB", "DD-MLM", "DD-BGVN", "DD-JNTR", "DD-KEU", "DD-WSB", "DD-PPJ", "DD-JEUR",
@@ -748,7 +748,7 @@ FOOTPLATE_ROUTE_HIERARCHY = {
         "MA-SUR", "ANG-WKA", "ANG-MKPT", "ANG-MO", "ANG-MVE", "ANG-PK", "ANG-BALE", "ANG-SUR",
         "WKA-MKPT", "WKA-MO", "WKA-MVE", "WKA-PK", "WKA-BALE", "WKA-SUR", "MKPT-MO", "MKPT-MVE",
         "MKPT-PK", "MKPT-BALE", "MKPT-SUR", "MO-MVE", "MO-PK", "MO-BALE", "MO-SUR", "MVE-PK",
-        "MVE-BALE", "MVE-SUR", "PK-BALE", "PK-SUR", "BALE-SUR",
+        "MVE-BALE", "MVE-SUR", "PK-BALE", "PK-SUR", "BALE-SUR", 'SUR', 'BALE', 'PK', 'MVE', 'MO', 'MKPT', 'WKA', 'ANG', 'MA', 'WDS', 'KWV', 'KEM', 'DHS', 'BLNI', 'JEUR', 'PPJ', 'WSB', 'KEU', 'JNTR', 'BGVN', 'MLM', 'BRB', 'DD', 'LC-40', 'LC-42', 'LC-21', 'LC-19'
     ],
     "SUR-WADI": [
         "SUR-TKWD", "SUR-HG", "SUR-TLT", "SUR-AKOR", "SUR-NGS", "SUR-BOT", "SUR-GUR", "SUR-GDGN",
@@ -774,7 +774,8 @@ FOOTPLATE_ROUTE_HIERARCHY = {
         "HDD-SDB", "HDD-WADI", "SVG-BBD", "SVG-TJSP", "SVG-KLBG", "SVG-HQR", "SVG-MR", "SVG-SDB",
         "SVG-WADI", "BBD-TJSP", "BBD-KLBG", "BBD-HQR", "BBD-MR", "BBD-SDB", "BBD-WADI", "TJSP-KLBG",
         "TJSP-HQR", "TJSP-MR", "TJSP-SDB", "TJSP-WADI", "KLBG-HQR", "KLBG-MR", "KLBG-SDB", "KLBG-WADI",
-        "HQR-MR", "HQR-SDB", "HQR-WADI", "MR-SDB", "MR-WADI", "SDB-WADI",
+        "HQR-MR", "HQR-SDB", "HQR-WADI", "MR-SDB", "MR-WADI", "SDB-WADI", 'SUR', 'TKWD', 'HG', 'TLT', 'AKOR', 'NGS', 'BOT', 'GUR', 'GDGN', 
+        'KUI', 'DUD', 'HDD', 'SVG', 'BBD', 'TJSP', 'KLBG', 'HQR', 'MR', 'SDB', 'WADI', 'LC-1', 'LC-60', 'LC-61', 'LC-66', 'LC-74', 'LC-82', 'LC-91'
     ],
     "WADI-SUR": [
         "WADI-SDB", "WADI-MR", "WADI-HQR", "WADI-KLBG", "WADI-TJSP", "WADI-BBD", "WADI-SVG", "WADI-HDD",
@@ -800,7 +801,8 @@ FOOTPLATE_ROUTE_HIERARCHY = {
         "GDGN-TKWD", "GDGN-SUR", "GUR-BOT", "GUR-NGS", "GUR-AKOR", "GUR-TLT", "GUR-HG", "GUR-TKWD",
         "GUR-SUR", "BOT-NGS", "BOT-AKOR", "BOT-TLT", "BOT-HG", "BOT-TKWD", "BOT-SUR", "NGS-AKOR",
         "NGS-TLT", "NGS-HG", "NGS-TKWD", "NGS-SUR", "AKOR-TLT", "AKOR-HG", "AKOR-TKWD", "AKOR-SUR",
-        "TLT-HG", "TLT-TKWD", "TLT-SUR", "HG-TKWD", "HG-SUR", "TKWD-SUR",
+        "TLT-HG", "TLT-TKWD", "TLT-SUR", "HG-TKWD", "HG-SUR", "TKWD-SUR", 'SUR', 'TKWD', 'HG', 'TLT', 'AKOR', 'NGS', 'BOT', 'GUR', 'GDGN', 'KUI', 'DUD', 'HDD', 'SVG', 'BBD', 'TJSP', 'KLBG', 'HQR', 'MR', 'SDB', 'WADI', 'LC-1', 'LC-60', 
+        'LC-61', 'LC-66', 'LC-74', 'LC-82', 'LC-91'
     ],
     "LUR-KWV": [
         "LUR-HGL", "LUR-OSA", "LUR-MRX", "LUR-DKY", "LUR-KMRD", "LUR-YSI", "LUR-DRSV", "LUR-PJR",
@@ -811,7 +813,7 @@ FOOTPLATE_ROUTE_HIERARCHY = {
         "DKY-DRSV", "DKY-PJR", "DKY-BTW", "DKY-SEI", "DKY-KWV", "KMRD-YSI", "KMRD-DRSV", "KMRD-PJR",
         "KMRD-BTW", "KMRD-SEI", "KMRD-KWV", "YSI-DRSV", "YSI-PJR", "YSI-BTW", "YSI-SEI", "YSI-KWV",
         "DRSV-PJR", "DRSV-BTW", "DRSV-SEI", "DRSV-KWV", "PJR-BTW", "PJR-SEI", "PJR-KWV", "BTW-SEI",
-        "BTW-KWV", "SEI-KWV",
+        "BTW-KWV", "SEI-KWV", 'SEI', 'BTW', 'PJR', 'DRSV', 'YSI', 'KMRD', 'DKY', 'MRX', 'OSA', 'HGL', 'LUR'
     ],
     "KWV-LUR": [
         "KWV-SEI", "KWV-BTW", "KWV-PJR", "KWV-DRSV", "KWV-YSI", "KWV-KMRD", "KWV-DKY", "KWV-MRX",
@@ -822,7 +824,7 @@ FOOTPLATE_ROUTE_HIERARCHY = {
         "DRSV-DKY", "DRSV-MRX", "DRSV-OSA", "DRSV-HGL", "DRSV-LUR", "YSI-KMRD", "YSI-DKY", "YSI-MRX",
         "YSI-OSA", "YSI-HGL", "YSI-LUR", "KMRD-DKY", "KMRD-MRX", "KMRD-OSA", "KMRD-HGL", "KMRD-LUR",
         "DKY-MRX", "DKY-OSA", "DKY-HGL", "DKY-LUR", "MRX-OSA", "MRX-HGL", "MRX-LUR", "OSA-HGL",
-        "OSA-LUR", "HGL-LUR",
+        "OSA-LUR", "HGL-LUR", 'SEI', 'BTW', 'PJR', 'DRSV', 'YSI', 'KMRD', 'DKY', 'MRX', 'OSA', 'HGL', 'LUR'
     ],
     "KWV-MRJ": [
         "KWV-ARAG", "KWV-BLNK", "KWV-SGRE", "KWV-KVK", "KWV-LNP", "KWV-DLGN", "KWV-JTRD", "KWV-MSDG",
@@ -838,7 +840,7 @@ FOOTPLATE_ROUTE_HIERARCHY = {
         "JTRD-SGLA", "JTRD-PVR", "JTRD-MLB", "JTRD-MRJ", "MSDG-JVA", "MSDG-WSD", "MSDG-SGLA", "MSDG-PVR",
         "MSDG-MLB", "MSDG-MRJ", "JVA-WSD", "JVA-SGLA", "JVA-PVR", "JVA-MLB", "JVA-MRJ", "WSD-SGLA",
         "WSD-PVR", "WSD-MLB", "WSD-MRJ", "SGLA-PVR", "SGLA-MLB", "SGLA-MRJ", "PVR-MLB", "PVR-MRJ",
-        "MLB-MRJ",
+        "MLB-MRJ", 'ARAG', 'BLNK', 'SGRE', 'KVK', 'LNP', 'DLGN', 'JTRD', 'MSDG', 'JVA', 'WSD', 'SGLA', 'PVR', 'MLB'
     ],
     "MRJ-KWV": [
         "MRJ-MLB", "MRJ-PVR", "MRJ-SGLA", "MRJ-WSD", "MRJ-JVA", "MRJ-MSDG", "MRJ-JTRD", "MRJ-DLGN",
@@ -854,7 +856,7 @@ FOOTPLATE_ROUTE_HIERARCHY = {
         "JTRD-SGRE", "JTRD-BLNK", "JTRD-ARAG", "JTRD-KWV", "DLGN-LNP", "DLGN-KVK", "DLGN-SGRE", "DLGN-BLNK",
         "DLGN-ARAG", "DLGN-KWV", "LNP-KVK", "LNP-SGRE", "LNP-BLNK", "LNP-ARAG", "LNP-KWV", "KVK-SGRE",
         "KVK-BLNK", "KVK-ARAG", "KVK-KWV", "SGRE-BLNK", "SGRE-ARAG", "SGRE-KWV", "BLNK-ARAG", "BLNK-KWV",
-        "ARAG-KWV",
+        "ARAG-KWV", 'ARAG', 'BLNK', 'SGRE', 'KVK', 'LNP', 'DLGN', 'JTRD', 'MSDG', 'JVA', 'WSD', 'SGLA', 'PVR', 'MLB'
     ]
 }
 
