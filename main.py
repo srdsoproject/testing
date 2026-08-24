@@ -2231,6 +2231,18 @@ with tabs[3]:
         "ADSTE/KWV-II (LC-34(DKY)-LUR)"
     ]
 
+    # Departments that have an assistant-level-officer (e.g. ADSTE) grouping
+    # defined. Signal & Telecom uses ADSTE. Mechanical has no such grouping
+    # yet — Section III is skipped entirely for it until the officer-level
+    # split for Mechanical is provided.
+    ASSISTANT_OFFICER_LEVEL = {
+        "SIGNAL & TELECOM": {
+            "label": "ADSTE",
+            "order": ADSTE_ORDER,
+        },
+        # "MECHANICAL": {...}   # to be added once officer-level grouping is known
+    }
+
     def build_adste_map():
         adste_map = {}
         for loc in KLBG:
@@ -2445,12 +2457,19 @@ with tabs[3]:
                 df["Status"] = df["Status"].fillna("Pending").astype(str)
     
         # --------------------------------------------------------
-        # 6. ADSTE mapping
+        # 6. Assistant-officer-level mapping (e.g. ADSTE for S&T)
+        # Only applied for departments that have this grouping defined.
+        # Mechanical currently has none, so this column is simply omitted
+        # for it and Section III is skipped further down.
         # --------------------------------------------------------
-        adste_map = build_adste_map()
-        df["ADSTE"] = df["Location"].map(adste_map)
-        debug["with_adste_mapped"] = int(df["ADSTE"].notna().sum())
-        debug["adste_unmapped"] = int(df["ADSTE"].isna().sum())
+        target_norm = _normalize_dept(department)
+        if target_norm in ASSISTANT_OFFICER_LEVEL:
+            adste_map = build_adste_map()
+            df["ADSTE"] = df["Location"].map(adste_map)
+            debug["with_adste_mapped"] = int(df["ADSTE"].notna().sum())
+            debug["adste_unmapped"] = int(df["ADSTE"].isna().sum())
+        else:
+            debug["assistant_officer_level"] = "not defined for this department — Section III skipped"
 
         # Year-Month period (avoids merging same month across different years)
         df["Month"] = df["Date of Inspection"].dt.to_period("M")
@@ -2636,17 +2655,27 @@ with tabs[3]:
     st.markdown("---")
 
     # ============================================================
-    # SECTION III — ADSTE WISE
+    # SECTION III — ASSISTANT OFFICER LEVEL WISE (e.g. ADSTE for S&T)
+    # Skipped entirely for departments with no such grouping defined
+    # (e.g. Mechanical, until that split is provided).
     # ============================================================
-    st.markdown(
-        f'<div class="section-header">III — CLASSIFICATION ADSTE WISE ({department})</div>',
-        unsafe_allow_html=True
-    )
+    _officer_level_cfg = ASSISTANT_OFFICER_LEVEL.get(_normalize_dept(department))
 
-    adste_df = df.dropna(subset=["ADSTE"])
-    if adste_df.empty:
-        st.info("No locations matched the current ADSTE mapping for the selected period.")
+    if _officer_level_cfg is None:
+        st.info(
+            f"ℹ️ Assistant-officer-level (e.g. ADSTE) classification is not yet defined for "
+            f"**{department}**. This section will appear once that grouping is provided."
+        )
     else:
+      st.markdown(
+        f'<div class="section-header">III — CLASSIFICATION {_officer_level_cfg["label"]} WISE ({department})</div>',
+        unsafe_allow_html=True
+      )
+
+      adste_df = df.dropna(subset=["ADSTE"])
+      if adste_df.empty:
+        st.info("No locations matched the current ADSTE mapping for the selected period.")
+      else:
         adste = (
             adste_df.groupby(["ADSTE", "Month"])
             .size()
