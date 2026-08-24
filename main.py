@@ -2115,7 +2115,14 @@ with tabs[3]:
     # the old copy here was missing the 'Trespass/CRO' entry under
     # ENGINEERING, which is exactly the kind of silent drift redundant
     # copies invite.)
+    #
+    # NOTE: This tab is now generic across departments (Signal & Telecom,
+    # Mechanical, ...). It no longer hardcodes "S&T" anywhere except in the
+    # DEPARTMENT_OPTIONS list below and the alias table in _normalize_dept.
+    # To add another department later, just add its canonical Head label to
+    # DEPARTMENT_OPTIONS and any spelling variants to the aliases dict.
     # ============================================================
+    DEPARTMENT_OPTIONS = ["SIGNAL & TELECOM", "MECHANICAL"]
 
     # ============================================================
     # CUSTOM CSS
@@ -2146,7 +2153,9 @@ with tabs[3]:
     """, unsafe_allow_html=True)
 
     # ============================================================
-    # ADSTE LOCATION MAPPING (currently only for S&T)
+    # ADSTE LOCATION MAPPING
+    # (Location-code based, so it applies to any department whose records
+    # use these same station/section codes — not just S&T.)
     # ============================================================
     KLBG = {
         "WADI", "SDB", "MR", "HQR", "KLBG", "BBD", "SVG", "HHD", "GUR", "KUI",
@@ -2287,6 +2296,7 @@ with tabs[3]:
         s = re.sub(r"\s+", " ", s)
         # Common aliases → canonical
         aliases = {
+            # Signal & Telecom
             "S&T": "SIGNAL & TELECOM",
             "S & T": "SIGNAL & TELECOM",
             "SIGNAL AND TELECOM": "SIGNAL & TELECOM",
@@ -2294,6 +2304,15 @@ with tabs[3]:
             "SIGNAL AND TELECOMMUNICATION": "SIGNAL & TELECOM",
             "SIG & TELE": "SIGNAL & TELECOM",
             "SIG&TELE": "SIGNAL & TELECOM",
+            # Mechanical
+            "MECH": "MECHANICAL",
+            "MECH.": "MECHANICAL",
+            "MECHANICAL DEPARTMENT": "MECHANICAL",
+            "MECHANICAL DEPT": "MECHANICAL",
+            "MECH DEPARTMENT": "MECHANICAL",
+            "MECH DEPT": "MECHANICAL",
+            "M&C": "MECHANICAL",
+            "M & C": "MECHANICAL",
         }
         return aliases.get(s, s)
 
@@ -2442,11 +2461,24 @@ with tabs[3]:
     # ============================================================
     # DASHBOARD CONTENT
     # ============================================================
-    st.markdown("""
+    # Filters are rendered first so the header below can reflect the
+    # department the user actually picked.
+    st.subheader("Filters")
+    col1, col2, col3 = st.columns([1, 1, 1.2])
+
+    with col3:
+        department = st.selectbox(
+            "Department / Jurisdiction",
+            options=DEPARTMENT_OPTIONS,
+            index=0,
+            key="snt_department"
+        )
+
+    st.markdown(f"""
     <div class="main-header">
         <h2 style="margin:0; font-size:1.6rem;">INDIAN RAILWAYS — SOLAPUR DIVISION — CENTRAL RAILWAY</h2>
         <h3 style="margin:0.3rem 0 0 0; font-weight:500; font-size:1.25rem;">
-            SAFETY DEFICIENCIES ANALYSIS OF S&T DEPARTMENT
+            SAFETY DEFICIENCIES ANALYSIS OF {department} DEPARTMENT
         </h3>
         <p style="margin:0.4rem 0 0 0; font-size:0.9rem; opacity:0.9;">Source: SARAL System</p>
     </div>
@@ -2480,21 +2512,10 @@ with tabs[3]:
     else:
         _default_from, _default_to = date.today() - timedelta(days=90), date.today()
 
-    # Filters
-    st.subheader("Filters")
-    col1, col2, col3 = st.columns([1, 1, 1.2])
-
     with col1:
         date_from = st.date_input("From", value=_default_from, key="snt_date_from")
     with col2:
         date_to = st.date_input("To", value=_default_to, key="snt_date_to")
-    with col3:
-        department = st.selectbox(
-            "Department / Jurisdiction",
-            options=["SIGNAL & TELECOM"],
-            index=0,
-            key="snt_department"
-        )
 
     if date_from > date_to:
         st.error("From date cannot be after To date.")
@@ -2509,8 +2530,8 @@ with tabs[3]:
             with st.expander("🔍 Why zero rows? (filter diagnostics)", expanded=True):
                 st.json(debug_info)
                 st.caption(
-                    "If `after_head_filter` is 0 but earlier stages have rows, the Head "
-                    "values in the sheet do not match 'SIGNAL & TELECOM' (check unique_heads_seen)."
+                    f"If `after_head_filter` is 0 but earlier stages have rows, the Head "
+                    f"values in the sheet do not match '{department}' (check unique_heads_seen)."
                 )
         st.stop()
     else:
@@ -2555,7 +2576,10 @@ with tabs[3]:
     # ============================================================
     # SECTION II — SUB HEAD DISTRIBUTION
     # ============================================================
-    st.markdown('<div class="section-header">II — CLASSIFICATION SUB HEAD DISTRIBUTION</div>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="section-header">II — CLASSIFICATION SUB HEAD DISTRIBUTION ({department})</div>',
+        unsafe_allow_html=True
+    )
 
     month_order = sorted(df["Month"].unique())
     sub = (
@@ -2598,7 +2622,7 @@ with tabs[3]:
             orientation="h",
             text="Total",
             color_discrete_sequence=["#123A7A"],
-            title="Sub Head Wise Distribution (Top 10)"
+            title=f"Sub Head Wise Distribution — {department} (Top 10)"
         )
         fig_bar.update_layout(
             yaxis={"categoryorder": "total ascending"},
@@ -2614,7 +2638,10 @@ with tabs[3]:
     # ============================================================
     # SECTION III — ADSTE WISE
     # ============================================================
-    st.markdown('<div class="section-header">III — CLASSIFICATION ADSTE WISE</div>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="section-header">III — CLASSIFICATION ADSTE WISE ({department})</div>',
+        unsafe_allow_html=True
+    )
 
     adste_df = df.dropna(subset=["ADSTE"])
     if adste_df.empty:
@@ -2660,7 +2687,7 @@ with tabs[3]:
                 hovertemplate="%{label}<br>%{value} (%{percent})<extra></extra>"
             )])
             fig_donut.update_layout(
-                title="ADSTE Wise Distribution",
+                title=f"ADSTE Wise Distribution — {department}",
                 height=320,
                 margin=dict(l=20, r=20, t=40, b=20),
                 annotations=[dict(
