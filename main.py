@@ -2197,7 +2197,8 @@ with tabs[3]:
         "GDGN-TKWD", "GDGN-SUR", "GUR-BOT", "GUR-NGS", "GUR-AKOR", "GUR-TLT", "GUR-HG", "GUR-TKWD",
         "GUR-SUR", "BOT-NGS", "BOT-AKOR", "BOT-TLT", "BOT-HG", "BOT-TKWD", "BOT-SUR", "NGS-AKOR",
         "NGS-TLT", "NGS-HG", "NGS-TKWD", "NGS-SUR", "AKOR-TLT", "AKOR-HG", "AKOR-TKWD", "AKOR-SUR",
-        "TLT-HG", "TLT-TKWD", "TLT-SUR", "HG-TKWD", "HG-SUR"
+        "TLT-HG", "TLT-TKWD", "TLT-SUR", "HG-TKWD", "HG-SUR", 'HG', 'TLT', 'AKOR', 'NGS', 'BOT', 'GUR', 'GDGN', 
+        'KUI', 'DUD', 'HDD', 'SVG', 'BBD', 'TJSP', 'KLBG', 'HQR', 'MR', 'SDB', 'WADI', 'LC-1', 'LC-60', 'LC-61', 'LC-66', 'LC-74', 'LC-82', 'LC-91'
     }
     SUR = {
         "TKWD", "SUR", "BALE", "PK", "MVE", "MO", "MKPT", "AAG", "WKA", "MLB",
