@@ -2624,193 +2624,253 @@ with tabs[3]:
     from matplotlib.gridspec import GridSpec
 
     def generate_analysis_image(df, department, date_from, date_to,
-                                total, resolved, pending, no_response, resolution_rate):
-        month_order = sorted(df["Month"].unique())
-        month_names = {m: m.strftime("%b-%Y") for m in month_order}
+                            total, resolved, pending, no_response, resolution_rate):
+    """Create a single high-quality PNG that looks like the official report."""
+    # ---------- prepare data (safe against empty / single-month cases) ----------
+    if df.empty or "Month" not in df.columns or "Sub Head" not in df.columns:
+        # Fallback empty image
+        fig, ax = plt.subplots(figsize=(12, 4), dpi=120)
+        ax.axis("off")
+        ax.text(0.5, 0.5, "No data available for the selected period / department",
+                ha="center", va="center", fontsize=14)
+        buf = BytesIO()
+        fig.savefig(buf, format="png", dpi=120, bbox_inches="tight")
+        plt.close(fig)
+        buf.seek(0)
+        return buf
 
-        # Sub-Head table (NO Share)
-        sub = (df.groupby(["Sub Head", "Month"]).size().unstack(fill_value=0))
-        for m in month_order:
-            if m not in sub.columns:
-                sub[m] = 0
-        sub["Total"] = sub[month_order].sum(axis=1)
-        sub = sub.sort_values("Total", ascending=False)
+    month_order = sorted(df["Month"].unique())
+    month_names = {m: m.strftime("%b-%Y") for m in month_order}
 
-        # Officer levels
-        officer_tables = []
-        _dept_cfg = ASSISTANT_OFFICER_LEVEL.get(_normalize_dept(department))
-        if _dept_cfg:
-            for level in _dept_cfg["levels"]:
-                key = level["key"]
-                label = level["label"]
-                order = level["order"]
-                level_df = df.dropna(subset=[key]) if key in df.columns else pd.DataFrame()
-                if level_df.empty:
-                    continue
-                grouped = (level_df.groupby([key, "Month"]).size()
-                           .unstack(fill_value=0).reindex(order))
-                for m in month_order:
-                    if m not in grouped.columns:
-                        grouped[m] = 0
-                grouped["Total"] = grouped[month_order].sum(axis=1)
-                officer_tables.append((label, grouped, order))
+    # Sub-Head table (NO Share) – force DataFrame
+    sub = (
+        df.groupby(["Sub Head", "Month"])
+        .size()
+        .unstack(fill_value=0)
+    )
+    # Guarantee all months exist as columns
+    for m in month_order:
+        if m not in sub.columns:
+            sub[m] = 0
+    # Keep only the month columns we care about + create Total
+    sub = sub.reindex(columns=month_order, fill_value=0)
+    sub["Total"] = sub[month_order].sum(axis=1)
+    sub = sub.sort_values("Total", ascending=False)
 
-        n_officer = len(officer_tables)
-        fig_h = 11 + 3.8 * n_officer + 0.35 * min(len(sub), 18)
-        fig = plt.figure(figsize=(16, fig_h), dpi=150, facecolor="white")
-        gs = GridSpec(3 + n_officer*2, 1, figure=fig,
-                      height_ratios=[1.1, 1.0, 0.15 + 0.28*min(len(sub), 18)] + [0.15, 2.6]*n_officer,
-                      hspace=0.35)
+    # Ensure it is always a DataFrame (protects against single-row edge cases)
+    if isinstance(sub, pd.Series):
+        sub = sub.to_frame().T
 
-        # ---------- 1. HEADER ----------
-        ax_header = fig.add_subplot(gs[0])
-        ax_header.set_xlim(0, 16)
-        ax_header.set_ylim(0, 2.2)
-        ax_header.axis("off")
+    # Officer levels
+    officer_tables = []
+    _dept_cfg = ASSISTANT_OFFICER_LEVEL.get(_normalize_dept(department))
+    if _dept_cfg:
+        for level in _dept_cfg["levels"]:
+            key = level["key"]
+            label = level["label"]
+            order = level["order"]
+            if key not in df.columns:
+                continue
+            level_df = df.dropna(subset=[key])
+            if level_df.empty:
+                continue
+            grouped = (
+                level_df.groupby([key, "Month"])
+                .size()
+                .unstack(fill_value=0)
+                .reindex(order)
+            )
+            for m in month_order:
+                if m not in grouped.columns:
+                    grouped[m] = 0
+            grouped = grouped.reindex(columns=month_order, fill_value=0)
+            grouped["Total"] = grouped[month_order].sum(axis=1)
+            if isinstance(grouped, pd.Series):
+                grouped = grouped.to_frame().T
+            officer_tables.append((label, grouped, order))
 
-        ax_header.add_patch(mpatches.FancyBboxPatch(
-            (0.1, 0.15), 15.8, 1.9,
-            boxstyle="round,pad=0.02,rounding_size=0.15",
-            facecolor="#0C2F67", edgecolor="none"))
+    n_officer = len(officer_tables)
+    n_sub_rows = min(len(sub), 18) if not sub.empty else 1
+    fig_h = 11 + 3.8 * n_officer + 0.35 * n_sub_rows
+    fig = plt.figure(figsize=(16, max(fig_h, 10)), dpi=150, facecolor="white")
+    height_ratios = [1.1, 1.0, 0.15 + 0.28 * n_sub_rows] + [0.15, 2.6] * n_officer
+    gs = GridSpec(3 + n_officer * 2, 1, figure=fig,
+                  height_ratios=height_ratios, hspace=0.35)
 
-        ax_header.text(0.4, 1.55, "INDIAN RAILWAYS", color="white",
-                       fontsize=11, fontweight="bold", va="center")
-        ax_header.text(0.4, 1.15, "SOLAPUR DIVISION", color="#A8C5E2",
-                       fontsize=9, va="center")
-        ax_header.text(0.4, 0.80, "CENTRAL RAILWAY", color="#A8C5E2",
-                       fontsize=9, va="center")
+    # ============================================================
+    # 1. HEADER
+    # ============================================================
+    ax_header = fig.add_subplot(gs[0])
+    ax_header.set_xlim(0, 16)
+    ax_header.set_ylim(0, 2.2)
+    ax_header.axis("off")
 
-        ax_header.text(8.0, 1.55,
-                       f"SAFETY DEFICIENCIES ANALYSIS OF\n{department} DEPARTMENT",
-                       color="white", fontsize=13, fontweight="bold",
-                       ha="center", va="center", linespacing=1.3)
-        ax_header.text(8.0, 0.75,
-                       f"FOR THE PERIOD OF  {date_from.strftime('%d %b %Y')}  –  {date_to.strftime('%d %b %Y')}",
-                       color="#A8C5E2", fontsize=10, ha="center", va="center")
+    ax_header.add_patch(mpatches.FancyBboxPatch(
+        (0.1, 0.15), 15.8, 1.9,
+        boxstyle="round,pad=0.02,rounding_size=0.15",
+        facecolor="#0C2F67", edgecolor="none"))
 
-        ax_header.text(15.5, 1.55, "Source: SARAL", color="white",
-                       fontsize=10, fontweight="bold", ha="right", va="center")
+    ax_header.text(0.4, 1.55, "INDIAN RAILWAYS", color="white",
+                   fontsize=11, fontweight="bold", va="center")
+    ax_header.text(0.4, 1.15, "SOLAPUR DIVISION", color="#A8C5E2",
+                   fontsize=9, va="center")
+    ax_header.text(0.4, 0.80, "CENTRAL RAILWAY", color="#A8C5E2",
+                   fontsize=9, va="center")
 
-        # ---------- 2. KPI CARDS ----------
-        ax_kpi = fig.add_subplot(gs[1])
-        ax_kpi.set_xlim(0, 16)
-        ax_kpi.set_ylim(0, 2.4)
-        ax_kpi.axis("off")
+    ax_header.text(8.0, 1.55,
+                   f"SAFETY DEFICIENCIES ANALYSIS OF\n{department} DEPARTMENT",
+                   color="white", fontsize=13, fontweight="bold",
+                   ha="center", va="center", linespacing=1.3)
+    ax_header.text(8.0, 0.75,
+                   f"FOR THE PERIOD OF  {date_from.strftime('%d %b %Y')}  –  {date_to.strftime('%d %b %Y')}",
+                   color="#A8C5E2", fontsize=10, ha="center", va="center")
 
-        kpi_data = [
-            ("TOTAL RECORDS",        f"{total}",               "#1D4FA3", "#E8F0FE", "100% of Total"),
-            ("RESOLVED",             f"{resolved}",            "#159447", "#E6F7ED", f"{resolution_rate:.2f}%"),
-            ("NO RESPONSE",          f"{no_response}",         "#D91F2D", "#FDE8E8", f"{(no_response/total*100) if total else 0:.2f}%"),
-            ("PENDING",              f"{pending}",             "#E58A00", "#FFF4E0", f"{(pending/total*100) if total else 0:.2f}%"),
-            ("OVERALL RESOLUTION\nRATE", f"{resolution_rate:.2f}%", "#7B2D8E", "#F3E8FF", "(Resolved / Total)"),
-        ]
+    ax_header.text(15.5, 1.55, "Source: SARAL", color="white",
+                   fontsize=10, fontweight="bold", ha="right", va="center")
 
-        card_w = 2.9
-        gap = 0.22
-        start_x = 0.35
-        for i, (title, value, color, bg, sub) in enumerate(kpi_data):
-            x = start_x + i * (card_w + gap)
-            ax_kpi.add_patch(mpatches.FancyBboxPatch(
-                (x, 0.25), card_w, 1.9,
-                boxstyle="round,pad=0.02,rounding_size=0.12",
-                facecolor=bg, edgecolor="#CCCCCC", linewidth=1.2))
-            ax_kpi.add_patch(mpatches.Rectangle(
-                (x, 1.95), card_w, 0.20, facecolor=color, edgecolor="none"))
-            ax_kpi.text(x + card_w/2, 1.70, title, color=color,
-                        fontsize=8.5, fontweight="bold", ha="center", va="center")
-            ax_kpi.text(x + card_w/2, 1.15, value, color=color,
-                        fontsize=20, fontweight="bold", ha="center", va="center")
-            ax_kpi.text(x + card_w/2, 0.55, sub, color="#666666",
-                        fontsize=8, ha="center", va="center")
+    # ============================================================
+    # 2. KPI CARDS
+    # ============================================================
+    ax_kpi = fig.add_subplot(gs[1])
+    ax_kpi.set_xlim(0, 16)
+    ax_kpi.set_ylim(0, 2.4)
+    ax_kpi.axis("off")
 
-        # ---------- 3. SUB-HEAD TABLE ----------
-        ax_sub = fig.add_subplot(gs[2])
-        ax_sub.axis("off")
-        ax_sub.set_title(f"II — CLASSIFICATION SUB HEAD DISTRIBUTION ({department})",
-                         loc="left", fontsize=11, fontweight="bold",
-                         color="#123A7A", pad=8)
+    kpi_data = [
+        ("TOTAL RECORDS",        f"{total}",               "#1D4FA3", "#E8F0FE", "100% of Total"),
+        ("RESOLVED",             f"{resolved}",            "#159447", "#E6F7ED", f"{resolution_rate:.2f}%"),
+        ("NO RESPONSE",          f"{no_response}",         "#D91F2D", "#FDE8E8", f"{(no_response/total*100) if total else 0:.2f}%"),
+        ("PENDING",              f"{pending}",             "#E58A00", "#FFF4E0", f"{(pending/total*100) if total else 0:.2f}%"),
+        ("OVERALL RESOLUTION\nRATE", f"{resolution_rate:.2f}%", "#7B2D8E", "#F3E8FF", "(Resolved / Total)"),
+    ]
 
+    card_w = 2.9
+    gap = 0.22
+    start_x = 0.35
+    for i, (title, value, color, bg, subtxt) in enumerate(kpi_data):
+        x = start_x + i * (card_w + gap)
+        ax_kpi.add_patch(mpatches.FancyBboxPatch(
+            (x, 0.25), card_w, 1.9,
+            boxstyle="round,pad=0.02,rounding_size=0.12",
+            facecolor=bg, edgecolor="#CCCCCC", linewidth=1.2))
+        ax_kpi.add_patch(mpatches.Rectangle(
+            (x, 1.95), card_w, 0.20, facecolor=color, edgecolor="none"))
+        ax_kpi.text(x + card_w/2, 1.70, title, color=color,
+                    fontsize=8.5, fontweight="bold", ha="center", va="center")
+        ax_kpi.text(x + card_w/2, 1.15, value, color=color,
+                    fontsize=20, fontweight="bold", ha="center", va="center")
+        ax_kpi.text(x + card_w/2, 0.55, subtxt, color="#666666",
+                    fontsize=8, ha="center", va="center")
+
+    # ============================================================
+    # 3. SUB-HEAD TABLE
+    # ============================================================
+    ax_sub = fig.add_subplot(gs[2])
+    ax_sub.axis("off")
+    ax_sub.set_title(f"II — CLASSIFICATION SUB HEAD DISTRIBUTION ({department})",
+                     loc="left", fontsize=11, fontweight="bold",
+                     color="#123A7A", pad=8)
+
+    if sub.empty:
+        ax_sub.text(0.5, 0.5, "No Sub-Head data", ha="center", va="center")
+    else:
         col_labels = ["Sub Head"] + [month_names[m] for m in month_order] + ["Total"]
         cell_text = []
-        for idx, row in sub.head(18).iterrows():
-            cell_text.append([str(idx)[:42]] +
-                             [str(int(row[m])) for m in month_order] +
-                             [str(int(row["Total"]))])
+        # Use .itertuples() which is safer than iterrows on some pandas versions
+        for row in sub.head(18).itertuples():
+            name = str(row.Index)[:42]
+            vals = [str(int(getattr(row, str(m), 0))) for m in month_order]
+            total_val = str(int(getattr(row, "Total", 0)))
+            cell_text.append([name] + vals + [total_val])
 
         table = ax_sub.table(cellText=cell_text, colLabels=col_labels,
                              loc="center", cellLoc="center")
         table.auto_set_font_size(False)
         table.set_fontsize(7.5)
         table.scale(1, 1.35)
-        for (row, col), cell in table.get_celld().items():
+        for (r, c), cell in table.get_celld().items():
             cell.set_edgecolor("#CCCCCC")
-            if row == 0:
+            if r == 0:
                 cell.set_facecolor("#123A7A")
                 cell.set_text_props(color="white", fontweight="bold")
-            elif row % 2 == 0:
+            elif r % 2 == 0:
                 cell.set_facecolor("#F7F9FC")
 
-        # ---------- 4. OFFICER-LEVEL TABLES + DONUTS ----------
-        for i, (label, grouped, order) in enumerate(officer_tables):
-            ax_t = fig.add_subplot(gs[3 + i*2])
-            ax_t.axis("off")
-            ax_t.set_title(f"III — CLASSIFICATION {label} WISE ({department})",
-                           loc="left", fontsize=11, fontweight="bold",
-                           color="#123A7A", pad=6)
+    # ============================================================
+    # 4. OFFICER-LEVEL TABLES + DONUTS
+    # ============================================================
+    for i, (label, grouped, order) in enumerate(officer_tables):
+        ax_t = fig.add_subplot(gs[3 + i*2])
+        ax_t.axis("off")
+        ax_t.set_title(f"III — CLASSIFICATION {label} WISE ({department})",
+                       loc="left", fontsize=11, fontweight="bold",
+                       color="#123A7A", pad=6)
 
-            col_labels = [label] + [month_names[m] for m in month_order] + ["Total"]
-            cell_text = []
-            for name in order:
-                if name in grouped.index:
-                    r = grouped.loc[name]
-                    cell_text.append([name] +
-                                     [str(int(r[m])) for m in month_order] +
-                                     [str(int(r["Total"]))])
-                else:
-                    cell_text.append([name] + ["0"]*len(month_order) + ["0"])
+        col_labels = [label] + [month_names[m] for m in month_order] + ["Total"]
+        cell_text = []
+        for name in order:
+            if name in grouped.index:
+                r = grouped.loc[name]
+                cell_text.append(
+                    [name] +
+                    [str(int(r.get(m, 0))) for m in month_order] +
+                    [str(int(r.get("Total", 0)))]
+                )
+            else:
+                cell_text.append([name] + ["0"] * len(month_order) + ["0"])
 
-            table = ax_t.table(cellText=cell_text, colLabels=col_labels,
-                               loc="center", cellLoc="center")
-            table.auto_set_font_size(False)
-            table.set_fontsize(7.5)
-            table.scale(1, 1.4)
-            for (row, col), cell in table.get_celld().items():
-                cell.set_edgecolor("#CCCCCC")
-                if row == 0:
-                    cell.set_facecolor("#123A7A")
-                    cell.set_text_props(color="white", fontweight="bold")
-                elif row % 2 == 0:
-                    cell.set_facecolor("#F7F9FC")
+        table = ax_t.table(cellText=cell_text, colLabels=col_labels,
+                           loc="center", cellLoc="center")
+        table.auto_set_font_size(False)
+        table.set_fontsize(7.5)
+        table.scale(1, 1.4)
+        for (r, c), cell in table.get_celld().items():
+            cell.set_edgecolor("#CCCCCC")
+            if r == 0:
+                cell.set_facecolor("#123A7A")
+                cell.set_text_props(color="white", fontweight="bold")
+            elif r % 2 == 0:
+                cell.set_facecolor("#F7F9FC")
 
-            ax_d = fig.add_subplot(gs[4 + i*2])
-            values = [int(grouped.loc[n, "Total"]) if n in grouped.index else 0 for n in order]
-            colors_list = _palette(len(order))
-            wedges, _ = ax_d.pie(values, colors=colors_list, startangle=90,
-                                 wedgeprops=dict(width=0.45, edgecolor="white", linewidth=2))
-            ax_d.set_title(f"{label} Wise Distribution", fontsize=10, fontweight="bold", pad=4)
-            ax_d.text(0, 0, f"TOTAL\n{total}", ha="center", va="center",
-                      fontsize=11, fontweight="bold")
-            ax_d.legend(wedges, [f"{n} ({v})" for n, v in zip(order, values)],
-                        loc="center left", bbox_to_anchor=(1.0, 0.5),
-                        fontsize=7.5, frameon=False)
+        # Donut
+        ax_d = fig.add_subplot(gs[4 + i*2])
+        values = []
+        for n in order:
+            if n in grouped.index:
+                values.append(int(grouped.loc[n, "Total"]))
+            else:
+                values.append(0)
+        colors_list = _palette(len(order))
+        wedges, _ = ax_d.pie(
+            values if sum(values) > 0 else [1],
+            colors=colors_list if sum(values) > 0 else ["#CCCCCC"],
+            startangle=90,
+            wedgeprops=dict(width=0.45, edgecolor="white", linewidth=2)
+        )
+        ax_d.set_title(f"{label} Wise Distribution", fontsize=10, fontweight="bold", pad=4)
+        ax_d.text(0, 0, f"TOTAL\n{total}", ha="center", va="center",
+                  fontsize=11, fontweight="bold")
+        ax_d.legend(wedges,
+                    [f"{n} ({v})" for n, v in zip(order, values)],
+                    loc="center left", bbox_to_anchor=(1.0, 0.5),
+                    fontsize=7.5, frameon=False)
 
-        # ---------- FOOTER ----------
-        fig.text(0.5, 0.008,
-                 f"Source: SARAL System  |  Reporting Department: Safety Department, SUR DIVN, CR  |  "
-                 f"Analysis Type: Deficiency Analysis  |  Period: {date_from.strftime('%d %b %Y')} to {date_to.strftime('%d %b %Y')}  |  "
-                 f"Department: {department}  |  Data as on: {date.today().strftime('%d %b %Y')}",
-                 ha="center", va="bottom", fontsize=7.5, color="white",
-                 bbox=dict(boxstyle="round,pad=0.4", facecolor="#0C2F67", edgecolor="none"))
+    # ---------- FOOTER ----------
+    fig.text(0.5, 0.008,
+             f"Source: SARAL System  |  Reporting Department: Safety Department, SUR DIVN, CR  |  "
+             f"Analysis Type: Deficiency Analysis  |  Period: {date_from.strftime('%d %b %Y')} to {date_to.strftime('%d %b %Y')}  |  "
+             f"Department: {department}  |  Data as on: {date.today().strftime('%d %b %Y')}",
+             ha="center", va="bottom", fontsize=7.5, color="white",
+             bbox=dict(boxstyle="round,pad=0.4", facecolor="#0C2F67", edgecolor="none"))
 
-        plt.tight_layout(rect=[0.02, 0.03, 0.98, 0.98])
+    plt.tight_layout(rect=[0.02, 0.03, 0.98, 0.98])
 
-        buf = BytesIO()
-        fig.savefig(buf, format="png", dpi=150, bbox_inches="tight",
-                    facecolor="white", edgecolor="none")
-        plt.close(fig)
-        buf.seek(0)
-        return buf
-
+    buf = BytesIO()
+    fig.savefig(buf, format="png", dpi=150, bbox_inches="tight",
+                facecolor="white", edgecolor="none")
+    plt.close(fig)
+    buf.seek(0)
+    return buf
     # ============================================================
     # DASHBOARD CONTENT
     # ============================================================
