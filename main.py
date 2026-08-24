@@ -2139,7 +2139,7 @@ with tabs[3]:
     """, unsafe_allow_html=True)
 
     # ============================================================
-    # ADSTE LOCATION MAPPING
+    # ADSTE LOCATION MAPPING (Signal & Telecom)
     # (Location-code based, so it applies to any department whose records
     # use these same station/section codes — not just S&T.)
     # ============================================================
@@ -2217,18 +2217,6 @@ with tabs[3]:
         "ADSTE/KWV-II (LC-34(DKY)-LUR)"
     ]
 
-    # Departments that have an assistant-level-officer (e.g. ADSTE) grouping
-    # defined. Signal & Telecom uses ADSTE. Mechanical has no such grouping
-    # yet — Section III is skipped entirely for it until the officer-level
-    # split for Mechanical is provided.
-    ASSISTANT_OFFICER_LEVEL = {
-        "SIGNAL & TELECOM": {
-            "label": "ADSTE",
-            "order": ADSTE_ORDER,
-        },
-        # "MECHANICAL": {...}   # to be added once officer-level grouping is known
-    }
-
     def build_adste_map():
         adste_map = {}
         for loc in KLBG:
@@ -2240,6 +2228,86 @@ with tabs[3]:
         for loc in KWV_II:
             adste_map[loc] = "ADSTE/KWV-II (LC-34(DKY)-LUR)"
         return adste_map
+
+    # ============================================================
+    # ADEN / Sr.DEN LOCATION MAPPING (Engineering)
+    # Engineering has a two-tier officer hierarchy:
+    #   ADEN / Sr.ADEN groups (6 groups, location-code based)
+    #   roll up into Sr.DEN / DEN groups (3 groups).
+    # ============================================================
+    ADEN_GROUPS = {
+        "ADEN/KLBG": {"GDGN", "GUR", "HQR", "KLBG", "KUI", "MR", "SBD", "SDB", "SVG", "TJSP", "WADI"},
+        "ADEN/LUR": {"BTW", "DKY", "HGL", "LUR", "OSA", "PJR", "SEI", "UMD", "YSI"},
+        "ADEN/PVR": {"ARAG", "DLGN", "JTRD", "KVK", "MLB", "PVR", "SGLA", "SGRE"},
+        "ADEN/S/SUR": {"AKOR", "BOT", "DUD", "HG", "NGS", "TKWD", "TLT"},
+        "Sr.ADEN/BG/KWV": {"BGVN", "BLNI", "BRB", "DHS", "JEUR", "JNTR", "KEM", "KWV", "MLM", "PPJ", "PRWD", "WSB"},
+        "Sr.ADEN/N/SUR": {"AAG", "BALE", "MA", "MKPT", "MO", "MVE", "PK", "SUR", "WDS", "WKA"},
+    }
+    ADEN_ORDER = ["ADEN/KLBG", "ADEN/LUR", "ADEN/PVR", "ADEN/S/SUR", "Sr.ADEN/BG/KWV", "Sr.ADEN/N/SUR"]
+
+    # ADEN group → its parent Sr.DEN / DEN jurisdiction
+    ADEN_TO_SRDEN = {
+        "ADEN/KLBG": "Sr.DEN/S",
+        "ADEN/S/SUR": "Sr.DEN/S",
+        "Sr.ADEN/N/SUR": "Sr.DEN/C",
+        "Sr.ADEN/BG/KWV": "Sr.DEN/C",
+        "ADEN/LUR": "DEN/TRACK",
+        "ADEN/PVR": "DEN/TRACK",
+    }
+    SRDEN_ORDER = ["Sr.DEN/S", "Sr.DEN/C", "DEN/TRACK"]
+
+    def build_aden_map():
+        aden_map = {}
+        for group, locs in ADEN_GROUPS.items():
+            for loc in locs:
+                aden_map[loc] = group
+        return aden_map
+
+    def _palette(n):
+        base = ["#1D4FA3", "#159447", "#D91F2D", "#E58A00", "#7B2D8E", "#0FA3B1", "#C2185B", "#455A64"]
+        return [base[i % len(base)] for i in range(n)]
+
+    # ============================================================
+    # OFFICER-LEVEL CONFIG PER DEPARTMENT
+    # Each department maps to a list of "levels". A level is either:
+    #   - a base level: mapped directly from Location via "location_map"
+    #   - a derived (roll-up) level: mapped from a parent level's column
+    #     via "parent_key" + "parent_map"
+    # Section III renders one sub-section per configured level, in order.
+    # Departments with no entry here simply skip Section III until their
+    # officer-level grouping is provided.
+    # ============================================================
+    ASSISTANT_OFFICER_LEVEL = {
+        "SIGNAL & TELECOM": {
+            "levels": [
+                {
+                    "key": "ADSTE",
+                    "label": "ADSTE",
+                    "order": ADSTE_ORDER,
+                    "location_map": build_adste_map(),
+                },
+            ]
+        },
+        "ENGINEERING": {
+            "levels": [
+                {
+                    "key": "ADEN",
+                    "label": "ADEN",
+                    "order": ADEN_ORDER,
+                    "location_map": build_aden_map(),
+                },
+                {
+                    "key": "SR_DEN",
+                    "label": "Sr.DEN",
+                    "order": SRDEN_ORDER,
+                    "parent_key": "ADEN",
+                    "parent_map": ADEN_TO_SRDEN,
+                },
+            ]
+        },
+        # "MECHANICAL": {...}   # to be added once officer-level grouping is known
+        # "COMMERCIAL": {...}   # to be added once officer-level grouping is known
+    }
 
     # ============================================================
     # LOAD DATA FROM GOOGLE SHEET
@@ -2318,6 +2386,14 @@ with tabs[3]:
             "COMMERCIAL DEPT": "COMMERCIAL",
             "COML": "COMMERCIAL",
             "COML.": "COMMERCIAL",
+            # Engineering
+            "ENGG": "ENGINEERING",
+            "ENGG.": "ENGINEERING",
+            "ENGINEERING DEPARTMENT": "ENGINEERING",
+            "ENGINEERING DEPT": "ENGINEERING",
+            "CIVIL": "ENGINEERING",
+            "CIVIL ENGINEERING": "ENGINEERING",
+            "ENGG DEPARTMENT": "ENGINEERING",
         }
         return aliases.get(s, s)
 
@@ -2450,19 +2526,30 @@ with tabs[3]:
                 df["Status"] = df["Status"].fillna("Pending").astype(str)
     
         # --------------------------------------------------------
-        # 6. Assistant-officer-level mapping (e.g. ADSTE for S&T)
-        # Only applied for departments that have this grouping defined.
-        # Mechanical currently has none, so this column is simply omitted
-        # for it and Section III is skipped further down.
+        # 6. Officer-level mapping (e.g. ADSTE for S&T, ADEN → Sr.DEN for
+        # Engineering). Departments without a config entry in
+        # ASSISTANT_OFFICER_LEVEL simply get no extra columns here, and
+        # Section III is skipped for them further down.
+        #
+        # Levels are processed in the order defined for the department, so
+        # a derived level (e.g. SR_DEN) can safely roll up from an earlier
+        # base level (e.g. ADEN) computed in the same pass.
         # --------------------------------------------------------
         target_norm = _normalize_dept(department)
-        if target_norm in ASSISTANT_OFFICER_LEVEL:
-            adste_map = build_adste_map()
-            df["ADSTE"] = df["Location"].map(adste_map)
-            debug["with_adste_mapped"] = int(df["ADSTE"].notna().sum())
-            debug["adste_unmapped"] = int(df["ADSTE"].isna().sum())
+        _cfg = ASSISTANT_OFFICER_LEVEL.get(target_norm)
+        if _cfg:
+            for level in _cfg["levels"]:
+                key = level["key"]
+                if "location_map" in level:
+                    df[key] = df["Location"].map(level["location_map"])
+                elif "parent_key" in level and level["parent_key"] in df.columns:
+                    df[key] = df[level["parent_key"]].map(level["parent_map"])
+                else:
+                    df[key] = None
+                debug[f"with_{key}_mapped"] = int(df[key].notna().sum())
+                debug[f"{key}_unmapped"] = int(df[key].isna().sum())
         else:
-            debug["assistant_officer_level"] = "not defined for this department — Section III skipped"
+            debug["officer_level"] = "not defined for this department — Section III skipped"
 
         # Year-Month period (avoids merging same month across different years)
         df["Month"] = df["Date of Inspection"].dt.to_period("M")
@@ -2648,90 +2735,103 @@ with tabs[3]:
     st.markdown("---")
 
     # ============================================================
-    # SECTION III — ASSISTANT OFFICER LEVEL WISE (e.g. ADSTE for S&T)
-    # Skipped entirely for departments with no such grouping defined
-    # (e.g. Mechanical, until that split is provided).
+    # SECTION III — OFFICER LEVEL WISE
+    # (ADSTE for S&T; ADEN then Sr.DEN roll-up for Engineering; skipped
+    # entirely for departments with no grouping defined yet, e.g.
+    # Mechanical, Commercial.)
     # ============================================================
-    _officer_level_cfg = ASSISTANT_OFFICER_LEVEL.get(_normalize_dept(department))
+    _dept_cfg = ASSISTANT_OFFICER_LEVEL.get(_normalize_dept(department))
 
-    if _officer_level_cfg is None:
+    if _dept_cfg is None:
         st.info(
-            f"ℹ️ Assistant-officer-level (e.g. ADSTE) classification is not yet defined for "
+            f"ℹ️ Officer-level (e.g. ADSTE / ADEN) classification is not yet defined for "
             f"**{department}**. This section will appear once that grouping is provided."
         )
     else:
-      st.markdown(
-        f'<div class="section-header">III — CLASSIFICATION {_officer_level_cfg["label"]} WISE ({department})</div>',
-        unsafe_allow_html=True
-      )
+        _levels = _dept_cfg["levels"]
+        _section_letters = ["A", "B", "C", "D", "E"]
 
-      adste_df = df.dropna(subset=["ADSTE"])
-      if adste_df.empty:
-        st.info("No locations matched the current ADSTE mapping for the selected period.")
-      else:
-        adste = (
-            adste_df.groupby(["ADSTE", "Month"])
-            .size()
-            .unstack(fill_value=0)
-            .reindex(ADSTE_ORDER)
-        )
-        for m in month_order:
-            if m not in adste.columns:
-                adste[m] = 0
-        adste["Total"] = adste[month_order].sum(axis=1)
-        adste["Share"] = (adste["Total"] / total * 100).round(2)
+        for _idx, _level in enumerate(_levels):
+            key = _level["key"]
+            label = _level["label"]
+            order = _level["order"]
+            suffix = f"III-{_section_letters[_idx]}" if len(_levels) > 1 else "III"
 
-        adste_display = adste.copy()
-        adste_display = adste_display.rename(columns=month_names)
-        adste_display = adste_display.reset_index()
-
-        col_adste_table, col_donut = st.columns([1.2, 1])
-
-        with col_adste_table:
-            st.dataframe(
-                adste_display,
-                use_container_width=True,
-                height=320,
-                hide_index=True
+            st.markdown(
+                f'<div class="section-header">{suffix} — CLASSIFICATION {label} WISE ({department})</div>',
+                unsafe_allow_html=True
             )
 
-        with col_donut:
-            donut_values = adste["Total"].fillna(0).values
-            donut_labels = ADSTE_ORDER
-            colors = ["#1D4FA3", "#159447", "#D91F2D", "#E58A00"]
-
-            fig_donut = go.Figure(data=[go.Pie(
-                labels=donut_labels,
-                values=donut_values,
-                hole=0.55,
-                marker=dict(colors=colors, line=dict(color="white", width=2)),
-                textinfo="none",
-                hovertemplate="%{label}<br>%{value} (%{percent})<extra></extra>"
-            )])
-            fig_donut.update_layout(
-                title=f"ADSTE Wise Distribution — {department}",
-                height=320,
-                margin=dict(l=20, r=20, t=40, b=20),
-                annotations=[dict(
-                    text=f"TOTAL<br><b>{int(total)}</b>",
-                    x=0.5, y=0.5,
-                    font_size=14,
-                    showarrow=False
-                )],
-                showlegend=True,
-                legend=dict(orientation="v", yanchor="middle", y=0.5, x=1.05)
-            )
-            st.plotly_chart(fig_donut, use_container_width=True)
-
-            st.markdown("**Legend**")
-            for i, name in enumerate(ADSTE_ORDER):
-                val = int(adste.loc[name, "Total"]) if name in adste.index else 0
-                pct = (val / total * 100) if total else 0
-                st.markdown(
-                    f"<span style='color:{colors[i]}; font-size:1.2rem;'>■</span> "
-                    f"**{name}** — {val} ({pct:.2f}%)",
-                    unsafe_allow_html=True
+            level_df = df.dropna(subset=[key]) if key in df.columns else pd.DataFrame()
+            if level_df.empty:
+                st.info(f"No locations matched the current {label} mapping for the selected period.")
+            else:
+                grouped = (
+                    level_df.groupby([key, "Month"])
+                    .size()
+                    .unstack(fill_value=0)
+                    .reindex(order)
                 )
+                for m in month_order:
+                    if m not in grouped.columns:
+                        grouped[m] = 0
+                grouped["Total"] = grouped[month_order].sum(axis=1)
+                grouped["Share"] = (grouped["Total"] / total * 100).round(2)
+
+                grouped_display = grouped.copy()
+                grouped_display = grouped_display.rename(columns=month_names)
+                grouped_display = grouped_display.reset_index()
+
+                col_lvl_table, col_lvl_donut = st.columns([1.2, 1])
+                colors = _palette(len(order))
+
+                with col_lvl_table:
+                    st.dataframe(
+                        grouped_display,
+                        use_container_width=True,
+                        height=320,
+                        hide_index=True
+                    )
+
+                with col_lvl_donut:
+                    donut_values = grouped["Total"].fillna(0).values
+                    donut_labels = order
+
+                    fig_donut = go.Figure(data=[go.Pie(
+                        labels=donut_labels,
+                        values=donut_values,
+                        hole=0.55,
+                        marker=dict(colors=colors, line=dict(color="white", width=2)),
+                        textinfo="none",
+                        hovertemplate="%{label}<br>%{value} (%{percent})<extra></extra>"
+                    )])
+                    fig_donut.update_layout(
+                        title=f"{label} Wise Distribution — {department}",
+                        height=320,
+                        margin=dict(l=20, r=20, t=40, b=20),
+                        annotations=[dict(
+                            text=f"TOTAL<br><b>{int(total)}</b>",
+                            x=0.5, y=0.5,
+                            font_size=14,
+                            showarrow=False
+                        )],
+                        showlegend=True,
+                        legend=dict(orientation="v", yanchor="middle", y=0.5, x=1.05)
+                    )
+                    st.plotly_chart(fig_donut, use_container_width=True, key=f"donut_{key}")
+
+                    st.markdown("**Legend**")
+                    for i, name in enumerate(order):
+                        val = int(grouped.loc[name, "Total"]) if name in grouped.index else 0
+                        pct = (val / total * 100) if total else 0
+                        st.markdown(
+                            f"<span style='color:{colors[i]}; font-size:1.2rem;'>■</span> "
+                            f"**{name}** — {val} ({pct:.2f}%)",
+                            unsafe_allow_html=True
+                        )
+
+            if _idx < len(_levels) - 1:
+                st.markdown("")  # small spacer between sub-sections
 
     # ============================================================
     # FOOTER
