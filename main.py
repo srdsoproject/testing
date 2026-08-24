@@ -2375,3 +2375,1082 @@ with tabs[2]:
         plt.close(fig)
         buf.seek(0)
         return buf
+with tabs[3]:
+    # ============================================================
+    # GOOGLE SHEET CONFIGURATION
+    # ============================================================
+    SHEET_ID = st.secrets["google_sheets"]["sheet_id"]
+    SHEET_NAME = st.secrets["google_sheets"]["sheet_name"]
+    # ============================================================
+    DEPARTMENT_OPTIONS = ["SIGNAL & TELECOM", "MECHANICAL", "COMMERCIAL", "OPTG", "ENGINEERING", "ELECT/TRD", "ELECT/TRO", "ELECT/G", "SECURITY", "FINANCE", "PERSONNEL", "GSU", "STORE"]
+
+    # ============================================================
+    # CUSTOM CSS
+    # ============================================================
+    st.markdown("""
+    <style>
+        .main-header {
+            background: linear-gradient(90deg, #0C2F67 0%, #123A7A 100%);
+            padding: 1.2rem 1.5rem;
+            border-radius: 10px;
+            color: white;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+        .section-header {
+            background: #123A7A;
+            color: white;
+            padding: 0.55rem 1rem;
+            border-radius: 8px 8px 0 0;
+            font-weight: 600;
+            font-size: 0.95rem;
+            margin-bottom: 0;
+        }
+        div[data-testid="stMetricValue"] {
+            font-size: 1.6rem;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # ============================================================
+    # ADSTE LOCATION MAPPING (Signal & Telecom)
+    # ============================================================
+    KLBG = {
+        "WADI", "SDB", "MR", "HQR", "KLBG", "BBD", "SVG", "HHD", "GUR", "KUI",
+        "DUD", "BOT", "AKOR", "TLT", "HG", "TJSP", "WADI-SUR", "SUR-WADI",
+        "WADI-KLBG", "SUR-SDB", "SUR-HG", "SUR-NGS", "SUR-HG", "SUR-TLT", "SUR-AKOR", "SUR-NGS", "SUR-BOT", "SUR-GUR", "SUR-GDGN",
+        "SUR-KUI", "SUR-DUD", "SUR-HDD", "SUR-SVG", "SUR-BBD", "SUR-TJSP", "SUR-KLBG", "SUR-HQR",
+        "SUR-MR", "SUR-SDB", "SUR-WADI", "TKWD-HG", "TKWD-TLT", "TKWD-AKOR", "TKWD-NGS", "TKWD-BOT",
+        "TKWD-GUR", "TKWD-GDGN", "TKWD-KUI", "TKWD-DUD", "TKWD-HDD", "TKWD-SVG", "TKWD-BBD", "TKWD-TJSP",
+        "TKWD-KLBG", "TKWD-HQR", "TKWD-MR", "TKWD-SDB", "TKWD-WADI", "HG-TLT", "HG-AKOR", "HG-NGS",
+        "HG-BOT", "HG-GUR", "HG-GDGN", "HG-KUI", "HG-DUD", "HG-HDD", "HG-SVG", "HG-BBD",
+        "HG-TJSP", "HG-KLBG", "HG-HQR", "HG-MR", "HG-SDB", "HG-WADI", "TLT-AKOR", "TLT-NGS",
+        "TLT-BOT", "TLT-GUR", "TLT-GDGN", "TLT-KUI", "TLT-DUD", "TLT-HDD", "TLT-SVG", "TLT-BBD",
+        "TLT-TJSP", "TLT-KLBG", "TLT-HQR", "TLT-MR", "TLT-SDB", "TLT-WADI", "AKOR-NGS", "AKOR-BOT",
+        "AKOR-GUR", "AKOR-GDGN", "AKOR-KUI", "AKOR-DUD", "AKOR-HDD", "AKOR-SVG", "AKOR-BBD", "AKOR-TJSP",
+        "AKOR-KLBG", "AKOR-HQR", "AKOR-MR", "AKOR-SDB", "AKOR-WADI", "NGS-BOT", "NGS-GUR", "NGS-GDGN",
+        "NGS-KUI", "NGS-DUD", "NGS-HDD", "NGS-SVG", "NGS-BBD", "NGS-TJSP", "NGS-KLBG", "NGS-HQR",
+        "NGS-MR", "NGS-SDB", "NGS-WADI", "BOT-GUR", "BOT-GDGN", "BOT-KUI", "BOT-DUD", "BOT-HDD",
+        "BOT-SVG", "BOT-BBD", "BOT-TJSP", "BOT-KLBG", "BOT-HQR", "BOT-MR", "BOT-SDB", "BOT-WADI",
+        "GUR-GDGN", "GUR-KUI", "GUR-DUD", "GUR-HDD", "GUR-SVG", "GUR-BBD", "GUR-TJSP", "GUR-KLBG",
+        "GUR-HQR", "GUR-MR", "GUR-SDB", "GUR-WADI", "GDGN-KUI", "GDGN-DUD", "GDGN-HDD", "GDGN-SVG",
+        "GDGN-BBD", "GDGN-TJSP", "GDGN-KLBG", "GDGN-HQR", "GDGN-MR", "GDGN-SDB", "GDGN-WADI", "KUI-DUD",
+        "KUI-HDD", "KUI-SVG", "KUI-BBD", "KUI-TJSP", "KUI-KLBG", "KUI-HQR", "KUI-MR", "KUI-SDB",
+        "KUI-WADI", "DUD-HDD", "DUD-SVG", "DUD-BBD", "DUD-TJSP", "DUD-KLBG", "DUD-HQR", "DUD-MR",
+        "DUD-SDB", "DUD-WADI", "HDD-SVG", "HDD-BBD", "HDD-TJSP", "HDD-KLBG", "HDD-HQR", "HDD-MR",
+        "HDD-SDB", "HDD-WADI", "SVG-BBD", "SVG-TJSP", "SVG-KLBG", "SVG-HQR", "SVG-MR", "SVG-SDB",
+        "SVG-WADI", "BBD-TJSP", "BBD-KLBG", "BBD-HQR", "BBD-MR", "BBD-SDB", "BBD-WADI", "TJSP-KLBG",
+        "TJSP-HQR", "TJSP-MR", "TJSP-SDB", "TJSP-WADI", "KLBG-HQR", "KLBG-MR", "KLBG-SDB", "KLBG-WADI",
+        "HQR-MR", "HQR-SDB", "HQR-WADI", "MR-SDB", "MR-WADI", "SDB-WADI", "WADI-SDB", "WADI-MR", "WADI-HQR", "WADI-KLBG", "WADI-TJSP", "WADI-BBD", "WADI-SVG", "WADI-HDD",
+        "WADI-DUD", "WADI-KUI", "WADI-GDGN", "WADI-GUR", "WADI-BOT", "WADI-NGS", "WADI-AKOR", "WADI-TLT",
+        "WADI-HG", "WADI-TKWD", "WADI-SUR", "SDB-MR", "SDB-HQR", "SDB-KLBG", "SDB-TJSP", "SDB-BBD",
+        "SDB-SVG", "SDB-HDD", "SDB-DUD", "SDB-KUI", "SDB-GDGN", "SDB-GUR", "SDB-BOT", "SDB-NGS",
+        "SDB-AKOR", "SDB-TLT", "SDB-HG", "SDB-TKWD", "SDB-SUR", "MR-HQR", "MR-KLBG", "MR-TJSP",
+        "MR-BBD", "MR-SVG", "MR-HDD", "MR-DUD", "MR-KUI", "MR-GDGN", "MR-GUR", "MR-BOT",
+        "MR-NGS", "MR-AKOR", "MR-TLT", "MR-HG", "MR-TKWD", "MR-SUR", "HQR-KLBG", "HQR-TJSP",
+        "HQR-BBD", "HQR-SVG", "HQR-HDD", "HQR-DUD", "HQR-KUI", "HQR-GDGN", "HQR-GUR", "HQR-BOT",
+        "HQR-NGS", "HQR-AKOR", "HQR-TLT", "HQR-HG", "HQR-TKWD", "HQR-SUR", "KLBG-TJSP", "KLBG-BBD",
+        "KLBG-SVG", "KLBG-HDD", "KLBG-DUD", "KLBG-KUI", "KLBG-GDGN", "KLBG-GUR", "KLBG-BOT", "KLBG-NGS",
+        "KLBG-AKOR", "KLBG-TLT", "KLBG-HG", "KLBG-TKWD", "KLBG-SUR", "TJSP-BBD", "TJSP-SVG", "TJSP-HDD",
+        "TJSP-DUD", "TJSP-KUI", "TJSP-GDGN", "TJSP-GUR", "TJSP-BOT", "TJSP-NGS", "TJSP-AKOR", "TJSP-TLT",
+        "TJSP-HG", "TJSP-TKWD", "TJSP-SUR", "BBD-SVG", "BBD-HDD", "BBD-DUD", "BBD-KUI", "BBD-GDGN",
+        "BBD-GUR", "BBD-BOT", "BBD-NGS", "BBD-AKOR", "BBD-TLT", "BBD-HG", "BBD-TKWD", "BBD-SUR",
+        "SVG-HDD", "SVG-DUD", "SVG-KUI", "SVG-GDGN", "SVG-GUR", "SVG-BOT", "SVG-NGS", "SVG-AKOR",
+        "SVG-TLT", "SVG-HG", "SVG-TKWD", "SVG-SUR", "HDD-DUD", "HDD-KUI", "HDD-GDGN", "HDD-GUR",
+        "HDD-BOT", "HDD-NGS", "HDD-AKOR", "HDD-TLT", "HDD-HG", "HDD-TKWD", "HDD-SUR", "DUD-KUI",
+        "DUD-GDGN", "DUD-GUR", "DUD-BOT", "DUD-NGS", "DUD-AKOR", "DUD-TLT", "DUD-HG", "DUD-TKWD",
+        "DUD-SUR", "KUI-GDGN", "KUI-GUR", "KUI-BOT", "KUI-NGS", "KUI-AKOR", "KUI-TLT", "KUI-HG",
+        "KUI-TKWD", "KUI-SUR", "GDGN-GUR", "GDGN-BOT", "GDGN-NGS", "GDGN-AKOR", "GDGN-TLT", "GDGN-HG",
+        "GDGN-TKWD", "GDGN-SUR", "GUR-BOT", "GUR-NGS", "GUR-AKOR", "GUR-TLT", "GUR-HG", "GUR-TKWD",
+        "GUR-SUR", "BOT-NGS", "BOT-AKOR", "BOT-TLT", "BOT-HG", "BOT-TKWD", "BOT-SUR", "NGS-AKOR",
+        "NGS-TLT", "NGS-HG", "NGS-TKWD", "NGS-SUR", "AKOR-TLT", "AKOR-HG", "AKOR-TKWD", "AKOR-SUR",
+        "TLT-HG", "TLT-TKWD", "TLT-SUR", "HG-TKWD", "HG-SUR", 'HG', 'TLT', 'AKOR', 'NGS', 'BOT', 'GUR', 'GDGN',
+        'KUI', 'DUD', 'HDD', 'SVG', 'BBD', 'TJSP', 'KLBG', 'HQR', 'MR', 'SDB', 'WADI', 'LC-1', 'LC-60', 'LC-61', 'LC-66', 'LC-74', 'LC-82', 'LC-91'
+    }
+    SUR = {
+        "TKWD", "SUR", "BALE", "PK", "MVE", "MO", "MKPT", "AAG", "WKA", "MLB",
+        "PVR", "SGLA", "MSDG", "JTRD", "DLGN", "KVK", "SGRE", "ARAG", "MRJ",
+        "SUR-KWV", "KWV-MLB", "MLB-MRJ", "TKWD-MKPT"
+    }
+    KWV_I = {
+        "KWV", "DHS", "KEM", "BLNI", "JEUR", "PPJ", "WSB", "KEU", "JNTR",
+        "BGVN", "MLM", "BRB", "WDS", "MLM-BRB", "DD-KWV", "BGVN-JNTR",
+        "SUR-KEM", "JEUR-SUR", "SUR-JEUR", "WSD", "KWV-BRB"
+    }
+    KWV_II = {
+        "SEI", "BTW", "PJR", "UMD", "YSI", "MRX", "OSA", "HGL", "LUR", "KMRD",
+        "LC-10", "LC-34", "LC-6", "LC-22", "LC-31", "LC-42", "LC-61", "LC-70",
+        "LC-91", "KWV-LUR", "KWV-SEI", "LC-3", "DRSV", "DKY", "LC-34(DKY)-LUR"
+    }
+    ADSTE_ORDER = [
+        "ADSTE/KLBG (WADI-HG)",
+        "ADSTE/SUR (TKWD-MKPT & MLB-MRJ)",
+        "ADSTE/KWV-I (KWV-BRB)",
+        "ADSTE/KWV-II (LC-34(DKY)-LUR)"
+    ]
+
+    def build_adste_map():
+        adste_map = {}
+        for loc in KLBG:
+            adste_map[loc] = "ADSTE/KLBG (WADI-HG)"
+        for loc in SUR:
+            adste_map[loc] = "ADSTE/SUR (TKWD-MKPT & MLB-MRJ)"
+        for loc in KWV_I:
+            adste_map[loc] = "ADSTE/KWV-I (KWV-BRB)"
+        for loc in KWV_II:
+            adste_map[loc] = "ADSTE/KWV-II (LC-34(DKY)-LUR)"
+        return adste_map
+
+    # ============================================================
+    # ADEN / Sr.DEN LOCATION MAPPING (Engineering)
+    # ============================================================
+    ADEN_GROUPS = {
+        "ADEN/KLBG": {"GDGN", "GUR", "HQR", "KLBG", "KUI", "MR", "SBD", "SDB", "SVG", "TJSP", "WADI"},
+        "ADEN/LUR": {"BTW", "DKY", "HGL", "LUR", "OSA", "PJR", "SEI", "UMD", "YSI"},
+        "ADEN/PVR": {"ARAG", "DLGN", "JTRD", "KVK", "MLB", "PVR", "SGLA", "SGRE"},
+        "ADEN/S/SUR": {"AKOR", "BOT", "DUD", "HG", "NGS", "TKWD", "TLT"},
+        "Sr.ADEN/BG/KWV": {"BGVN", "BLNI", "BRB", "DHS", "JEUR", "JNTR", "KEM", "KWV", "MLM", "PPJ", "PRWD", "WSB"},
+        "Sr.ADEN/N/SUR": {"AAG", "BALE", "MA", "MKPT", "MO", "MVE", "PK", "SUR", "WDS", "WKA"},
+    }
+    ADEN_ORDER = ["ADEN/KLBG", "ADEN/LUR", "ADEN/PVR", "ADEN/S/SUR", "Sr.ADEN/BG/KWV", "Sr.ADEN/N/SUR"]
+
+    ADEN_TO_SRDEN = {
+        "ADEN/KLBG": "Sr.DEN/S",
+        "ADEN/S/SUR": "Sr.DEN/S",
+        "Sr.ADEN/N/SUR": "Sr.DEN/C",
+        "Sr.ADEN/BG/KWV": "Sr.DEN/C",
+        "ADEN/LUR": "DEN/TRACK",
+        "ADEN/PVR": "DEN/TRACK",
+    }
+    SRDEN_ORDER = ["Sr.DEN/S", "Sr.DEN/C", "DEN/TRACK"]
+
+    def build_aden_map():
+        aden_map = {}
+        for group, locs in ADEN_GROUPS.items():
+            for loc in locs:
+                aden_map[loc] = group
+        return aden_map
+
+    # ============================================================
+    # SSE/TRD SUPERVISOR-LEVEL LOCATION MAPPING (Electrical/TRD)
+    # ============================================================
+    SUR_DD_TRD = {
+        "SUR": "SSE/TRD/SUR",
+        "BALE": "SSE/TRD/SUR",
+        "PAKNI": "SSE/TRD/SUR",
+        "MVE": "SSE/TRD/SUR",
+        "MOHOL": "SSE/TRD/SUR",
+        "MKPT": "SSE/TRD/KWV",
+        "AAG": "SSE/TRD/KWV",
+        "WKA": "SSE/TRD/KWV",
+        "MADHA": "SSE/TRD/KWV",
+        "WDS": "SSE/TRD/KWV",
+        "KWV": "SSE/TRD/KWV",
+        "DHS": "SSE/TRD/KWV",
+        "KEM": "SSE/TRD/KWV",
+        "BLNI": "SSE/TRD/KWV",
+        "JEUR": "SSE/TRD/KEU",
+        "PPJ": "SSE/TRD/KEU",
+        "WSB": "SSE/TRD/KEU",
+        "KEU": "SSE/TRD/KEU",
+        "JNTR": "SSE/TRD/KEU",
+        "BGVN": "SSE/TRD/KEU",
+        "MLM": "SSE/TRD/KEU",
+        "BRB": "SSE/TRD/KEU"
+    }
+    KWV_LUR_TRD = {
+        "SEI": "SSE/TRD/BTW",
+        "BTW": "SSE/TRD/BTW",
+        "PJR": "SSE/TRD/BTW",
+        "DRSV": "SSE/TRD/DRSV",
+        "YSI": "SSE/TRD/DRSV",
+        "DKY": "SSE/TRD/DRSV",
+        "OSA": "SSE/TRD/LUR",
+        "HGL": "SSE/TRD/LUR",
+        "LUR": "SSE/TRD/LUR"
+    }
+    KWV_MRJ_TRD = {
+        "MLB": "SSE/TRD/PVR",
+        "PVR": "SSE/TRD/PVR",
+        "SGLA": "SSE/TRD/SGLA",
+        "JTRD": "SSE/TRD/SGLA",
+        "DLGN": "SSE/TRD/SGLA",
+        "KVK": "SSE/TRD/SGRE",
+        "SGRE": "SSE/TRD/SGRE",
+        "ARAG": "SSE/TRD/SGRE"
+    }
+    SSE_TRD_ORDER = [
+        "SSE/TRD/SUR", "SSE/TRD/KWV", "SSE/TRD/KEU",
+        "SSE/TRD/BTW", "SSE/TRD/DRSV", "SSE/TRD/LUR",
+        "SSE/TRD/PVR", "SSE/TRD/SGLA", "SSE/TRD/SGRE",
+    ]
+
+    def build_sse_trd_map():
+        trd_map = {}
+        trd_map.update(SUR_DD_TRD)
+        trd_map.update(KWV_LUR_TRD)
+        trd_map.update(KWV_MRJ_TRD)
+        return trd_map
+
+    # ============================================================
+    # SSE/ELECT SUPERVISOR-LEVEL LOCATION MAPPING (Electrical/General)
+    # ============================================================
+    SSE_ELECT_KWV = {
+        "KWV", "DHS", "KEM", "BLNI", "BTW", "SEI", "PPJ", "WSB", "KEU", "JNTR",
+        "BGVN", "MLM", "BRB", "DD", "MLB", "PVR", "SGLA", "DLGN", "JTRD", "SGRE",
+        "ARAG", "KVK", "MRJ", "MKPT", "AAG", "WKA", "MA", "WDS"
+    }
+    SSE_ELECT_SUR = {
+        "MKPT", "MA", "AAG", "WKA", "WDS", "DUD", "NGS", "BOT", "AKOR", "SUR",
+        "JEUR", "PK", "BALE", "MVE", "MO", "TKWD", "HG"
+    }
+    SSE_ELECT_KLBG = {
+        "DUD", "KUI", "GDGN", "GUR", "SVG", "BBD", "KLBG", "TJSP", "HQR", "MR",
+        "SDB", "SBD",
+    }
+    SSE_ELECT_WADI = {
+        "SDB", "WADI"
+    }
+    SSE_ELECT_LUR = {
+        "PJR", "LTRR", "YSI", "DKY", "OSA", "HGL", "LUR"
+    }
+    ELECT_G_ORDER = [
+        "SSE/ELECT/KWV",
+        "SSE/ELECT/SUR",
+        "SSE/ELECT/KLBG",
+        "SSE/ELECT/WADI",
+        "SSE/ELECT/LUR"
+    ]
+
+    def build_elect_g_map():
+        ordered_groups = [
+            ("SSE/ELECT/KWV", SSE_ELECT_KWV),
+            ("SSE/ELECT/SUR", SSE_ELECT_SUR),
+            ("SSE/ELECT/KLBG", SSE_ELECT_KLBG),
+            ("SSE/ELECT/WADI", SSE_ELECT_WADI),
+            ("SSE/ELECT/LUR", SSE_ELECT_LUR),
+        ]
+        elect_g_map = {}
+        for label, locs in ordered_groups:
+            for loc in locs:
+                elect_g_map.setdefault(loc, label)
+        return elect_g_map
+
+    def _palette(n):
+        base = ["#1D4FA3", "#159447", "#D91F2D", "#E58A00", "#7B2D8E", "#0FA3B1", "#C2185B", "#455A64"]
+        return [base[i % len(base)] for i in range(n)]
+
+    # ============================================================
+    # OFFICER-LEVEL CONFIG PER DEPARTMENT
+    # ============================================================
+    ASSISTANT_OFFICER_LEVEL = {
+        "SIGNAL & TELECOM": {
+            "levels": [
+                {
+                    "key": "ADSTE",
+                    "label": "ADSTE",
+                    "order": ADSTE_ORDER,
+                    "location_map": build_adste_map(),
+                },
+            ]
+        },
+        "ENGINEERING": {
+            "levels": [
+                {
+                    "key": "ADEN",
+                    "label": "ADEN",
+                    "order": ADEN_ORDER,
+                    "location_map": build_aden_map(),
+                },
+                {
+                    "key": "SR_DEN",
+                    "label": "Sr.DEN",
+                    "order": SRDEN_ORDER,
+                    "parent_key": "ADEN",
+                    "parent_map": ADEN_TO_SRDEN,
+                },
+            ]
+        },
+        "ELECT/TRD": {
+            "levels": [
+                {
+                    "key": "SSE_TRD",
+                    "label": "SSE/TRD",
+                    "order": SSE_TRD_ORDER,
+                    "location_map": build_sse_trd_map(),
+                },
+            ]
+        },
+        "ELECT/G": {
+            "levels": [
+                {
+                    "key": "SSE_ELECT",
+                    "label": "SSE/ELECT",
+                    "order": ELECT_G_ORDER,
+                    "location_map": build_elect_g_map(),
+                },
+            ]
+        },
+    }
+
+    # ============================================================
+    # LOAD DATA FROM GOOGLE SHEET
+    # ============================================================
+    @st.cache_data(ttl=60)
+    def load_google_sheet(sheet_id: str, sheet_name: str):
+        if not sheet_id or not sheet_name:
+            return None
+        try:
+            service_account_info = dict(st.secrets["gcp_service_account"])
+            if "private_key" in service_account_info:
+                service_account_info["private_key"] = service_account_info["private_key"].replace("\\n", "\n")
+            scopes = [
+                "https://www.googleapis.com/auth/spreadsheets",
+                "https://www.googleapis.com/auth/drive",
+            ]
+            creds = Credentials.from_service_account_info(service_account_info, scopes=scopes)
+            gc = gspread.authorize(creds)
+            ws = gc.open_by_key(sheet_id).worksheet(sheet_name)
+            data = ws.get_all_values()
+            if not data or len(data) < 2:
+                return pd.DataFrame()
+            headers = [str(c).strip() for c in data[0]]
+            df = pd.DataFrame(data[1:], columns=headers)
+            return df
+        except Exception as e1:
+            try:
+                url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={sheet_name}"
+                df = pd.read_csv(url)
+                return df
+            except Exception as e2:
+                st.error(
+                    f"Failed to load Google Sheet for Smart Analysis.\n"
+                    f"Service account: {e1}\nCSV fallback: {e2}"
+                )
+                return None
+
+    # ============================================================
+    # PREPROCESS DATA + DEPARTMENT FILTER
+    # ============================================================
+    def _normalize_dept(name: str) -> str:
+        if not isinstance(name, str):
+            return ""
+        s = name.upper().strip()
+        s = re.sub(r"\s+", " ", s)
+        aliases = {
+            "S&T": "SIGNAL & TELECOM", "S & T": "SIGNAL & TELECOM",
+            "SIGNAL AND TELECOM": "SIGNAL & TELECOM",
+            "SIGNAL & TELECOMMUNICATION": "SIGNAL & TELECOM",
+            "SIGNAL AND TELECOMMUNICATION": "SIGNAL & TELECOM",
+            "SIG & TELE": "SIGNAL & TELECOM", "SIG&TELE": "SIGNAL & TELECOM",
+            "MECH": "MECHANICAL", "MECH.": "MECHANICAL",
+            "MECHANICAL DEPARTMENT": "MECHANICAL", "MECHANICAL DEPT": "MECHANICAL",
+            "MECH DEPARTMENT": "MECHANICAL", "MECH DEPT": "MECHANICAL",
+            "M&C": "MECHANICAL", "M & C": "MECHANICAL",
+            "COMM": "COMMERCIAL", "COMM.": "COMMERCIAL",
+            "COMMERCIAL DEPARTMENT": "COMMERCIAL", "COMMERCIAL DEPT": "COMMERCIAL",
+            "COML": "COMMERCIAL", "COML.": "COMMERCIAL",
+            "ENGG": "ENGINEERING", "ENGG.": "ENGINEERING",
+            "ENGINEERING DEPARTMENT": "ENGINEERING", "ENGINEERING DEPT": "ENGINEERING",
+            "CIVIL": "ENGINEERING", "CIVIL ENGINEERING": "ENGINEERING",
+            "ENGG DEPARTMENT": "ENGINEERING",
+            "TRD": "ELECT/TRD", "ELECT TRD": "ELECT/TRD", "ELECT-TRD": "ELECT/TRD",
+            "ELECT (TRD)": "ELECT/TRD", "ELECTRICAL/TRD": "ELECT/TRD",
+            "ELECTRICAL TRD": "ELECT/TRD", "ELEC/TRD": "ELECT/TRD", "ELEC TRD": "ELECT/TRD",
+            "ELECT G": "ELECT/G", "ELECT-G": "ELECT/G", "ELECT (G)": "ELECT/G",
+            "ELECTRICAL/G": "ELECT/G", "ELECTRICAL GENERAL": "ELECT/G",
+            "ELEC/G": "ELECT/G", "ELEC G": "ELECT/G", "ELECT/GEN": "ELECT/G", "ELECT GEN": "ELECT/G",
+        }
+        return aliases.get(s, s)
+
+    def preprocess_data(df: pd.DataFrame, date_from: date, date_to: date, department: str):
+        df = df.copy()
+        debug = {}
+
+        col_map = {}
+        for c in df.columns:
+            cl = str(c).strip().lower()
+            if "date" in cl and "inspection" in cl:
+                col_map[c] = "Date of Inspection"
+            elif cl in ["sub head", "subhead", "sub_head"]:
+                col_map[c] = "Sub Head"
+            elif cl in ["location", "loc"]:
+                col_map[c] = "Location"
+            elif cl in ["head", "department", "dept"]:
+                col_map[c] = "Head"
+            elif cl in ["action by", "action_by", "actionby"]:
+                col_map[c] = "Action By"
+            elif "feedback" in cl or "remark" in cl or "response" in cl:
+                if "user" in cl or "officer" in cl:
+                    col_map[c] = "User Remark"
+                else:
+                    col_map[c] = "Feedback"
+            elif cl == "status":
+                col_map[c] = "Status"
+
+        df = df.rename(columns=col_map)
+        if df.columns.tolist().count("Head") > 1:
+            cols = []
+            seen = set()
+            for c in df.columns:
+                if c == "Head" and c in seen:
+                    continue
+                cols.append(c)
+                seen.add(c)
+            df = df[cols]
+
+        debug["raw_rows"] = len(df)
+
+        required = ["Date of Inspection", "Sub Head", "Location"]
+        for col in required:
+            if col not in df.columns:
+                st.warning(f"Column '{col}' not found. Available columns: {list(df.columns)}")
+                return pd.DataFrame()
+
+        df["Date of Inspection"] = pd.to_datetime(
+            df["Date of Inspection"], errors="coerce", dayfirst=True
+        )
+        still_nat = df["Date of Inspection"].isna()
+        if still_nat.any():
+            df.loc[still_nat, "Date of Inspection"] = pd.to_datetime(
+                df.loc[still_nat, "Date of Inspection"], errors="coerce", dayfirst=False
+            )
+        df = df.dropna(subset=["Date of Inspection"])
+        debug["after_date_parse"] = len(df)
+
+        mask = (
+            (df["Date of Inspection"].dt.date >= date_from)
+            & (df["Date of Inspection"].dt.date <= date_to)
+        )
+        df = df[mask].copy()
+        debug["after_date_filter"] = len(df)
+
+        df["Sub Head"] = df["Sub Head"].fillna("").astype(str).str.strip()
+        df["Location"] = df["Location"].fillna("").astype(str).str.strip().str.upper()
+
+        target = _normalize_dept(department)
+        if "Head" in df.columns:
+            head_series = df["Head"]
+            if isinstance(head_series, pd.DataFrame):
+                head_series = head_series.iloc[:, 0]
+            head_norm = head_series.fillna("").astype(str).map(_normalize_dept)
+            df = df[head_norm == target].copy()
+            debug["after_head_filter"] = len(df)
+            debug["unique_heads_seen"] = sorted(
+                set(head_series.fillna("").astype(str).str.strip().unique()) - {""}
+            )[:30]
+        else:
+            allowed_subheads = SUBHEAD_LIST.get(department, [])
+            if allowed_subheads:
+                allowed_upper = {s.upper().strip() for s in allowed_subheads}
+                df = df[df["Sub Head"].str.upper().str.strip().isin(allowed_upper)].copy()
+            debug["after_head_filter"] = len(df)
+            debug["unique_heads_seen"] = ["(no Head column — used Sub Head fallback)"]
+
+        if df.empty:
+            df.attrs["debug"] = debug
+            return df
+
+        feedback_col = "Feedback" if "Feedback" in df.columns else None
+        remark_col = "User Remark" if "User Remark" in df.columns else None
+
+        if feedback_col or remark_col:
+            statuses = []
+            for _, row in df.iterrows():
+                fb = row.get(feedback_col, "") if feedback_col else ""
+                rm = row.get(remark_col, "") if remark_col else ""
+                statuses.append(classify_feedback(fb, rm))
+            df["Status"] = statuses
+        else:
+            if "Status" not in df.columns:
+                df["Status"] = "Pending"
+            else:
+                df["Status"] = df["Status"].fillna("Pending").astype(str)
+
+        target_norm = _normalize_dept(department)
+        _cfg = ASSISTANT_OFFICER_LEVEL.get(target_norm)
+        if _cfg:
+            for level in _cfg["levels"]:
+                key = level["key"]
+                if "location_map" in level:
+                    df[key] = df["Location"].map(level["location_map"])
+                elif "parent_key" in level and level["parent_key"] in df.columns:
+                    df[key] = df[level["parent_key"]].map(level["parent_map"])
+                else:
+                    df[key] = None
+                debug[f"with_{key}_mapped"] = int(df[key].notna().sum())
+                debug[f"{key}_unmapped"] = int(df[key].isna().sum())
+        else:
+            debug["officer_level"] = "not defined for this department — Section III skipped"
+
+        df["Month"] = df["Date of Inspection"].dt.to_period("M")
+        df["Month Name"] = df["Date of Inspection"].dt.strftime("%B-%Y")
+
+        df.attrs["debug"] = debug
+        return df
+
+    # ============================================================
+    # IMAGE EXPORT FUNCTION (LANDSCAPE – no overlapping)
+    # ============================================================
+    from io import BytesIO
+    import matplotlib.pyplot as plt
+    import matplotlib.patches as mpatches
+    from matplotlib.gridspec import GridSpec
+
+    def generate_analysis_image(df, department, date_from, date_to,
+                                total, resolved, pending, no_response, resolution_rate):
+        """Create a single high-quality LANDSCAPE PNG (no overlapping)."""
+        if df.empty or "Month" not in df.columns or "Sub Head" not in df.columns:
+            fig, ax = plt.subplots(figsize=(16, 9), dpi=150)
+            ax.axis("off")
+            ax.text(0.5, 0.5, "No data available for the selected period / department",
+                    ha="center", va="center", fontsize=14)
+            buf = BytesIO()
+            fig.savefig(buf, format="png", dpi=150, bbox_inches="tight")
+            plt.close(fig)
+            buf.seek(0)
+            return buf
+
+        month_order = sorted(df["Month"].unique())
+        month_names = {m: m.strftime("%b-%Y") for m in month_order}
+
+        # Sub-Head table (NO Share)
+        sub = (
+            df.groupby(["Sub Head", "Month"])
+            .size()
+            .unstack(fill_value=0)
+        )
+        for m in month_order:
+            if m not in sub.columns:
+                sub[m] = 0
+        sub = sub.reindex(columns=month_order, fill_value=0)
+        sub["Total"] = sub[month_order].sum(axis=1)
+        sub = sub.sort_values("Total", ascending=False)
+        if isinstance(sub, pd.Series):
+            sub = sub.to_frame().T
+
+        # Officer levels
+        officer_tables = []
+        _dept_cfg = ASSISTANT_OFFICER_LEVEL.get(_normalize_dept(department))
+        if _dept_cfg:
+            for level in _dept_cfg["levels"]:
+                key = level["key"]
+                label = level["label"]
+                order = level["order"]
+                if key not in df.columns:
+                    continue
+                level_df = df.dropna(subset=[key])
+                if level_df.empty:
+                    continue
+                grouped = (
+                    level_df.groupby([key, "Month"])
+                    .size()
+                    .unstack(fill_value=0)
+                    .reindex(order)
+                )
+                for m in month_order:
+                    if m not in grouped.columns:
+                        grouped[m] = 0
+                grouped = grouped.reindex(columns=month_order, fill_value=0)
+                grouped["Total"] = grouped[month_order].sum(axis=1)
+                if isinstance(grouped, pd.Series):
+                    grouped = grouped.to_frame().T
+                officer_tables.append((label, grouped, order))
+
+        n_officer = len(officer_tables)
+        n_sub_rows = min(len(sub), 15) if not sub.empty else 1
+
+        # ========== LANDSCAPE figure ==========
+        fig_w = 20
+        fig_h = 9.5 + 3.2 * n_officer + 0.22 * n_sub_rows
+        fig = plt.figure(figsize=(fig_w, fig_h), dpi=150, facecolor="white")
+
+        height_ratios = [0.85, 0.95, 0.12 + 0.22 * n_sub_rows]
+        for _ in range(n_officer):
+            height_ratios.extend([0.12, 2.4])
+
+        gs = GridSpec(
+            3 + n_officer * 2, 1,
+            figure=fig,
+            height_ratios=height_ratios,
+            hspace=0.45
+        )
+
+        # ---------- 1. HEADER ----------
+        ax_header = fig.add_subplot(gs[0])
+        ax_header.set_xlim(0, 20)
+        ax_header.set_ylim(0, 1.8)
+        ax_header.axis("off")
+
+        ax_header.add_patch(mpatches.FancyBboxPatch(
+            (0.15, 0.12), 19.7, 1.55,
+            boxstyle="round,pad=0.02,rounding_size=0.12",
+            facecolor="#0C2F67", edgecolor="none"))
+
+        ax_header.text(0.5, 1.25, "INDIAN RAILWAYS", color="white",
+                       fontsize=12, fontweight="bold", va="center")
+        ax_header.text(0.5, 0.90, "SOLAPUR DIVISION", color="#A8C5E2",
+                       fontsize=9.5, va="center")
+        ax_header.text(0.5, 0.58, "CENTRAL RAILWAY", color="#A8C5E2",
+                       fontsize=9.5, va="center")
+
+        ax_header.text(10.0, 1.25,
+                       f"SAFETY DEFICIENCIES ANALYSIS OF  {department}  DEPARTMENT",
+                       color="white", fontsize=14, fontweight="bold",
+                       ha="center", va="center")
+        ax_header.text(10.0, 0.70,
+                       f"FOR THE PERIOD OF  {date_from.strftime('%d %b %Y')}  –  {date_to.strftime('%d %b %Y')}",
+                       color="#A8C5E2", fontsize=11, ha="center", va="center")
+
+        ax_header.text(19.5, 1.25, "Source: SARAL", color="white",
+                       fontsize=11, fontweight="bold", ha="right", va="center")
+
+        # ---------- 2. KPI CARDS ----------
+        ax_kpi = fig.add_subplot(gs[1])
+        ax_kpi.set_xlim(0, 20)
+        ax_kpi.set_ylim(0, 2.2)
+        ax_kpi.axis("off")
+
+        kpi_data = [
+            ("TOTAL RECORDS",          f"{total}",               "#1D4FA3", "#E8F0FE", "100% of Total"),
+            ("RESOLVED",               f"{resolved}",            "#159447", "#E6F7ED", f"{resolution_rate:.2f}%"),
+            ("NO RESPONSE",            f"{no_response}",         "#D91F2D", "#FDE8E8", f"{(no_response/total*100) if total else 0:.2f}%"),
+            ("PENDING",                f"{pending}",             "#E58A00", "#FFF4E0", f"{(pending/total*100) if total else 0:.2f}%"),
+            ("OVERALL RESOLUTION RATE", f"{resolution_rate:.2f}%", "#7B2D8E", "#F3E8FF", "(Resolved / Total)"),
+        ]
+
+        card_w = 3.6
+        gap = 0.28
+        start_x = 0.4
+        for i, (title, value, color, bg, subtxt) in enumerate(kpi_data):
+            x = start_x + i * (card_w + gap)
+            ax_kpi.add_patch(mpatches.FancyBboxPatch(
+                (x, 0.25), card_w, 1.75,
+                boxstyle="round,pad=0.02,rounding_size=0.10",
+                facecolor=bg, edgecolor="#CCCCCC", linewidth=1.1))
+            ax_kpi.add_patch(mpatches.Rectangle(
+                (x, 1.80), card_w, 0.20, facecolor=color, edgecolor="none"))
+            ax_kpi.text(x + card_w/2, 1.55, title, color=color,
+                        fontsize=9, fontweight="bold", ha="center", va="center")
+            ax_kpi.text(x + card_w/2, 1.05, value, color=color,
+                        fontsize=22, fontweight="bold", ha="center", va="center")
+            ax_kpi.text(x + card_w/2, 0.50, subtxt, color="#555555",
+                        fontsize=8.5, ha="center", va="center")
+
+        # ---------- 3. SUB-HEAD TABLE ----------
+        ax_sub = fig.add_subplot(gs[2])
+        ax_sub.axis("off")
+        ax_sub.set_title(f"II — CLASSIFICATION SUB HEAD DISTRIBUTION ({department})",
+                         loc="left", fontsize=12, fontweight="bold",
+                         color="#123A7A", pad=6)
+
+        if sub.empty:
+            ax_sub.text(0.5, 0.5, "No Sub-Head data", ha="center", va="center")
+        else:
+            col_labels = ["Sub Head"] + [month_names[m] for m in month_order] + ["Total"]
+            cell_text = []
+            for row in sub.head(15).itertuples():
+                name = str(row.Index)[:48]
+                vals = [str(int(getattr(row, str(m), 0))) for m in month_order]
+                total_val = str(int(getattr(row, "Total", 0)))
+                cell_text.append([name] + vals + [total_val])
+
+            table = ax_sub.table(
+                cellText=cell_text,
+                colLabels=col_labels,
+                loc="center",
+                cellLoc="center"
+            )
+            table.auto_set_font_size(False)
+            table.set_fontsize(8)
+            table.scale(1.0, 1.45)
+            for (r, c), cell in table.get_celld().items():
+                cell.set_edgecolor("#CCCCCC")
+                if r == 0:
+                    cell.set_facecolor("#123A7A")
+                    cell.set_text_props(color="white", fontweight="bold")
+                elif r % 2 == 0:
+                    cell.set_facecolor("#F7F9FC")
+
+        # ---------- 4. OFFICER-LEVEL TABLES + DONUTS ----------
+        for i, (label, grouped, order) in enumerate(officer_tables):
+            ax_t = fig.add_subplot(gs[3 + i*2])
+            ax_t.axis("off")
+            ax_t.set_title(f"III — CLASSIFICATION {label} WISE ({department})",
+                           loc="left", fontsize=12, fontweight="bold",
+                           color="#123A7A", pad=5)
+
+            col_labels = [label] + [month_names[m] for m in month_order] + ["Total"]
+            cell_text = []
+            for name in order:
+                if name in grouped.index:
+                    r = grouped.loc[name]
+                    cell_text.append(
+                        [name] +
+                        [str(int(r.get(m, 0))) for m in month_order] +
+                        [str(int(r.get("Total", 0)))]
+                    )
+                else:
+                    cell_text.append([name] + ["0"] * len(month_order) + ["0"])
+
+            table = ax_t.table(
+                cellText=cell_text,
+                colLabels=col_labels,
+                loc="center",
+                cellLoc="center"
+            )
+            table.auto_set_font_size(False)
+            table.set_fontsize(8)
+            table.scale(1.0, 1.5)
+            for (r, c), cell in table.get_celld().items():
+                cell.set_edgecolor("#CCCCCC")
+                if r == 0:
+                    cell.set_facecolor("#123A7A")
+                    cell.set_text_props(color="white", fontweight="bold")
+                elif r % 2 == 0:
+                    cell.set_facecolor("#F7F9FC")
+
+            # Donut
+            ax_d = fig.add_subplot(gs[4 + i*2])
+            values = [int(grouped.loc[n, "Total"]) if n in grouped.index else 0 for n in order]
+            colors_list = _palette(len(order))
+
+            if sum(values) == 0:
+                values = [1]
+                colors_list = ["#CCCCCC"]
+
+            wedges, _ = ax_d.pie(
+                values,
+                colors=colors_list,
+                startangle=90,
+                wedgeprops=dict(width=0.42, edgecolor="white", linewidth=2)
+            )
+            ax_d.set_title(f"{label} Wise Distribution", fontsize=11, fontweight="bold", pad=4)
+            ax_d.text(0, 0, f"TOTAL\n{total}", ha="center", va="center",
+                      fontsize=12, fontweight="bold")
+
+            ax_d.legend(
+                wedges,
+                [f"{n}  ({v})" for n, v in zip(order, values)],
+                loc="center left",
+                bbox_to_anchor=(1.05, 0.5),
+                fontsize=8,
+                frameon=False
+            )
+
+        # ---------- FOOTER ----------
+        fig.text(
+            0.5, 0.012,
+            f"Source: SARAL System  |  Reporting Department: Safety Department, SUR DIVN, CR  |  "
+            f"Analysis Type: Deficiency Analysis  |  Period: {date_from.strftime('%d %b %Y')} to {date_to.strftime('%d %b %Y')}  |  "
+            f"Department: {department}  |  Data as on: {date.today().strftime('%d %b %Y')}",
+            ha="center", va="bottom", fontsize=8, color="white",
+            bbox=dict(boxstyle="round,pad=0.35", facecolor="#0C2F67", edgecolor="none")
+        )
+
+        plt.tight_layout(rect=[0.015, 0.035, 0.985, 0.985])
+        fig.subplots_adjust(hspace=0.45)
+
+        buf = BytesIO()
+        fig.savefig(buf, format="png", dpi=150, bbox_inches="tight",
+                    facecolor="white", edgecolor="none")
+        plt.close(fig)
+        buf.seek(0)
+        return buf
+
+    # ============================================================
+    # DASHBOARD CONTENT
+    # ============================================================
+    st.subheader("Filters")
+    col1, col2, col3 = st.columns([1, 1, 1.2])
+
+    with col3:
+        department = st.selectbox(
+            "Department / Jurisdiction",
+            options=DEPARTMENT_OPTIONS,
+            index=0,
+            key="snt_department"
+        )
+
+    st.markdown(f"""
+    <div class="main-header">
+        <h2 style="margin:0; font-size:1.6rem;">INDIAN RAILWAYS — SOLAPUR DIVISION — CENTRAL RAILWAY</h2>
+        <h3 style="margin:0.3rem 0 0 0; font-weight:500; font-size:1.25rem;">
+            SAFETY DEFICIENCIES ANALYSIS OF {department} DEPARTMENT
+        </h3>
+        <p style="margin:0.4rem 0 0 0; font-size:0.9rem; opacity:0.9;">Source: SARAL System</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    raw_df = None
+    if st.session_state.get("df") is not None and not st.session_state.df.empty:
+        raw_df = st.session_state.df.copy()
+        st.caption("📡 Using data already loaded by the main app (most reliable).")
+    else:
+        with st.spinner("Loading data from Google Sheet..."):
+            raw_df = load_google_sheet(SHEET_ID, SHEET_NAME)
+
+    if raw_df is None or raw_df.empty:
+        st.error("No data loaded. Check Sheet ID, Sheet Name, and sharing permissions.")
+        st.stop()
+
+    _date_col = None
+    for _c in raw_df.columns:
+        if "date" in str(_c).lower() and "inspection" in str(_c).lower():
+            _date_col = _c
+            break
+    if _date_col is None:
+        _date_col = raw_df.columns[0]
+    _all_dates = pd.to_datetime(raw_df[_date_col], errors="coerce", dayfirst=True).dropna()
+    if not _all_dates.empty:
+        _default_from, _default_to = _all_dates.min().date(), _all_dates.max().date()
+    else:
+        _default_from, _default_to = date.today() - timedelta(days=90), date.today()
+
+    with col1:
+        date_from = st.date_input("From", value=_default_from, key="snt_date_from")
+    with col2:
+        date_to = st.date_input("To", value=_default_to, key="snt_date_to")
+
+    if date_from > date_to:
+        st.error("From date cannot be after To date.")
+        st.stop()
+
+    df = preprocess_data(raw_df, date_from, date_to, department)
+    debug_info = getattr(df, "attrs", {}).get("debug", {})
+
+    if df.empty:
+        st.warning(f"No records found for **{department}** in the selected date range.")
+        if debug_info:
+            with st.expander("🔍 Why zero rows? (filter diagnostics)", expanded=True):
+                st.json(debug_info)
+                st.caption(
+                    f"If `after_head_filter` is 0 but earlier stages have rows, the Head "
+                    f"values in the sheet do not match '{department}' (check unique_heads_seen)."
+                )
+        st.stop()
+    else:
+        with st.expander("🔍 Filter diagnostics (row counts)", expanded=False):
+            st.json(debug_info)
+            st.caption(
+                f"Showing **{len(df)}** rows for **{department}** "
+                f"between {date_from.strftime('%d-%m-%Y')} and {date_to.strftime('%d-%m-%Y')}."
+            )
+
+    # ============================================================
+    # KPI CALCULATIONS
+    # ============================================================
+    total = len(df)
+    resolved = df["Status"].str.contains("Resolved", case=False, na=False).sum()
+    pending = df["Status"].str.contains("Pending", case=False, na=False).sum()
+    no_response = df["Status"].str.contains("No Response", case=False, na=False).sum()
+    if no_response == 0:
+        no_response = (df["Status"].isna() | (df["Status"] == "")).sum()
+
+    resolution_rate = (resolved / total * 100) if total else 0.0
+
+    # ============================================================
+    # KPI CARDS
+    # ============================================================
+    st.markdown("### Key Performance Indicators")
+    k1, k2, k3, k4, k5 = st.columns(5)
+
+    with k1:
+        st.metric("TOTAL RECORDS", f"{total}", "100% of Total")
+    with k2:
+        st.metric("RESOLVED", f"{resolved}", f"{resolution_rate:.2f}%")
+    with k3:
+        st.metric("NO RESPONSE", f"{no_response}", f"{(no_response/total*100) if total else 0:.2f}%")
+    with k4:
+        st.metric("PENDING", f"{pending}", f"{(pending/total*100) if total else 0:.2f}%")
+    with k5:
+        st.metric("OVERALL RESOLUTION RATE", f"{resolution_rate:.2f}%", "(Resolved / Total)")
+
+    st.markdown("---")
+
+    # ============================================================
+    # EXPORT AS IMAGE (LANDSCAPE)
+    # ============================================================
+    st.markdown("### Export Analysis as Image")
+    img_buffer = generate_analysis_image(
+        df, department, date_from, date_to,
+        total, resolved, pending, no_response, resolution_rate
+    )
+    st.download_button(
+        label="📥 Download Full Analysis Image (PNG – Landscape)",
+        data=img_buffer,
+        file_name=f"Safety_Deficiencies_{department.replace(' ', '_')}_{date_from}_{date_to}.png",
+        mime="image/png",
+        use_container_width=True
+    )
+
+    st.markdown("---")
+
+    # ============================================================
+    # SECTION II — SUB HEAD DISTRIBUTION (NO Share)
+    # ============================================================
+    st.markdown(
+        f'<div class="section-header">II — CLASSIFICATION SUB HEAD DISTRIBUTION ({department})</div>',
+        unsafe_allow_html=True
+    )
+
+    month_order = sorted(df["Month"].unique())
+    sub = (
+        df.groupby(["Sub Head", "Month"])
+        .size()
+        .unstack(fill_value=0)
+    )
+    for m in month_order:
+        if m not in sub.columns:
+            sub[m] = 0
+    sub["Total"] = sub[month_order].sum(axis=1)
+    sub = sub.sort_values("Total", ascending=False)
+
+    display_sub = sub.copy()
+    month_names = {m: m.strftime("%B-%Y") for m in month_order}
+    display_sub = display_sub.rename(columns=month_names)
+    display_sub = display_sub.reset_index()
+
+    col_table, col_chart = st.columns([1.1, 1])
+
+    with col_table:
+        st.dataframe(
+            display_sub,
+            use_container_width=True,
+            height=420,
+            hide_index=True
+        )
+
+    with col_chart:
+        top_n = min(10, len(sub))
+        plot_df = sub.head(top_n).reset_index()
+        fig_bar = px.bar(
+            plot_df,
+            x="Total",
+            y="Sub Head",
+            orientation="h",
+            text="Total",
+            color_discrete_sequence=["#123A7A"],
+            title=f"Sub Head Wise Distribution — {department} (Top 10)"
+        )
+        fig_bar.update_layout(
+            yaxis={"categoryorder": "total ascending"},
+            height=420,
+            margin=dict(l=10, r=10, t=40, b=10),
+            showlegend=False
+        )
+        fig_bar.update_traces(textposition="outside")
+        st.plotly_chart(fig_bar, use_container_width=True)
+
+    st.markdown("---")
+
+    # ============================================================
+    # SECTION III — OFFICER LEVEL WISE (NO Share)
+    # ============================================================
+    _dept_cfg = ASSISTANT_OFFICER_LEVEL.get(_normalize_dept(department))
+
+    if _dept_cfg is None:
+        st.info(
+            f"ℹ️ Officer-level (e.g. ADSTE / ADEN) classification is not yet defined for "
+            f"**{department}**. This section will appear once that grouping is provided."
+        )
+    else:
+        _levels = _dept_cfg["levels"]
+        _section_letters = ["A", "B", "C", "D", "E"]
+
+        for _idx, _level in enumerate(_levels):
+            key = _level["key"]
+            label = _level["label"]
+            order = _level["order"]
+            suffix = f"III-{_section_letters[_idx]}" if len(_levels) > 1 else "III"
+
+            st.markdown(
+                f'<div class="section-header">{suffix} — CLASSIFICATION {label} WISE ({department})</div>',
+                unsafe_allow_html=True
+            )
+
+            level_df = df.dropna(subset=[key]) if key in df.columns else pd.DataFrame()
+            if level_df.empty:
+                st.info(f"No locations matched the current {label} mapping for the selected period.")
+            else:
+                grouped = (
+                    level_df.groupby([key, "Month"])
+                    .size()
+                    .unstack(fill_value=0)
+                    .reindex(order)
+                )
+                for m in month_order:
+                    if m not in grouped.columns:
+                        grouped[m] = 0
+                grouped["Total"] = grouped[month_order].sum(axis=1)
+                grouped_display = grouped.copy()
+                grouped_display = grouped_display.rename(columns=month_names)
+                grouped_display = grouped_display.reset_index()
+
+                col_lvl_table, col_lvl_donut = st.columns([1.2, 1])
+                colors = _palette(len(order))
+
+                with col_lvl_table:
+                    st.dataframe(
+                        grouped_display,
+                        use_container_width=True,
+                        height=320,
+                        hide_index=True
+                    )
+
+                with col_lvl_donut:
+                    donut_values = grouped["Total"].fillna(0).values
+                    donut_labels = order
+
+                    fig_donut = go.Figure(data=[go.Pie(
+                        labels=donut_labels,
+                        values=donut_values,
+                        hole=0.55,
+                        marker=dict(colors=colors, line=dict(color="white", width=2)),
+                        textinfo="none",
+                        hovertemplate="%{label}<br>%{value} (%{percent})<extra></extra>"
+                    )])
+                    fig_donut.update_layout(
+                        title=f"{label} Wise Distribution — {department}",
+                        height=320,
+                        margin=dict(l=20, r=20, t=40, b=20),
+                        annotations=[dict(
+                            text=f"TOTAL<br><b>{int(total)}</b>",
+                            x=0.5, y=0.5,
+                            font_size=14,
+                            showarrow=False
+                        )],
+                        showlegend=True,
+                        legend=dict(orientation="v", yanchor="middle", y=0.5, x=1.05)
+                    )
+                    st.plotly_chart(fig_donut, use_container_width=True, key=f"donut_{key}")
+
+                    st.markdown("**Legend**")
+                    for i, name in enumerate(order):
+                        val = int(grouped.loc[name, "Total"]) if name in grouped.index else 0
+                        pct = (val / total * 100) if total else 0
+                        st.markdown(
+                            f"<span style='color:{colors[i]}; font-size:1.2rem;'>■</span> "
+                            f"**{name}** — {val} ({pct:.2f}%)",
+                            unsafe_allow_html=True
+                        )
+
+            if _idx < len(_levels) - 1:
+                st.markdown("")
+
+    # ============================================================
+    # FOOTER
+    # ============================================================
+    st.markdown("---")
+    st.markdown(
+        f"""
+        <div style="background:#0C2F67; color:white; padding:0.7rem 1.2rem; border-radius:8px; font-size:0.85rem;">
+            <b>Source:</b> SARAL System &nbsp;|&nbsp;
+            <b>Reporting Department:</b> Safety Department, SUR DIVN, CR &nbsp;|&nbsp;
+            <b>Analysis Type:</b> Deficiency Analysis &nbsp;|&nbsp;
+            <b>Period:</b> {date_from.strftime('%d %b %Y')} to {date_to.strftime('%d %b %Y')} &nbsp;|&nbsp;
+            <b>Department:</b> {department}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
