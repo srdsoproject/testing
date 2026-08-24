@@ -2832,6 +2832,252 @@ with tabs[3]:
     st.markdown("---")
 
     # ============================================================
+# EXPORT ANALYSIS (PDF matching the official template)
+# ============================================================
+from io import BytesIO
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.units import mm, inch
+from reportlab.lib import colors
+from reportlab.platypus import (
+    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+    KeepTogether, HRFlowable
+)
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+from reportlab.pdfgen import canvas
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+
+def generate_analysis_pdf(df, department, date_from, date_to, total, resolved, pending, no_response, resolution_rate):
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        leftMargin=12*mm, rightMargin=12*mm,
+        topMargin=10*mm, bottomMargin=12*mm
+    )
+
+    styles = getSampleStyleSheet()
+    # Custom styles matching the attached image
+    title_style = ParagraphStyle(
+        "TitleIR", parent=styles["Title"],
+        fontSize=16, textColor=colors.HexColor("#0C2F67"),
+        alignment=TA_CENTER, spaceAfter=2, fontName="Helvetica-Bold"
+    )
+    subtitle_style = ParagraphStyle(
+        "SubIR", parent=styles["Normal"],
+        fontSize=13, textColor=colors.HexColor("#0C2F67"),
+        alignment=TA_CENTER, spaceAfter=2, fontName="Helvetica-Bold"
+    )
+    small_center = ParagraphStyle(
+        "SmallC", parent=styles["Normal"],
+        fontSize=9, alignment=TA_CENTER, textColor=colors.HexColor("#333333")
+    )
+    section_header = ParagraphStyle(
+        "SecH", parent=styles["Normal"],
+        fontSize=11, textColor=colors.white, fontName="Helvetica-Bold",
+        backColor=colors.HexColor("#123A7A"),
+        borderPadding=6, spaceBefore=8, spaceAfter=4
+    )
+    normal = styles["Normal"]
+    normal.fontSize = 8
+
+    story = []
+
+    # ---------- HEADER (matches the attached image) ----------
+    header_data = [[
+        Paragraph("<b>INDIAN RAILWAYS</b><br/>SOLAPUR DIVISION<br/>CENTRAL RAILWAY",
+                  ParagraphStyle("L", fontSize=9, textColor=colors.HexColor("#0C2F67"), alignment=TA_LEFT, leading=11)),
+        Paragraph(f"<b>SAFETY DEFICIENCIES ANALYSIS OF<br/>{department} DEPARTMENT</b><br/>FOR THE PERIOD OF<br/>{date_from.strftime('%d %b %Y')} – {date_to.strftime('%d %b %Y')}",
+                  ParagraphStyle("C", fontSize=12, textColor=colors.HexColor("#0C2F67"), alignment=TA_CENTER, leading=14, fontName="Helvetica-Bold")),
+        Paragraph("<b>Source: SARAL</b>",
+                  ParagraphStyle("R", fontSize=9, textColor=colors.HexColor("#0C2F67"), alignment=TA_RIGHT))
+    ]]
+    header_table = Table(header_data, colWidths=[55*mm, 140*mm, 55*mm])
+    header_table.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F0F5FF")),
+        ("BOX", (0, 0), (-1, -1), 1, colors.HexColor("#0C2F67")),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+    ]))
+    story.append(header_table)
+    story.append(Spacer(1, 6*mm))
+
+    # ---------- KPI CARDS (exactly like the image) ----------
+    kpi_style = ParagraphStyle("KPI", fontSize=9, alignment=TA_CENTER, textColor=colors.HexColor("#333"))
+    kpi_val = ParagraphStyle("KPIV", fontSize=16, alignment=TA_CENTER, fontName="Helvetica-Bold")
+
+    def kpi_box(title, value, color_hex, sub=""):
+        return [
+            Paragraph(f"<font color='{color_hex}'><b>{title}</b></font>", kpi_style),
+            Paragraph(f"<font color='{color_hex}'>{value}</font>", kpi_val),
+            Paragraph(sub, ParagraphStyle("S", fontSize=7, alignment=TA_CENTER, textColor=colors.grey))
+        ]
+
+    kpi_row = [[
+        kpi_box("TOTAL RECORDS", f"{total}", "#1D4FA3", "100% of Total"),
+        kpi_box("RESOLVED", f"{resolved}", "#159447", f"{resolution_rate:.2f}%"),
+        kpi_box("NO RESPONSE", f"{no_response}", "#D91F2D", f"{(no_response/total*100) if total else 0:.2f}%"),
+        kpi_box("PENDING", f"{pending}", "#E58A00", f"{(pending/total*100) if total else 0:.2f}%"),
+        kpi_box("OVERALL RESOLUTION RATE", f"{resolution_rate:.2f}%", "#7B2D8E", "(Resolved / Total)"),
+    ]]
+    kpi_table = Table(kpi_row, colWidths=[48*mm]*5)
+    kpi_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (0, 0), colors.HexColor("#E8F0FE")),
+        ("BACKGROUND", (1, 0), (1, 0), colors.HexColor("#E6F7ED")),
+        ("BACKGROUND", (2, 0), (2, 0), colors.HexColor("#FDE8E8")),
+        ("BACKGROUND", (3, 0), (3, 0), colors.HexColor("#FFF4E0")),
+        ("BACKGROUND", (4, 0), (4, 0), colors.HexColor("#F3E8FF")),
+        ("BOX", (0, 0), (-1, -1), 0.7, colors.HexColor("#CCCCCC")),
+        ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#DDDDDD")),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    story.append(kpi_table)
+    story.append(Spacer(1, 8*mm))
+
+    # ---------- SECTION II – Sub Head (no Share) ----------
+    story.append(Paragraph(f"<b>II — CLASSIFICATION SUB HEAD DISTRIBUTION ({department})</b>", section_header))
+    story.append(Spacer(1, 3*mm))
+
+    month_order = sorted(df["Month"].unique())
+    month_names = {m: m.strftime("%B-%Y") for m in month_order}
+    sub = (
+        df.groupby(["Sub Head", "Month"])
+        .size()
+        .unstack(fill_value=0)
+    )
+    for m in month_order:
+        if m not in sub.columns:
+            sub[m] = 0
+    sub["Total"] = sub[month_order].sum(axis=1)
+    sub = sub.sort_values("Total", ascending=False)
+
+    # Build table data (no Share)
+    header_row = ["Sub Head"] + [month_names[m] for m in month_order] + ["Total"]
+    table_data = [header_row]
+    for idx, row in sub.iterrows():
+        table_data.append(
+            [str(idx)] + [str(int(row[m])) for m in month_order] + [str(int(row["Total"]))]
+        )
+
+    col_w = [55*mm] + [28*mm]*len(month_order) + [22*mm]
+    t = Table(table_data, colWidths=col_w, repeatRows=1)
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#123A7A")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 7),
+        ("ALIGN", (1, 0), (-1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F7F9FC")]),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+    ]))
+    story.append(t)
+    story.append(Spacer(1, 6*mm))
+
+    # ---------- SECTION III – Officer levels (no Share) ----------
+    _dept_cfg = ASSISTANT_OFFICER_LEVEL.get(_normalize_dept(department))
+    if _dept_cfg:
+        _levels = _dept_cfg["levels"]
+        _section_letters = ["A", "B", "C", "D", "E"]
+        for _idx, _level in enumerate(_levels):
+            key = _level["key"]
+            label = _level["label"]
+            order = _level["order"]
+            suffix = f"III-{_section_letters[_idx]}" if len(_levels) > 1 else "III"
+
+            story.append(Paragraph(
+                f"<b>{suffix} — CLASSIFICATION {label} WISE ({department})</b>", section_header
+            ))
+            story.append(Spacer(1, 3*mm))
+
+            level_df = df.dropna(subset=[key]) if key in df.columns else pd.DataFrame()
+            if level_df.empty:
+                story.append(Paragraph(f"No locations matched the current {label} mapping.", normal))
+            else:
+                grouped = (
+                    level_df.groupby([key, "Month"])
+                    .size()
+                    .unstack(fill_value=0)
+                    .reindex(order)
+                )
+                for m in month_order:
+                    if m not in grouped.columns:
+                        grouped[m] = 0
+                grouped["Total"] = grouped[month_order].sum(axis=1)
+
+                header_row = [label] + [month_names[m] for m in month_order] + ["Total"]
+                table_data = [header_row]
+                for name in order:
+                    if name in grouped.index:
+                        r = grouped.loc[name]
+                        table_data.append(
+                            [name] + [str(int(r[m])) for m in month_order] + [str(int(r["Total"]))]
+                        )
+                    else:
+                        table_data.append([name] + ["0"]*len(month_order) + ["0"])
+
+                col_w = [70*mm] + [28*mm]*len(month_order) + [22*mm]
+                t = Table(table_data, colWidths=col_w, repeatRows=1)
+                t.setStyle(TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#123A7A")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 7),
+                    ("ALIGN", (1, 0), (-1, -1), "CENTER"),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F7F9FC")]),
+                    ("TOPPADDING", (0, 0), (-1, -1), 3),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                ]))
+                story.append(t)
+            story.append(Spacer(1, 5*mm))
+
+    # ---------- FOOTER (matches image) ----------
+    story.append(Spacer(1, 4*mm))
+    footer_text = (
+        f"<b>Source:</b> SARAL System &nbsp;|&nbsp; "
+        f"<b>Reporting Department:</b> Safety Department, SUR DIVN, CR &nbsp;|&nbsp; "
+        f"<b>Analysis Type:</b> Deficiency Analysis &nbsp;|&nbsp; "
+        f"<b>Period:</b> {date_from.strftime('%d %b %Y')} to {date_to.strftime('%d %b %Y')} &nbsp;|&nbsp; "
+        f"<b>Department:</b> {department} &nbsp;|&nbsp; "
+        f"<b>Data as on:</b> {date.today().strftime('%d %b %Y')}"
+    )
+    footer = Table([[Paragraph(footer_text, ParagraphStyle("F", fontSize=8, textColor=colors.white, alignment=TA_CENTER))]],
+                   colWidths=[250*mm])
+    footer.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#0C2F67")),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    story.append(footer)
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
+# --- Button in the UI ---
+st.markdown("### Export Analysis")
+pdf_buffer = generate_analysis_pdf(
+    df, department, date_from, date_to,
+    total, resolved, pending, no_response, resolution_rate
+)
+st.download_button(
+    label="📥 Download Full Analysis PDF (Official Template)",
+    data=pdf_buffer,
+    file_name=f"Safety_Deficiencies_{department.replace(' ', '_')}_{date_from}_{date_to}.pdf",
+    mime="application/pdf",
+    use_container_width=True
+)
+    # ============================================================
     # SECTION II — SUB HEAD DISTRIBUTION
     # ============================================================
     st.markdown(
@@ -2849,7 +3095,6 @@ with tabs[3]:
         if m not in sub.columns:
             sub[m] = 0
     sub["Total"] = sub[month_order].sum(axis=1)
-    sub["Share"] = (sub["Total"] / total * 100).round(2)
     sub = sub.sort_values("Total", ascending=False)
 
     display_sub = sub.copy()
@@ -2935,8 +3180,6 @@ with tabs[3]:
                     if m not in grouped.columns:
                         grouped[m] = 0
                 grouped["Total"] = grouped[month_order].sum(axis=1)
-                grouped["Share"] = (grouped["Total"] / total * 100).round(2)
-
                 grouped_display = grouped.copy()
                 grouped_display = grouped_display.rename(columns=month_names)
                 grouped_display = grouped_display.reset_index()
