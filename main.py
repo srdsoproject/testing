@@ -3077,177 +3077,177 @@ st.download_button(
     mime="application/pdf",
     use_container_width=True
 )
-    # ============================================================
-    # SECTION II — SUB HEAD DISTRIBUTION
-    # ============================================================
-    st.markdown(
-        f'<div class="section-header">II — CLASSIFICATION SUB HEAD DISTRIBUTION ({department})</div>',
-        unsafe_allow_html=True
+# ============================================================
+# SECTION II — SUB HEAD DISTRIBUTION
+# ============================================================
+st.markdown(
+    f'<div class="section-header">II — CLASSIFICATION SUB HEAD DISTRIBUTION ({department})</div>',
+    unsafe_allow_html=True
+)
+
+month_order = sorted(df["Month"].unique())
+sub = (
+    df.groupby(["Sub Head", "Month"])
+    .size()
+    .unstack(fill_value=0)
+)
+for m in month_order:
+    if m not in sub.columns:
+        sub[m] = 0
+sub["Total"] = sub[month_order].sum(axis=1)
+sub = sub.sort_values("Total", ascending=False)
+
+display_sub = sub.copy()
+# Month is now a Year-Month Period (see preprocess_data), so it already
+# knows its own year - no more hardcoded "2026" mislabeling data from
+# any other year.
+month_names = {m: m.strftime("%B-%Y") for m in month_order}
+display_sub = display_sub.rename(columns=month_names)
+display_sub = display_sub.reset_index()
+
+col_table, col_chart = st.columns([1.1, 1])
+
+with col_table:
+    st.dataframe(
+        display_sub,
+        use_container_width=True,
+        height=420,
+        hide_index=True
     )
 
-    month_order = sorted(df["Month"].unique())
-    sub = (
-        df.groupby(["Sub Head", "Month"])
-        .size()
-        .unstack(fill_value=0)
+with col_chart:
+    top_n = min(10, len(sub))
+    plot_df = sub.head(top_n).reset_index()
+    fig_bar = px.bar(
+        plot_df,
+        x="Total",
+        y="Sub Head",
+        orientation="h",
+        text="Total",
+        color_discrete_sequence=["#123A7A"],
+        title=f"Sub Head Wise Distribution — {department} (Top 10)"
     )
-    for m in month_order:
-        if m not in sub.columns:
-            sub[m] = 0
-    sub["Total"] = sub[month_order].sum(axis=1)
-    sub = sub.sort_values("Total", ascending=False)
+    fig_bar.update_layout(
+        yaxis={"categoryorder": "total ascending"},
+        height=420,
+        margin=dict(l=10, r=10, t=40, b=10),
+        showlegend=False
+    )
+    fig_bar.update_traces(textposition="outside")
+    st.plotly_chart(fig_bar, use_container_width=True)
 
-    display_sub = sub.copy()
-    # Month is now a Year-Month Period (see preprocess_data), so it already
-    # knows its own year - no more hardcoded "2026" mislabeling data from
-    # any other year.
-    month_names = {m: m.strftime("%B-%Y") for m in month_order}
-    display_sub = display_sub.rename(columns=month_names)
-    display_sub = display_sub.reset_index()
+st.markdown("---")
 
-    col_table, col_chart = st.columns([1.1, 1])
+# ============================================================
+# SECTION III — OFFICER LEVEL WISE
+# (ADSTE for S&T; ADEN then Sr.DEN roll-up for Engineering; skipped
+# entirely for departments with no grouping defined yet, e.g.
+# Mechanical, Commercial.)
+# ============================================================
+_dept_cfg = ASSISTANT_OFFICER_LEVEL.get(_normalize_dept(department))
 
-    with col_table:
-        st.dataframe(
-            display_sub,
-            use_container_width=True,
-            height=420,
-            hide_index=True
+if _dept_cfg is None:
+    st.info(
+        f"ℹ️ Officer-level (e.g. ADSTE / ADEN) classification is not yet defined for "
+        f"**{department}**. This section will appear once that grouping is provided."
+    )
+else:
+    _levels = _dept_cfg["levels"]
+    _section_letters = ["A", "B", "C", "D", "E"]
+
+    for _idx, _level in enumerate(_levels):
+        key = _level["key"]
+        label = _level["label"]
+        order = _level["order"]
+        suffix = f"III-{_section_letters[_idx]}" if len(_levels) > 1 else "III"
+
+        st.markdown(
+            f'<div class="section-header">{suffix} — CLASSIFICATION {label} WISE ({department})</div>',
+            unsafe_allow_html=True
         )
 
-    with col_chart:
-        top_n = min(10, len(sub))
-        plot_df = sub.head(top_n).reset_index()
-        fig_bar = px.bar(
-            plot_df,
-            x="Total",
-            y="Sub Head",
-            orientation="h",
-            text="Total",
-            color_discrete_sequence=["#123A7A"],
-            title=f"Sub Head Wise Distribution — {department} (Top 10)"
-        )
-        fig_bar.update_layout(
-            yaxis={"categoryorder": "total ascending"},
-            height=420,
-            margin=dict(l=10, r=10, t=40, b=10),
-            showlegend=False
-        )
-        fig_bar.update_traces(textposition="outside")
-        st.plotly_chart(fig_bar, use_container_width=True)
-
-    st.markdown("---")
-
-    # ============================================================
-    # SECTION III — OFFICER LEVEL WISE
-    # (ADSTE for S&T; ADEN then Sr.DEN roll-up for Engineering; skipped
-    # entirely for departments with no grouping defined yet, e.g.
-    # Mechanical, Commercial.)
-    # ============================================================
-    _dept_cfg = ASSISTANT_OFFICER_LEVEL.get(_normalize_dept(department))
-
-    if _dept_cfg is None:
-        st.info(
-            f"ℹ️ Officer-level (e.g. ADSTE / ADEN) classification is not yet defined for "
-            f"**{department}**. This section will appear once that grouping is provided."
-        )
-    else:
-        _levels = _dept_cfg["levels"]
-        _section_letters = ["A", "B", "C", "D", "E"]
-
-        for _idx, _level in enumerate(_levels):
-            key = _level["key"]
-            label = _level["label"]
-            order = _level["order"]
-            suffix = f"III-{_section_letters[_idx]}" if len(_levels) > 1 else "III"
-
-            st.markdown(
-                f'<div class="section-header">{suffix} — CLASSIFICATION {label} WISE ({department})</div>',
-                unsafe_allow_html=True
+        level_df = df.dropna(subset=[key]) if key in df.columns else pd.DataFrame()
+        if level_df.empty:
+            st.info(f"No locations matched the current {label} mapping for the selected period.")
+        else:
+            grouped = (
+                level_df.groupby([key, "Month"])
+                .size()
+                .unstack(fill_value=0)
+                .reindex(order)
             )
+            for m in month_order:
+                if m not in grouped.columns:
+                    grouped[m] = 0
+            grouped["Total"] = grouped[month_order].sum(axis=1)
+            grouped_display = grouped.copy()
+            grouped_display = grouped_display.rename(columns=month_names)
+            grouped_display = grouped_display.reset_index()
 
-            level_df = df.dropna(subset=[key]) if key in df.columns else pd.DataFrame()
-            if level_df.empty:
-                st.info(f"No locations matched the current {label} mapping for the selected period.")
-            else:
-                grouped = (
-                    level_df.groupby([key, "Month"])
-                    .size()
-                    .unstack(fill_value=0)
-                    .reindex(order)
+            col_lvl_table, col_lvl_donut = st.columns([1.2, 1])
+            colors = _palette(len(order))
+
+            with col_lvl_table:
+                st.dataframe(
+                    grouped_display,
+                    use_container_width=True,
+                    height=320,
+                    hide_index=True
                 )
-                for m in month_order:
-                    if m not in grouped.columns:
-                        grouped[m] = 0
-                grouped["Total"] = grouped[month_order].sum(axis=1)
-                grouped_display = grouped.copy()
-                grouped_display = grouped_display.rename(columns=month_names)
-                grouped_display = grouped_display.reset_index()
 
-                col_lvl_table, col_lvl_donut = st.columns([1.2, 1])
-                colors = _palette(len(order))
+            with col_lvl_donut:
+                donut_values = grouped["Total"].fillna(0).values
+                donut_labels = order
 
-                with col_lvl_table:
-                    st.dataframe(
-                        grouped_display,
-                        use_container_width=True,
-                        height=320,
-                        hide_index=True
+                fig_donut = go.Figure(data=[go.Pie(
+                    labels=donut_labels,
+                    values=donut_values,
+                    hole=0.55,
+                    marker=dict(colors=colors, line=dict(color="white", width=2)),
+                    textinfo="none",
+                    hovertemplate="%{label}<br>%{value} (%{percent})<extra></extra>"
+                )])
+                fig_donut.update_layout(
+                    title=f"{label} Wise Distribution — {department}",
+                    height=320,
+                    margin=dict(l=20, r=20, t=40, b=20),
+                    annotations=[dict(
+                        text=f"TOTAL<br><b>{int(total)}</b>",
+                        x=0.5, y=0.5,
+                        font_size=14,
+                        showarrow=False
+                    )],
+                    showlegend=True,
+                    legend=dict(orientation="v", yanchor="middle", y=0.5, x=1.05)
+                )
+                st.plotly_chart(fig_donut, use_container_width=True, key=f"donut_{key}")
+
+                st.markdown("**Legend**")
+                for i, name in enumerate(order):
+                    val = int(grouped.loc[name, "Total"]) if name in grouped.index else 0
+                    pct = (val / total * 100) if total else 0
+                    st.markdown(
+                        f"<span style='color:{colors[i]}; font-size:1.2rem;'>■</span> "
+                        f"**{name}** — {val} ({pct:.2f}%)",
+                        unsafe_allow_html=True
                     )
 
-                with col_lvl_donut:
-                    donut_values = grouped["Total"].fillna(0).values
-                    donut_labels = order
+        if _idx < len(_levels) - 1:
+            st.markdown("")  # small spacer between sub-sections
 
-                    fig_donut = go.Figure(data=[go.Pie(
-                        labels=donut_labels,
-                        values=donut_values,
-                        hole=0.55,
-                        marker=dict(colors=colors, line=dict(color="white", width=2)),
-                        textinfo="none",
-                        hovertemplate="%{label}<br>%{value} (%{percent})<extra></extra>"
-                    )])
-                    fig_donut.update_layout(
-                        title=f"{label} Wise Distribution — {department}",
-                        height=320,
-                        margin=dict(l=20, r=20, t=40, b=20),
-                        annotations=[dict(
-                            text=f"TOTAL<br><b>{int(total)}</b>",
-                            x=0.5, y=0.5,
-                            font_size=14,
-                            showarrow=False
-                        )],
-                        showlegend=True,
-                        legend=dict(orientation="v", yanchor="middle", y=0.5, x=1.05)
-                    )
-                    st.plotly_chart(fig_donut, use_container_width=True, key=f"donut_{key}")
-
-                    st.markdown("**Legend**")
-                    for i, name in enumerate(order):
-                        val = int(grouped.loc[name, "Total"]) if name in grouped.index else 0
-                        pct = (val / total * 100) if total else 0
-                        st.markdown(
-                            f"<span style='color:{colors[i]}; font-size:1.2rem;'>■</span> "
-                            f"**{name}** — {val} ({pct:.2f}%)",
-                            unsafe_allow_html=True
-                        )
-
-            if _idx < len(_levels) - 1:
-                st.markdown("")  # small spacer between sub-sections
-
-    # ============================================================
-    # FOOTER
-    # ============================================================
-    st.markdown("---")
-    st.markdown(
-        f"""
-        <div style="background:#0C2F67; color:white; padding:0.7rem 1.2rem; border-radius:8px; font-size:0.85rem;">
-            <b>Source:</b> SARAL System &nbsp;|&nbsp;
-            <b>Reporting Department:</b> Safety Department, SUR DIVN, CR &nbsp;|&nbsp;
-            <b>Analysis Type:</b> Deficiency Analysis &nbsp;|&nbsp;
-            <b>Period:</b> {date_from.strftime('%d %b %Y')} to {date_to.strftime('%d %b %Y')} &nbsp;|&nbsp;
-            <b>Department:</b> {department}
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+# ============================================================
+# FOOTER
+# ============================================================
+st.markdown("---")
+st.markdown(
+    f"""
+    <div style="background:#0C2F67; color:white; padding:0.7rem 1.2rem; border-radius:8px; font-size:0.85rem;">
+        <b>Source:</b> SARAL System &nbsp;|&nbsp;
+        <b>Reporting Department:</b> Safety Department, SUR DIVN, CR &nbsp;|&nbsp;
+        <b>Analysis Type:</b> Deficiency Analysis &nbsp;|&nbsp;
+        <b>Period:</b> {date_from.strftime('%d %b %Y')} to {date_to.strftime('%d %b %Y')} &nbsp;|&nbsp;
+        <b>Department:</b> {department}
+    </div>
+    """,
+    unsafe_allow_html=True
+)
