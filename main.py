@@ -437,10 +437,10 @@ if not st.session_state.logged_in:
         st.stop()
 
     with st.form("login_form", clear_on_submit=False):
-        email = st.text_input("📧 Email", placeholder="your.email@example.com")
+        email = st.text_input("📧 Email", placeholder="Enter Id")
         password = st.text_input("🔒 Password", type="password")
 
-        st.markdown("**🤖 Human check:**")
+        st.markdown("**✅ Human check:**")
         st.image(
             generate_captcha_image(st.session_state.captcha_text),
             caption="Type the characters shown above (not case-sensitive)",
