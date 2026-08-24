@@ -2263,6 +2263,73 @@ with tabs[3]:
                 aden_map[loc] = group
         return aden_map
 
+    # ============================================================
+    # SSE/TRD SUPERVISOR-LEVEL LOCATION MAPPING (Electrical/TRD)
+    # Single-tier grouping — location code maps directly to its SSE/TRD
+    # jurisdiction. Unlike ADSTE/ADEN these are given as direct
+    # location→group dicts rather than group→{locations}, so they are
+    # merged as-is (later dicts don't override earlier keys since the
+    # location sets don't overlap across the three sections).
+    # ============================================================
+    SUR_DD_TRD = {
+        "SUR": "SSE/TRD/SUR",
+        "BALE": "SSE/TRD/SUR",
+        "PAKNI": "SSE/TRD/SUR",
+        "MVE": "SSE/TRD/SUR",
+        "MOHOL": "SSE/TRD/SUR",
+        "MKPT": "SSE/TRD/KWV",
+        "AAG": "SSE/TRD/KWV",
+        "WKA": "SSE/TRD/KWV",
+        "MADHA": "SSE/TRD/KWV",
+        "WDS": "SSE/TRD/KWV",
+        "KWV": "SSE/TRD/KWV",
+        "DHS": "SSE/TRD/KWV",
+        "KEM": "SSE/TRD/KWV",
+        "BLNI": "SSE/TRD/KWV",
+        "JEUR": "SSE/TRD/KEU",
+        "PPJ": "SSE/TRD/KEU",
+        "WSB": "SSE/TRD/KEU",
+        "KEU": "SSE/TRD/KEU",
+        "JNTR": "SSE/TRD/KEU",
+        "BGVN": "SSE/TRD/KEU",
+        "MLM": "SSE/TRD/KEU",
+        "BRB": "SSE/TRD/KEU"
+    }
+    KWV_LUR_TRD = {
+        "SEI": "SSE/TRD/BTW",
+        "BTW": "SSE/TRD/BTW",
+        "PJR": "SSE/TRD/BTW",
+        "DRSV": "SSE/TRD/DRSV",
+        "YSI": "SSE/TRD/DRSV",
+        "DKY": "SSE/TRD/DRSV",
+        "OSA": "SSE/TRD/LUR",
+        "HGL": "SSE/TRD/LUR",
+        "LUR": "SSE/TRD/LUR"
+    }
+    KWV_MRJ_TRD = {
+        "MLB": "SSE/TRD/PVR",
+        "PVR": "SSE/TRD/PVR",
+        "SGLA": "SSE/TRD/SGLA",
+        "JTRD": "SSE/TRD/SGLA",
+        "DLGN": "SSE/TRD/SGLA",
+        "KVK": "SSE/TRD/SGRE",
+        "SGRE": "SSE/TRD/SGRE",
+        "ARAG": "SSE/TRD/SGRE"
+    }
+    # Group display order — first appearance order across the three sections
+    SSE_TRD_ORDER = [
+        "SSE/TRD/SUR", "SSE/TRD/KWV", "SSE/TRD/KEU",
+        "SSE/TRD/BTW", "SSE/TRD/DRSV", "SSE/TRD/LUR",
+        "SSE/TRD/PVR", "SSE/TRD/SGLA", "SSE/TRD/SGRE",
+    ]
+
+    def build_sse_trd_map():
+        trd_map = {}
+        trd_map.update(SUR_DD_TRD)
+        trd_map.update(KWV_LUR_TRD)
+        trd_map.update(KWV_MRJ_TRD)
+        return trd_map
+
     def _palette(n):
         base = ["#1D4FA3", "#159447", "#D91F2D", "#E58A00", "#7B2D8E", "#0FA3B1", "#C2185B", "#455A64"]
         return [base[i % len(base)] for i in range(n)]
@@ -2302,6 +2369,16 @@ with tabs[3]:
                     "order": SRDEN_ORDER,
                     "parent_key": "ADEN",
                     "parent_map": ADEN_TO_SRDEN,
+                },
+            ]
+        },
+        "ELECT/TRD": {
+            "levels": [
+                {
+                    "key": "SSE_TRD",
+                    "label": "SSE/TRD",
+                    "order": SSE_TRD_ORDER,
+                    "location_map": build_sse_trd_map(),
                 },
             ]
         },
@@ -2394,6 +2471,15 @@ with tabs[3]:
             "CIVIL": "ENGINEERING",
             "CIVIL ENGINEERING": "ENGINEERING",
             "ENGG DEPARTMENT": "ENGINEERING",
+            # Electrical / TRD
+            "TRD": "ELECT/TRD",
+            "ELECT TRD": "ELECT/TRD",
+            "ELECT-TRD": "ELECT/TRD",
+            "ELECT (TRD)": "ELECT/TRD",
+            "ELECTRICAL/TRD": "ELECT/TRD",
+            "ELECTRICAL TRD": "ELECT/TRD",
+            "ELEC/TRD": "ELECT/TRD",
+            "ELEC TRD": "ELECT/TRD",
         }
         return aliases.get(s, s)
 
