@@ -2330,6 +2330,59 @@ with tabs[3]:
         trd_map.update(KWV_MRJ_TRD)
         return trd_map
 
+    # ============================================================
+    # SSE/ELECT SUPERVISOR-LEVEL LOCATION MAPPING (Electrical/General)
+    # Single-tier grouping. Unlike ADSTE/ADEN/SSE-TRD, these 5 sets
+    # OVERLAP (e.g. MKPT/AAG/WKA/WDS/MA sit in both KWV & SUR; DUD sits in
+    # both SUR & KLBG; SDB sits in both KLBG & WADI). Since a location can
+    # only belong to one jurisdiction here, overlaps are resolved by
+    # priority in the order the groups are listed below (KWV → SUR →
+    # KLBG → WADI → LUR — same order as ELECT_G_ORDER): the first group a
+    # location appears in wins.
+    # ============================================================
+    SSE_ELECT_KWV = {
+        "KWV", "DHS", "KEM", "BLNI", "BTW", "SEI", "PPJ", "WSB", "KEU", "JNTR",
+        "BGVN", "MLM", "BRB", "DD", "MLB", "PVR", "SGLA", "DLGN", "JTRD", "SGRE",
+        "ARAG", "KVK", "MRJ", "MKPT", "AAG", "WKA", "MA", "WDS"
+    }
+    SSE_ELECT_SUR = {
+        "MKPT", "MA", "AAG", "WKA", "WDS", "DUD", "NGS", "BOT", "AKOR", "SUR",
+        "JEUR", "PK", "BALE", "MVE", "MO", "TKWD", "HG"
+    }
+    SSE_ELECT_KLBG = {
+        "DUD", "KUI", "GDGN", "GUR", "SVG", "BBD", "KLBG", "TJSP", "HQR", "MR",
+        "SDB", "SBD",
+    }
+    SSE_ELECT_WADI = {
+        "SDB", "WADI"
+    }
+    SSE_ELECT_LUR = {
+        "PJR", "LTRR", "YSI", "DKY", "OSA", "HGL", "LUR"
+    }
+    ELECT_G_ORDER = [
+        "SSE/ELECT/KWV",
+        "SSE/ELECT/SUR",
+        "SSE/ELECT/KLBG",
+        "SSE/ELECT/WADI",
+        "SSE/ELECT/LUR"
+    ]
+
+    def build_elect_g_map():
+        # Priority order matches ELECT_G_ORDER — first group listed wins
+        # for any location that appears in more than one set.
+        ordered_groups = [
+            ("SSE/ELECT/KWV", SSE_ELECT_KWV),
+            ("SSE/ELECT/SUR", SSE_ELECT_SUR),
+            ("SSE/ELECT/KLBG", SSE_ELECT_KLBG),
+            ("SSE/ELECT/WADI", SSE_ELECT_WADI),
+            ("SSE/ELECT/LUR", SSE_ELECT_LUR),
+        ]
+        elect_g_map = {}
+        for label, locs in ordered_groups:
+            for loc in locs:
+                elect_g_map.setdefault(loc, label)
+        return elect_g_map
+
     def _palette(n):
         base = ["#1D4FA3", "#159447", "#D91F2D", "#E58A00", "#7B2D8E", "#0FA3B1", "#C2185B", "#455A64"]
         return [base[i % len(base)] for i in range(n)]
@@ -2379,6 +2432,16 @@ with tabs[3]:
                     "label": "SSE/TRD",
                     "order": SSE_TRD_ORDER,
                     "location_map": build_sse_trd_map(),
+                },
+            ]
+        },
+        "ELECT/G": {
+            "levels": [
+                {
+                    "key": "SSE_ELECT",
+                    "label": "SSE/ELECT",
+                    "order": ELECT_G_ORDER,
+                    "location_map": build_elect_g_map(),
                 },
             ]
         },
@@ -2480,6 +2543,16 @@ with tabs[3]:
             "ELECTRICAL TRD": "ELECT/TRD",
             "ELEC/TRD": "ELECT/TRD",
             "ELEC TRD": "ELECT/TRD",
+            # Electrical / General
+            "ELECT G": "ELECT/G",
+            "ELECT-G": "ELECT/G",
+            "ELECT (G)": "ELECT/G",
+            "ELECTRICAL/G": "ELECT/G",
+            "ELECTRICAL GENERAL": "ELECT/G",
+            "ELEC/G": "ELECT/G",
+            "ELEC G": "ELECT/G",
+            "ELECT/GEN": "ELECT/G",
+            "ELECT GEN": "ELECT/G",
         }
         return aliases.get(s, s)
 
