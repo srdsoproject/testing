@@ -2107,22 +2107,8 @@ with tabs[3]:
     # ============================================================
     SHEET_ID = st.secrets["google_sheets"]["sheet_id"]
     SHEET_NAME = st.secrets["google_sheets"]["sheet_name"]
-
     # ============================================================
-    # DEPARTMENT → SUB HEAD MAPPING
-    # (reuses the single canonical SUBHEAD_LIST defined near the top of the
-    # file instead of redefining a second, slightly different copy here —
-    # the old copy here was missing the 'Trespass/CRO' entry under
-    # ENGINEERING, which is exactly the kind of silent drift redundant
-    # copies invite.)
-    #
-    # NOTE: This tab is now generic across departments (Signal & Telecom,
-    # Mechanical, ...). It no longer hardcodes "S&T" anywhere except in the
-    # DEPARTMENT_OPTIONS list below and the alias table in _normalize_dept.
-    # To add another department later, just add its canonical Head label to
-    # DEPARTMENT_OPTIONS and any spelling variants to the aliases dict.
-    # ============================================================
-    DEPARTMENT_OPTIONS = ["SIGNAL & TELECOM", "MECHANICAL", "COMMERCIAL", "OPTG", "ENGINEERING"]
+    DEPARTMENT_OPTIONS = ["SIGNAL & TELECOM", "MECHANICAL", "COMMERCIAL", "OPTG", "ENGINEERING", "ELECT/TRD", "ELECT/TRO", "ELECT/G", "SECURITY", "FINANCE", "PERSONNEL", "GSU", "STORE"]
 
     # ============================================================
     # CUSTOM CSS
