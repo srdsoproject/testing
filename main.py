@@ -2122,7 +2122,7 @@ with tabs[3]:
     # To add another department later, just add its canonical Head label to
     # DEPARTMENT_OPTIONS and any spelling variants to the aliases dict.
     # ============================================================
-    DEPARTMENT_OPTIONS = ["SIGNAL & TELECOM", "MECHANICAL"]
+    DEPARTMENT_OPTIONS = ["SIGNAL & TELECOM", "MECHANICAL", "COMMERCIAL"]
 
     # ============================================================
     # CUSTOM CSS
@@ -2325,6 +2325,13 @@ with tabs[3]:
             "MECH DEPT": "MECHANICAL",
             "M&C": "MECHANICAL",
             "M & C": "MECHANICAL",
+            # Commercial
+            "COMM": "COMMERCIAL",
+            "COMM.": "COMMERCIAL",
+            "COMMERCIAL DEPARTMENT": "COMMERCIAL",
+            "COMMERCIAL DEPT": "COMMERCIAL",
+            "COML": "COMMERCIAL",
+            "COML.": "COMMERCIAL",
         }
         return aliases.get(s, s)
 
