@@ -2140,8 +2140,6 @@ with tabs[3]:
 
     # ============================================================
     # ADSTE LOCATION MAPPING (Signal & Telecom)
-    # (Location-code based, so it applies to any department whose records
-    # use these same station/section codes — not just S&T.)
     # ============================================================
     KLBG = {
         "WADI", "SDB", "MR", "HQR", "KLBG", "BBD", "SVG", "HHD", "GUR", "KUI",
@@ -2169,7 +2167,7 @@ with tabs[3]:
         "HDD-SDB", "HDD-WADI", "SVG-BBD", "SVG-TJSP", "SVG-KLBG", "SVG-HQR", "SVG-MR", "SVG-SDB",
         "SVG-WADI", "BBD-TJSP", "BBD-KLBG", "BBD-HQR", "BBD-MR", "BBD-SDB", "BBD-WADI", "TJSP-KLBG",
         "TJSP-HQR", "TJSP-MR", "TJSP-SDB", "TJSP-WADI", "KLBG-HQR", "KLBG-MR", "KLBG-SDB", "KLBG-WADI",
-        "HQR-MR", "HQR-SDB", "HQR-WADI", "MR-SDB", "MR-WADI", "SDB-WADI",     "WADI-SDB", "WADI-MR", "WADI-HQR", "WADI-KLBG", "WADI-TJSP", "WADI-BBD", "WADI-SVG", "WADI-HDD",
+        "HQR-MR", "HQR-SDB", "HQR-WADI", "MR-SDB", "MR-WADI", "SDB-WADI", "WADI-SDB", "WADI-MR", "WADI-HQR", "WADI-KLBG", "WADI-TJSP", "WADI-BBD", "WADI-SVG", "WADI-HDD",
         "WADI-DUD", "WADI-KUI", "WADI-GDGN", "WADI-GUR", "WADI-BOT", "WADI-NGS", "WADI-AKOR", "WADI-TLT",
         "WADI-HG", "WADI-TKWD", "WADI-SUR", "SDB-MR", "SDB-HQR", "SDB-KLBG", "SDB-TJSP", "SDB-BBD",
         "SDB-SVG", "SDB-HDD", "SDB-DUD", "SDB-KUI", "SDB-GDGN", "SDB-GUR", "SDB-BOT", "SDB-NGS",
@@ -2192,7 +2190,7 @@ with tabs[3]:
         "GDGN-TKWD", "GDGN-SUR", "GUR-BOT", "GUR-NGS", "GUR-AKOR", "GUR-TLT", "GUR-HG", "GUR-TKWD",
         "GUR-SUR", "BOT-NGS", "BOT-AKOR", "BOT-TLT", "BOT-HG", "BOT-TKWD", "BOT-SUR", "NGS-AKOR",
         "NGS-TLT", "NGS-HG", "NGS-TKWD", "NGS-SUR", "AKOR-TLT", "AKOR-HG", "AKOR-TKWD", "AKOR-SUR",
-        "TLT-HG", "TLT-TKWD", "TLT-SUR", "HG-TKWD", "HG-SUR", 'HG', 'TLT', 'AKOR', 'NGS', 'BOT', 'GUR', 'GDGN', 
+        "TLT-HG", "TLT-TKWD", "TLT-SUR", "HG-TKWD", "HG-SUR", 'HG', 'TLT', 'AKOR', 'NGS', 'BOT', 'GUR', 'GDGN',
         'KUI', 'DUD', 'HDD', 'SVG', 'BBD', 'TJSP', 'KLBG', 'HQR', 'MR', 'SDB', 'WADI', 'LC-1', 'LC-60', 'LC-61', 'LC-66', 'LC-74', 'LC-82', 'LC-91'
     }
     SUR = {
@@ -2231,9 +2229,6 @@ with tabs[3]:
 
     # ============================================================
     # ADEN / Sr.DEN LOCATION MAPPING (Engineering)
-    # Engineering has a two-tier officer hierarchy:
-    #   ADEN / Sr.ADEN groups (6 groups, location-code based)
-    #   roll up into Sr.DEN / DEN groups (3 groups).
     # ============================================================
     ADEN_GROUPS = {
         "ADEN/KLBG": {"GDGN", "GUR", "HQR", "KLBG", "KUI", "MR", "SBD", "SDB", "SVG", "TJSP", "WADI"},
@@ -2245,7 +2240,6 @@ with tabs[3]:
     }
     ADEN_ORDER = ["ADEN/KLBG", "ADEN/LUR", "ADEN/PVR", "ADEN/S/SUR", "Sr.ADEN/BG/KWV", "Sr.ADEN/N/SUR"]
 
-    # ADEN group → its parent Sr.DEN / DEN jurisdiction
     ADEN_TO_SRDEN = {
         "ADEN/KLBG": "Sr.DEN/S",
         "ADEN/S/SUR": "Sr.DEN/S",
@@ -2265,11 +2259,6 @@ with tabs[3]:
 
     # ============================================================
     # SSE/TRD SUPERVISOR-LEVEL LOCATION MAPPING (Electrical/TRD)
-    # Single-tier grouping — location code maps directly to its SSE/TRD
-    # jurisdiction. Unlike ADSTE/ADEN these are given as direct
-    # location→group dicts rather than group→{locations}, so they are
-    # merged as-is (later dicts don't override earlier keys since the
-    # location sets don't overlap across the three sections).
     # ============================================================
     SUR_DD_TRD = {
         "SUR": "SSE/TRD/SUR",
@@ -2316,7 +2305,6 @@ with tabs[3]:
         "SGRE": "SSE/TRD/SGRE",
         "ARAG": "SSE/TRD/SGRE"
     }
-    # Group display order — first appearance order across the three sections
     SSE_TRD_ORDER = [
         "SSE/TRD/SUR", "SSE/TRD/KWV", "SSE/TRD/KEU",
         "SSE/TRD/BTW", "SSE/TRD/DRSV", "SSE/TRD/LUR",
@@ -2332,13 +2320,6 @@ with tabs[3]:
 
     # ============================================================
     # SSE/ELECT SUPERVISOR-LEVEL LOCATION MAPPING (Electrical/General)
-    # Single-tier grouping. Unlike ADSTE/ADEN/SSE-TRD, these 5 sets
-    # OVERLAP (e.g. MKPT/AAG/WKA/WDS/MA sit in both KWV & SUR; DUD sits in
-    # both SUR & KLBG; SDB sits in both KLBG & WADI). Since a location can
-    # only belong to one jurisdiction here, overlaps are resolved by
-    # priority in the order the groups are listed below (KWV → SUR →
-    # KLBG → WADI → LUR — same order as ELECT_G_ORDER): the first group a
-    # location appears in wins.
     # ============================================================
     SSE_ELECT_KWV = {
         "KWV", "DHS", "KEM", "BLNI", "BTW", "SEI", "PPJ", "WSB", "KEU", "JNTR",
@@ -2368,8 +2349,6 @@ with tabs[3]:
     ]
 
     def build_elect_g_map():
-        # Priority order matches ELECT_G_ORDER — first group listed wins
-        # for any location that appears in more than one set.
         ordered_groups = [
             ("SSE/ELECT/KWV", SSE_ELECT_KWV),
             ("SSE/ELECT/SUR", SSE_ELECT_SUR),
@@ -2389,13 +2368,6 @@ with tabs[3]:
 
     # ============================================================
     # OFFICER-LEVEL CONFIG PER DEPARTMENT
-    # Each department maps to a list of "levels". A level is either:
-    #   - a base level: mapped directly from Location via "location_map"
-    #   - a derived (roll-up) level: mapped from a parent level's column
-    #     via "parent_key" + "parent_map"
-    # Section III renders one sub-section per configured level, in order.
-    # Departments with no entry here simply skip Section III until their
-    # officer-level grouping is provided.
     # ============================================================
     ASSISTANT_OFFICER_LEVEL = {
         "SIGNAL & TELECOM": {
@@ -2445,8 +2417,6 @@ with tabs[3]:
                 },
             ]
         },
-        # "MECHANICAL": {...}   # to be added once officer-level grouping is known
-        # "COMMERCIAL": {...}   # to be added once officer-level grouping is known
     }
 
     # ============================================================
@@ -2454,13 +2424,8 @@ with tabs[3]:
     # ============================================================
     @st.cache_data(ttl=60)
     def load_google_sheet(sheet_id: str, sheet_name: str):
-        """Load sheet the same reliable way as the main app (service account first).
-        Public gviz CSV is only a last-resort fallback and often returns incomplete
-        or zero rows for private sheets.
-        """
         if not sheet_id or not sheet_name:
             return None
-        # 1) Prefer service account (identical path to connect_to_gsheet / load_data)
         try:
             service_account_info = dict(st.secrets["gcp_service_account"])
             if "private_key" in service_account_info:
@@ -2479,7 +2444,6 @@ with tabs[3]:
             df = pd.DataFrame(data[1:], columns=headers)
             return df
         except Exception as e1:
-            # 2) Fallback: public CSV export (only works if sheet is shared publicly)
             try:
                 url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={sheet_name}"
                 df = pd.read_csv(url)
@@ -2492,77 +2456,43 @@ with tabs[3]:
                 return None
 
     # ============================================================
-    # PREPROCESS DATA + DEPARTMENT FILTER (FIXED)
+    # PREPROCESS DATA + DEPARTMENT FILTER
     # ============================================================
     def _normalize_dept(name: str) -> str:
-        """Normalize department / Head labels for reliable matching."""
         if not isinstance(name, str):
             return ""
         s = name.upper().strip()
         s = re.sub(r"\s+", " ", s)
-        # Common aliases → canonical
         aliases = {
-            # Signal & Telecom
-            "S&T": "SIGNAL & TELECOM",
-            "S & T": "SIGNAL & TELECOM",
+            "S&T": "SIGNAL & TELECOM", "S & T": "SIGNAL & TELECOM",
             "SIGNAL AND TELECOM": "SIGNAL & TELECOM",
             "SIGNAL & TELECOMMUNICATION": "SIGNAL & TELECOM",
             "SIGNAL AND TELECOMMUNICATION": "SIGNAL & TELECOM",
-            "SIG & TELE": "SIGNAL & TELECOM",
-            "SIG&TELE": "SIGNAL & TELECOM",
-            # Mechanical
-            "MECH": "MECHANICAL",
-            "MECH.": "MECHANICAL",
-            "MECHANICAL DEPARTMENT": "MECHANICAL",
-            "MECHANICAL DEPT": "MECHANICAL",
-            "MECH DEPARTMENT": "MECHANICAL",
-            "MECH DEPT": "MECHANICAL",
-            "M&C": "MECHANICAL",
-            "M & C": "MECHANICAL",
-            # Commercial
-            "COMM": "COMMERCIAL",
-            "COMM.": "COMMERCIAL",
-            "COMMERCIAL DEPARTMENT": "COMMERCIAL",
-            "COMMERCIAL DEPT": "COMMERCIAL",
-            "COML": "COMMERCIAL",
-            "COML.": "COMMERCIAL",
-            # Engineering
-            "ENGG": "ENGINEERING",
-            "ENGG.": "ENGINEERING",
-            "ENGINEERING DEPARTMENT": "ENGINEERING",
-            "ENGINEERING DEPT": "ENGINEERING",
-            "CIVIL": "ENGINEERING",
-            "CIVIL ENGINEERING": "ENGINEERING",
+            "SIG & TELE": "SIGNAL & TELECOM", "SIG&TELE": "SIGNAL & TELECOM",
+            "MECH": "MECHANICAL", "MECH.": "MECHANICAL",
+            "MECHANICAL DEPARTMENT": "MECHANICAL", "MECHANICAL DEPT": "MECHANICAL",
+            "MECH DEPARTMENT": "MECHANICAL", "MECH DEPT": "MECHANICAL",
+            "M&C": "MECHANICAL", "M & C": "MECHANICAL",
+            "COMM": "COMMERCIAL", "COMM.": "COMMERCIAL",
+            "COMMERCIAL DEPARTMENT": "COMMERCIAL", "COMMERCIAL DEPT": "COMMERCIAL",
+            "COML": "COMMERCIAL", "COML.": "COMMERCIAL",
+            "ENGG": "ENGINEERING", "ENGG.": "ENGINEERING",
+            "ENGINEERING DEPARTMENT": "ENGINEERING", "ENGINEERING DEPT": "ENGINEERING",
+            "CIVIL": "ENGINEERING", "CIVIL ENGINEERING": "ENGINEERING",
             "ENGG DEPARTMENT": "ENGINEERING",
-            # Electrical / TRD
-            "TRD": "ELECT/TRD",
-            "ELECT TRD": "ELECT/TRD",
-            "ELECT-TRD": "ELECT/TRD",
-            "ELECT (TRD)": "ELECT/TRD",
-            "ELECTRICAL/TRD": "ELECT/TRD",
-            "ELECTRICAL TRD": "ELECT/TRD",
-            "ELEC/TRD": "ELECT/TRD",
-            "ELEC TRD": "ELECT/TRD",
-            # Electrical / General
-            "ELECT G": "ELECT/G",
-            "ELECT-G": "ELECT/G",
-            "ELECT (G)": "ELECT/G",
-            "ELECTRICAL/G": "ELECT/G",
-            "ELECTRICAL GENERAL": "ELECT/G",
-            "ELEC/G": "ELECT/G",
-            "ELEC G": "ELECT/G",
-            "ELECT/GEN": "ELECT/G",
-            "ELECT GEN": "ELECT/G",
+            "TRD": "ELECT/TRD", "ELECT TRD": "ELECT/TRD", "ELECT-TRD": "ELECT/TRD",
+            "ELECT (TRD)": "ELECT/TRD", "ELECTRICAL/TRD": "ELECT/TRD",
+            "ELECTRICAL TRD": "ELECT/TRD", "ELEC/TRD": "ELECT/TRD", "ELEC TRD": "ELECT/TRD",
+            "ELECT G": "ELECT/G", "ELECT-G": "ELECT/G", "ELECT (G)": "ELECT/G",
+            "ELECTRICAL/G": "ELECT/G", "ELECTRICAL GENERAL": "ELECT/G",
+            "ELEC/G": "ELECT/G", "ELEC G": "ELECT/G", "ELECT/GEN": "ELECT/G", "ELECT GEN": "ELECT/G",
         }
         return aliases.get(s, s)
 
     def preprocess_data(df: pd.DataFrame, date_from: date, date_to: date, department: str):
         df = df.copy()
-        debug = {}  # row counts after each stage (shown in UI)
+        debug = {}
 
-        # --------------------------------------------------------
-        # 1. Normalize column names  (CRITICAL: never map Action By → Head)
-        # --------------------------------------------------------
         col_map = {}
         for c in df.columns:
             cl = str(c).strip().lower()
@@ -2584,12 +2514,8 @@ with tabs[3]:
             elif cl == "status":
                 col_map[c] = "Status"
 
-        # Avoid duplicate target names if both Head and Action By existed
-        # and somehow collided (should not happen after the fix above)
         df = df.rename(columns=col_map)
-        # If rename still produced duplicate "Head" columns, keep the first only
         if df.columns.tolist().count("Head") > 1:
-            # keep first occurrence, drop the rest
             cols = []
             seen = set()
             for c in df.columns:
@@ -2601,22 +2527,15 @@ with tabs[3]:
 
         debug["raw_rows"] = len(df)
 
-        # --------------------------------------------------------
-        # 2. Required columns check
-        # --------------------------------------------------------
         required = ["Date of Inspection", "Sub Head", "Location"]
         for col in required:
             if col not in df.columns:
                 st.warning(f"Column '{col}' not found. Available columns: {list(df.columns)}")
                 return pd.DataFrame()
 
-        # --------------------------------------------------------
-        # 3. Date filter
-        # --------------------------------------------------------
         df["Date of Inspection"] = pd.to_datetime(
             df["Date of Inspection"], errors="coerce", dayfirst=True
         )
-        # Also try non-dayfirst for any remaining NaT (e.g. YYYY-MM-DD)
         still_nat = df["Date of Inspection"].isna()
         if still_nat.any():
             df.loc[still_nat, "Date of Inspection"] = pd.to_datetime(
@@ -2632,13 +2551,9 @@ with tabs[3]:
         df = df[mask].copy()
         debug["after_date_filter"] = len(df)
 
-        # Clean text columns
         df["Sub Head"] = df["Sub Head"].fillna("").astype(str).str.strip()
         df["Location"] = df["Location"].fillna("").astype(str).str.strip().str.upper()
 
-        # --------------------------------------------------------
-        # 4. FILTER BY HEAD = department  (robust matching)
-        # --------------------------------------------------------
         target = _normalize_dept(department)
         if "Head" in df.columns:
             head_series = df["Head"]
@@ -2647,12 +2562,10 @@ with tabs[3]:
             head_norm = head_series.fillna("").astype(str).map(_normalize_dept)
             df = df[head_norm == target].copy()
             debug["after_head_filter"] = len(df)
-            # Helpful diagnostic: unique Head values that were present before filter
             debug["unique_heads_seen"] = sorted(
                 set(head_series.fillna("").astype(str).str.strip().unique()) - {""}
             )[:30]
         else:
-            # Fallback: keep rows whose Sub Head belongs to this department
             allowed_subheads = SUBHEAD_LIST.get(department, [])
             if allowed_subheads:
                 allowed_upper = {s.upper().strip() for s in allowed_subheads}
@@ -2661,16 +2574,12 @@ with tabs[3]:
             debug["unique_heads_seen"] = ["(no Head column — used Sub Head fallback)"]
 
         if df.empty:
-            # Attach debug so caller can show why
             df.attrs["debug"] = debug
             return df
-    
-        # --------------------------------------------------------
-        # 5. Classification
-        # --------------------------------------------------------
+
         feedback_col = "Feedback" if "Feedback" in df.columns else None
         remark_col = "User Remark" if "User Remark" in df.columns else None
-    
+
         if feedback_col or remark_col:
             statuses = []
             for _, row in df.iterrows():
@@ -2683,17 +2592,7 @@ with tabs[3]:
                 df["Status"] = "Pending"
             else:
                 df["Status"] = df["Status"].fillna("Pending").astype(str)
-    
-        # --------------------------------------------------------
-        # 6. Officer-level mapping (e.g. ADSTE for S&T, ADEN → Sr.DEN for
-        # Engineering). Departments without a config entry in
-        # ASSISTANT_OFFICER_LEVEL simply get no extra columns here, and
-        # Section III is skipped for them further down.
-        #
-        # Levels are processed in the order defined for the department, so
-        # a derived level (e.g. SR_DEN) can safely roll up from an earlier
-        # base level (e.g. ADEN) computed in the same pass.
-        # --------------------------------------------------------
+
         target_norm = _normalize_dept(department)
         _cfg = ASSISTANT_OFFICER_LEVEL.get(target_norm)
         if _cfg:
@@ -2710,17 +2609,226 @@ with tabs[3]:
         else:
             debug["officer_level"] = "not defined for this department — Section III skipped"
 
-        # Year-Month period (avoids merging same month across different years)
         df["Month"] = df["Date of Inspection"].dt.to_period("M")
         df["Month Name"] = df["Date of Inspection"].dt.strftime("%B-%Y")
 
         df.attrs["debug"] = debug
         return df
+
+    # ============================================================
+    # PDF EXPORT FUNCTION (official template style)
+    # ============================================================
+    from io import BytesIO
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.units import mm
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+
+    def generate_analysis_pdf(df, department, date_from, date_to, total, resolved, pending, no_response, resolution_rate):
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=landscape(A4),
+            leftMargin=12*mm, rightMargin=12*mm,
+            topMargin=10*mm, bottomMargin=12*mm
+        )
+
+        styles = getSampleStyleSheet()
+        section_header = ParagraphStyle(
+            "SecH", parent=styles["Normal"],
+            fontSize=11, textColor=colors.white, fontName="Helvetica-Bold",
+            backColor=colors.HexColor("#123A7A"),
+            borderPadding=6, spaceBefore=8, spaceAfter=4
+        )
+        normal = styles["Normal"]
+        normal.fontSize = 8
+
+        story = []
+
+        # Header matching your image
+        header_data = [[
+            Paragraph("<b>INDIAN RAILWAYS</b><br/>SOLAPUR DIVISION<br/>CENTRAL RAILWAY",
+                      ParagraphStyle("L", fontSize=9, textColor=colors.HexColor("#0C2F67"), alignment=TA_LEFT, leading=11)),
+            Paragraph(f"<b>SAFETY DEFICIENCIES ANALYSIS OF<br/>{department} DEPARTMENT</b><br/>FOR THE PERIOD OF<br/>{date_from.strftime('%d %b %Y')} – {date_to.strftime('%d %b %Y')}",
+                      ParagraphStyle("C", fontSize=12, textColor=colors.HexColor("#0C2F67"), alignment=TA_CENTER, leading=14, fontName="Helvetica-Bold")),
+            Paragraph("<b>Source: SARAL</b>",
+                      ParagraphStyle("R", fontSize=9, textColor=colors.HexColor("#0C2F67"), alignment=TA_RIGHT))
+        ]]
+        header_table = Table(header_data, colWidths=[55*mm, 140*mm, 55*mm])
+        header_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F0F5FF")),
+            ("BOX", (0, 0), (-1, -1), 1, colors.HexColor("#0C2F67")),
+            ("TOPPADDING", (0, 0), (-1, -1), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ]))
+        story.append(header_table)
+        story.append(Spacer(1, 6*mm))
+
+        # KPI cards
+        kpi_style = ParagraphStyle("KPI", fontSize=9, alignment=TA_CENTER, textColor=colors.HexColor("#333"))
+        kpi_val = ParagraphStyle("KPIV", fontSize=16, alignment=TA_CENTER, fontName="Helvetica-Bold")
+
+        def kpi_box(title, value, color_hex, sub=""):
+            return [
+                Paragraph(f"<font color='{color_hex}'><b>{title}</b></font>", kpi_style),
+                Paragraph(f"<font color='{color_hex}'>{value}</font>", kpi_val),
+                Paragraph(sub, ParagraphStyle("S", fontSize=7, alignment=TA_CENTER, textColor=colors.grey))
+            ]
+
+        kpi_row = [[
+            kpi_box("TOTAL RECORDS", f"{total}", "#1D4FA3", "100% of Total"),
+            kpi_box("RESOLVED", f"{resolved}", "#159447", f"{resolution_rate:.2f}%"),
+            kpi_box("NO RESPONSE", f"{no_response}", "#D91F2D", f"{(no_response/total*100) if total else 0:.2f}%"),
+            kpi_box("PENDING", f"{pending}", "#E58A00", f"{(pending/total*100) if total else 0:.2f}%"),
+            kpi_box("OVERALL RESOLUTION RATE", f"{resolution_rate:.2f}%", "#7B2D8E", "(Resolved / Total)"),
+        ]]
+        kpi_table = Table(kpi_row, colWidths=[48*mm]*5)
+        kpi_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (0, 0), colors.HexColor("#E8F0FE")),
+            ("BACKGROUND", (1, 0), (1, 0), colors.HexColor("#E6F7ED")),
+            ("BACKGROUND", (2, 0), (2, 0), colors.HexColor("#FDE8E8")),
+            ("BACKGROUND", (3, 0), (3, 0), colors.HexColor("#FFF4E0")),
+            ("BACKGROUND", (4, 0), (4, 0), colors.HexColor("#F3E8FF")),
+            ("BOX", (0, 0), (-1, -1), 0.7, colors.HexColor("#CCCCCC")),
+            ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#DDDDDD")),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        story.append(kpi_table)
+        story.append(Spacer(1, 8*mm))
+
+        # Section II – Sub Head (NO Share)
+        story.append(Paragraph(f"<b>II — CLASSIFICATION SUB HEAD DISTRIBUTION ({department})</b>", section_header))
+        story.append(Spacer(1, 3*mm))
+
+        month_order = sorted(df["Month"].unique())
+        month_names = {m: m.strftime("%B-%Y") for m in month_order}
+        sub = (
+            df.groupby(["Sub Head", "Month"])
+            .size()
+            .unstack(fill_value=0)
+        )
+        for m in month_order:
+            if m not in sub.columns:
+                sub[m] = 0
+        sub["Total"] = sub[month_order].sum(axis=1)
+        sub = sub.sort_values("Total", ascending=False)
+
+        header_row = ["Sub Head"] + [month_names[m] for m in month_order] + ["Total"]
+        table_data = [header_row]
+        for idx, row in sub.iterrows():
+            table_data.append(
+                [str(idx)] + [str(int(row[m])) for m in month_order] + [str(int(row["Total"]))]
+            )
+
+        col_w = [55*mm] + [28*mm]*len(month_order) + [22*mm]
+        t = Table(table_data, colWidths=col_w, repeatRows=1)
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#123A7A")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 7),
+            ("ALIGN", (1, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F7F9FC")]),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ]))
+        story.append(t)
+        story.append(Spacer(1, 6*mm))
+
+        # Section III – Officer levels (NO Share)
+        _dept_cfg = ASSISTANT_OFFICER_LEVEL.get(_normalize_dept(department))
+        if _dept_cfg:
+            _levels = _dept_cfg["levels"]
+            _section_letters = ["A", "B", "C", "D", "E"]
+            for _idx, _level in enumerate(_levels):
+                key = _level["key"]
+                label = _level["label"]
+                order = _level["order"]
+                suffix = f"III-{_section_letters[_idx]}" if len(_levels) > 1 else "III"
+
+                story.append(Paragraph(
+                    f"<b>{suffix} — CLASSIFICATION {label} WISE ({department})</b>", section_header
+                ))
+                story.append(Spacer(1, 3*mm))
+
+                level_df = df.dropna(subset=[key]) if key in df.columns else pd.DataFrame()
+                if level_df.empty:
+                    story.append(Paragraph(f"No locations matched the current {label} mapping.", normal))
+                else:
+                    grouped = (
+                        level_df.groupby([key, "Month"])
+                        .size()
+                        .unstack(fill_value=0)
+                        .reindex(order)
+                    )
+                    for m in month_order:
+                        if m not in grouped.columns:
+                            grouped[m] = 0
+                    grouped["Total"] = grouped[month_order].sum(axis=1)
+
+                    header_row = [label] + [month_names[m] for m in month_order] + ["Total"]
+                    table_data = [header_row]
+                    for name in order:
+                        if name in grouped.index:
+                            r = grouped.loc[name]
+                            table_data.append(
+                                [name] + [str(int(r[m])) for m in month_order] + [str(int(r["Total"]))]
+                            )
+                        else:
+                            table_data.append([name] + ["0"]*len(month_order) + ["0"])
+
+                    col_w = [70*mm] + [28*mm]*len(month_order) + [22*mm]
+                    t = Table(table_data, colWidths=col_w, repeatRows=1)
+                    t.setStyle(TableStyle([
+                        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#123A7A")),
+                        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                        ("FONTSIZE", (0, 0), (-1, -1), 7),
+                        ("ALIGN", (1, 0), (-1, -1), "CENTER"),
+                        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                        ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
+                        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F7F9FC")]),
+                        ("TOPPADDING", (0, 0), (-1, -1), 3),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                    ]))
+                    story.append(t)
+                story.append(Spacer(1, 5*mm))
+
+        # Footer matching image
+        story.append(Spacer(1, 4*mm))
+        footer_text = (
+            f"<b>Source:</b> SARAL System &nbsp;|&nbsp; "
+            f"<b>Reporting Department:</b> Safety Department, SUR DIVN, CR &nbsp;|&nbsp; "
+            f"<b>Analysis Type:</b> Deficiency Analysis &nbsp;|&nbsp; "
+            f"<b>Period:</b> {date_from.strftime('%d %b %Y')} to {date_to.strftime('%d %b %Y')} &nbsp;|&nbsp; "
+            f"<b>Department:</b> {department} &nbsp;|&nbsp; "
+            f"<b>Data as on:</b> {date.today().strftime('%d %b %Y')}"
+        )
+        footer = Table([[Paragraph(footer_text, ParagraphStyle("F", fontSize=8, textColor=colors.white, alignment=TA_CENTER))]],
+                       colWidths=[250*mm])
+        footer.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#0C2F67")),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        story.append(footer)
+
+        doc.build(story)
+        buffer.seek(0)
+        return buffer
+
     # ============================================================
     # DASHBOARD CONTENT
     # ============================================================
-    # Filters are rendered first so the header below can reflect the
-    # department the user actually picked.
     st.subheader("Filters")
     col1, col2, col3 = st.columns([1, 1, 1.2])
 
@@ -2742,9 +2850,6 @@ with tabs[3]:
     </div>
     """, unsafe_allow_html=True)
 
-    # Prefer the DataFrame already loaded by the main app (same Google Sheet,
-    # same service-account path). This avoids a second, historically buggy
-    # loader that preferred the public CSV export and mapped "Action By" → "Head".
     raw_df = None
     if st.session_state.get("df") is not None and not st.session_state.df.empty:
         raw_df = st.session_state.df.copy()
@@ -2832,120 +2937,32 @@ with tabs[3]:
     st.markdown("---")
 
     # ============================================================
-# EXPORT ANALYSIS (PDF matching the official template)
-# ============================================================
-from io import BytesIO
-from reportlab.lib.pagesizes import A4, landscape
-from reportlab.lib.units import mm, inch
-from reportlab.lib import colors
-from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-    KeepTogether, HRFlowable
-)
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
-from reportlab.pdfgen import canvas
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-
-def generate_analysis_pdf(df, department, date_from, date_to, total, resolved, pending, no_response, resolution_rate):
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=landscape(A4),
-        leftMargin=12*mm, rightMargin=12*mm,
-        topMargin=10*mm, bottomMargin=12*mm
+    # EXPORT BUTTON
+    # ============================================================
+    st.markdown("### Export Analysis")
+    pdf_buffer = generate_analysis_pdf(
+        df, department, date_from, date_to,
+        total, resolved, pending, no_response, resolution_rate
+    )
+    st.download_button(
+        label="📥 Download Full Analysis PDF (Official Template)",
+        data=pdf_buffer,
+        file_name=f"Safety_Deficiencies_{department.replace(' ', '_')}_{date_from}_{date_to}.pdf",
+        mime="application/pdf",
+        use_container_width=True
     )
 
-    styles = getSampleStyleSheet()
-    # Custom styles matching the attached image
-    title_style = ParagraphStyle(
-        "TitleIR", parent=styles["Title"],
-        fontSize=16, textColor=colors.HexColor("#0C2F67"),
-        alignment=TA_CENTER, spaceAfter=2, fontName="Helvetica-Bold"
+    st.markdown("---")
+
+    # ============================================================
+    # SECTION II — SUB HEAD DISTRIBUTION  (NO Share)
+    # ============================================================
+    st.markdown(
+        f'<div class="section-header">II — CLASSIFICATION SUB HEAD DISTRIBUTION ({department})</div>',
+        unsafe_allow_html=True
     )
-    subtitle_style = ParagraphStyle(
-        "SubIR", parent=styles["Normal"],
-        fontSize=13, textColor=colors.HexColor("#0C2F67"),
-        alignment=TA_CENTER, spaceAfter=2, fontName="Helvetica-Bold"
-    )
-    small_center = ParagraphStyle(
-        "SmallC", parent=styles["Normal"],
-        fontSize=9, alignment=TA_CENTER, textColor=colors.HexColor("#333333")
-    )
-    section_header = ParagraphStyle(
-        "SecH", parent=styles["Normal"],
-        fontSize=11, textColor=colors.white, fontName="Helvetica-Bold",
-        backColor=colors.HexColor("#123A7A"),
-        borderPadding=6, spaceBefore=8, spaceAfter=4
-    )
-    normal = styles["Normal"]
-    normal.fontSize = 8
-
-    story = []
-
-    # ---------- HEADER (matches the attached image) ----------
-    header_data = [[
-        Paragraph("<b>INDIAN RAILWAYS</b><br/>SOLAPUR DIVISION<br/>CENTRAL RAILWAY",
-                  ParagraphStyle("L", fontSize=9, textColor=colors.HexColor("#0C2F67"), alignment=TA_LEFT, leading=11)),
-        Paragraph(f"<b>SAFETY DEFICIENCIES ANALYSIS OF<br/>{department} DEPARTMENT</b><br/>FOR THE PERIOD OF<br/>{date_from.strftime('%d %b %Y')} – {date_to.strftime('%d %b %Y')}",
-                  ParagraphStyle("C", fontSize=12, textColor=colors.HexColor("#0C2F67"), alignment=TA_CENTER, leading=14, fontName="Helvetica-Bold")),
-        Paragraph("<b>Source: SARAL</b>",
-                  ParagraphStyle("R", fontSize=9, textColor=colors.HexColor("#0C2F67"), alignment=TA_RIGHT))
-    ]]
-    header_table = Table(header_data, colWidths=[55*mm, 140*mm, 55*mm])
-    header_table.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F0F5FF")),
-        ("BOX", (0, 0), (-1, -1), 1, colors.HexColor("#0C2F67")),
-        ("TOPPADDING", (0, 0), (-1, -1), 8),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
-    ]))
-    story.append(header_table)
-    story.append(Spacer(1, 6*mm))
-
-    # ---------- KPI CARDS (exactly like the image) ----------
-    kpi_style = ParagraphStyle("KPI", fontSize=9, alignment=TA_CENTER, textColor=colors.HexColor("#333"))
-    kpi_val = ParagraphStyle("KPIV", fontSize=16, alignment=TA_CENTER, fontName="Helvetica-Bold")
-
-    def kpi_box(title, value, color_hex, sub=""):
-        return [
-            Paragraph(f"<font color='{color_hex}'><b>{title}</b></font>", kpi_style),
-            Paragraph(f"<font color='{color_hex}'>{value}</font>", kpi_val),
-            Paragraph(sub, ParagraphStyle("S", fontSize=7, alignment=TA_CENTER, textColor=colors.grey))
-        ]
-
-    kpi_row = [[
-        kpi_box("TOTAL RECORDS", f"{total}", "#1D4FA3", "100% of Total"),
-        kpi_box("RESOLVED", f"{resolved}", "#159447", f"{resolution_rate:.2f}%"),
-        kpi_box("NO RESPONSE", f"{no_response}", "#D91F2D", f"{(no_response/total*100) if total else 0:.2f}%"),
-        kpi_box("PENDING", f"{pending}", "#E58A00", f"{(pending/total*100) if total else 0:.2f}%"),
-        kpi_box("OVERALL RESOLUTION RATE", f"{resolution_rate:.2f}%", "#7B2D8E", "(Resolved / Total)"),
-    ]]
-    kpi_table = Table(kpi_row, colWidths=[48*mm]*5)
-    kpi_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (0, 0), colors.HexColor("#E8F0FE")),
-        ("BACKGROUND", (1, 0), (1, 0), colors.HexColor("#E6F7ED")),
-        ("BACKGROUND", (2, 0), (2, 0), colors.HexColor("#FDE8E8")),
-        ("BACKGROUND", (3, 0), (3, 0), colors.HexColor("#FFF4E0")),
-        ("BACKGROUND", (4, 0), (4, 0), colors.HexColor("#F3E8FF")),
-        ("BOX", (0, 0), (-1, -1), 0.7, colors.HexColor("#CCCCCC")),
-        ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#DDDDDD")),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("TOPPADDING", (0, 0), (-1, -1), 6),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-        ("LEFTPADDING", (0, 0), (-1, -1), 4),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-    ]))
-    story.append(kpi_table)
-    story.append(Spacer(1, 8*mm))
-
-    # ---------- SECTION II – Sub Head (no Share) ----------
-    story.append(Paragraph(f"<b>II — CLASSIFICATION SUB HEAD DISTRIBUTION ({department})</b>", section_header))
-    story.append(Spacer(1, 3*mm))
 
     month_order = sorted(df["Month"].unique())
-    month_names = {m: m.strftime("%B-%Y") for m in month_order}
     sub = (
         df.groupby(["Sub Head", "Month"])
         .size()
@@ -2957,50 +2974,72 @@ def generate_analysis_pdf(df, department, date_from, date_to, total, resolved, p
     sub["Total"] = sub[month_order].sum(axis=1)
     sub = sub.sort_values("Total", ascending=False)
 
-    # Build table data (no Share)
-    header_row = ["Sub Head"] + [month_names[m] for m in month_order] + ["Total"]
-    table_data = [header_row]
-    for idx, row in sub.iterrows():
-        table_data.append(
-            [str(idx)] + [str(int(row[m])) for m in month_order] + [str(int(row["Total"]))]
+    display_sub = sub.copy()
+    month_names = {m: m.strftime("%B-%Y") for m in month_order}
+    display_sub = display_sub.rename(columns=month_names)
+    display_sub = display_sub.reset_index()
+
+    col_table, col_chart = st.columns([1.1, 1])
+
+    with col_table:
+        st.dataframe(
+            display_sub,
+            use_container_width=True,
+            height=420,
+            hide_index=True
         )
 
-    col_w = [55*mm] + [28*mm]*len(month_order) + [22*mm]
-    t = Table(table_data, colWidths=col_w, repeatRows=1)
-    t.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#123A7A")),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 7),
-        ("ALIGN", (1, 0), (-1, -1), "CENTER"),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F7F9FC")]),
-        ("TOPPADDING", (0, 0), (-1, -1), 3),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-    ]))
-    story.append(t)
-    story.append(Spacer(1, 6*mm))
+    with col_chart:
+        top_n = min(10, len(sub))
+        plot_df = sub.head(top_n).reset_index()
+        fig_bar = px.bar(
+            plot_df,
+            x="Total",
+            y="Sub Head",
+            orientation="h",
+            text="Total",
+            color_discrete_sequence=["#123A7A"],
+            title=f"Sub Head Wise Distribution — {department} (Top 10)"
+        )
+        fig_bar.update_layout(
+            yaxis={"categoryorder": "total ascending"},
+            height=420,
+            margin=dict(l=10, r=10, t=40, b=10),
+            showlegend=False
+        )
+        fig_bar.update_traces(textposition="outside")
+        st.plotly_chart(fig_bar, use_container_width=True)
 
-    # ---------- SECTION III – Officer levels (no Share) ----------
+    st.markdown("---")
+
+    # ============================================================
+    # SECTION III — OFFICER LEVEL WISE  (NO Share)
+    # ============================================================
     _dept_cfg = ASSISTANT_OFFICER_LEVEL.get(_normalize_dept(department))
-    if _dept_cfg:
+
+    if _dept_cfg is None:
+        st.info(
+            f"ℹ️ Officer-level (e.g. ADSTE / ADEN) classification is not yet defined for "
+            f"**{department}**. This section will appear once that grouping is provided."
+        )
+    else:
         _levels = _dept_cfg["levels"]
         _section_letters = ["A", "B", "C", "D", "E"]
+
         for _idx, _level in enumerate(_levels):
             key = _level["key"]
             label = _level["label"]
             order = _level["order"]
             suffix = f"III-{_section_letters[_idx]}" if len(_levels) > 1 else "III"
 
-            story.append(Paragraph(
-                f"<b>{suffix} — CLASSIFICATION {label} WISE ({department})</b>", section_header
-            ))
-            story.append(Spacer(1, 3*mm))
+            st.markdown(
+                f'<div class="section-header">{suffix} — CLASSIFICATION {label} WISE ({department})</div>',
+                unsafe_allow_html=True
+            )
 
             level_df = df.dropna(subset=[key]) if key in df.columns else pd.DataFrame()
             if level_df.empty:
-                story.append(Paragraph(f"No locations matched the current {label} mapping.", normal))
+                st.info(f"No locations matched the current {label} mapping for the selected period.")
             else:
                 grouped = (
                     level_df.groupby([key, "Month"])
@@ -3012,242 +3051,74 @@ def generate_analysis_pdf(df, department, date_from, date_to, total, resolved, p
                     if m not in grouped.columns:
                         grouped[m] = 0
                 grouped["Total"] = grouped[month_order].sum(axis=1)
+                grouped_display = grouped.copy()
+                grouped_display = grouped_display.rename(columns=month_names)
+                grouped_display = grouped_display.reset_index()
 
-                header_row = [label] + [month_names[m] for m in month_order] + ["Total"]
-                table_data = [header_row]
-                for name in order:
-                    if name in grouped.index:
-                        r = grouped.loc[name]
-                        table_data.append(
-                            [name] + [str(int(r[m])) for m in month_order] + [str(int(r["Total"]))]
-                        )
-                    else:
-                        table_data.append([name] + ["0"]*len(month_order) + ["0"])
+                col_lvl_table, col_lvl_donut = st.columns([1.2, 1])
+                colors = _palette(len(order))
 
-                col_w = [70*mm] + [28*mm]*len(month_order) + [22*mm]
-                t = Table(table_data, colWidths=col_w, repeatRows=1)
-                t.setStyle(TableStyle([
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#123A7A")),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                    ("FONTSIZE", (0, 0), (-1, -1), 7),
-                    ("ALIGN", (1, 0), (-1, -1), "CENTER"),
-                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                    ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
-                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F7F9FC")]),
-                    ("TOPPADDING", (0, 0), (-1, -1), 3),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-                ]))
-                story.append(t)
-            story.append(Spacer(1, 5*mm))
-
-    # ---------- FOOTER (matches image) ----------
-    story.append(Spacer(1, 4*mm))
-    footer_text = (
-        f"<b>Source:</b> SARAL System &nbsp;|&nbsp; "
-        f"<b>Reporting Department:</b> Safety Department, SUR DIVN, CR &nbsp;|&nbsp; "
-        f"<b>Analysis Type:</b> Deficiency Analysis &nbsp;|&nbsp; "
-        f"<b>Period:</b> {date_from.strftime('%d %b %Y')} to {date_to.strftime('%d %b %Y')} &nbsp;|&nbsp; "
-        f"<b>Department:</b> {department} &nbsp;|&nbsp; "
-        f"<b>Data as on:</b> {date.today().strftime('%d %b %Y')}"
-    )
-    footer = Table([[Paragraph(footer_text, ParagraphStyle("F", fontSize=8, textColor=colors.white, alignment=TA_CENTER))]],
-                   colWidths=[250*mm])
-    footer.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#0C2F67")),
-        ("TOPPADDING", (0, 0), (-1, -1), 6),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-    ]))
-    story.append(footer)
-
-    doc.build(story)
-    buffer.seek(0)
-    return buffer
-
-# --- Button in the UI ---
-st.markdown("### Export Analysis")
-pdf_buffer = generate_analysis_pdf(
-    df, department, date_from, date_to,
-    total, resolved, pending, no_response, resolution_rate
-)
-st.download_button(
-    label="📥 Download Full Analysis PDF (Official Template)",
-    data=pdf_buffer,
-    file_name=f"Safety_Deficiencies_{department.replace(' ', '_')}_{date_from}_{date_to}.pdf",
-    mime="application/pdf",
-    use_container_width=True
-)
-# ============================================================
-# SECTION II — SUB HEAD DISTRIBUTION
-# ============================================================
-st.markdown(
-    f'<div class="section-header">II — CLASSIFICATION SUB HEAD DISTRIBUTION ({department})</div>',
-    unsafe_allow_html=True
-)
-
-month_order = sorted(df["Month"].unique())
-sub = (
-    df.groupby(["Sub Head", "Month"])
-    .size()
-    .unstack(fill_value=0)
-)
-for m in month_order:
-    if m not in sub.columns:
-        sub[m] = 0
-sub["Total"] = sub[month_order].sum(axis=1)
-sub = sub.sort_values("Total", ascending=False)
-
-display_sub = sub.copy()
-# Month is now a Year-Month Period (see preprocess_data), so it already
-# knows its own year - no more hardcoded "2026" mislabeling data from
-# any other year.
-month_names = {m: m.strftime("%B-%Y") for m in month_order}
-display_sub = display_sub.rename(columns=month_names)
-display_sub = display_sub.reset_index()
-
-col_table, col_chart = st.columns([1.1, 1])
-
-with col_table:
-    st.dataframe(
-        display_sub,
-        use_container_width=True,
-        height=420,
-        hide_index=True
-    )
-
-with col_chart:
-    top_n = min(10, len(sub))
-    plot_df = sub.head(top_n).reset_index()
-    fig_bar = px.bar(
-        plot_df,
-        x="Total",
-        y="Sub Head",
-        orientation="h",
-        text="Total",
-        color_discrete_sequence=["#123A7A"],
-        title=f"Sub Head Wise Distribution — {department} (Top 10)"
-    )
-    fig_bar.update_layout(
-        yaxis={"categoryorder": "total ascending"},
-        height=420,
-        margin=dict(l=10, r=10, t=40, b=10),
-        showlegend=False
-    )
-    fig_bar.update_traces(textposition="outside")
-    st.plotly_chart(fig_bar, use_container_width=True)
-
-st.markdown("---")
-
-# ============================================================
-# SECTION III — OFFICER LEVEL WISE
-# (ADSTE for S&T; ADEN then Sr.DEN roll-up for Engineering; skipped
-# entirely for departments with no grouping defined yet, e.g.
-# Mechanical, Commercial.)
-# ============================================================
-_dept_cfg = ASSISTANT_OFFICER_LEVEL.get(_normalize_dept(department))
-
-if _dept_cfg is None:
-    st.info(
-        f"ℹ️ Officer-level (e.g. ADSTE / ADEN) classification is not yet defined for "
-        f"**{department}**. This section will appear once that grouping is provided."
-    )
-else:
-    _levels = _dept_cfg["levels"]
-    _section_letters = ["A", "B", "C", "D", "E"]
-
-    for _idx, _level in enumerate(_levels):
-        key = _level["key"]
-        label = _level["label"]
-        order = _level["order"]
-        suffix = f"III-{_section_letters[_idx]}" if len(_levels) > 1 else "III"
-
-        st.markdown(
-            f'<div class="section-header">{suffix} — CLASSIFICATION {label} WISE ({department})</div>',
-            unsafe_allow_html=True
-        )
-
-        level_df = df.dropna(subset=[key]) if key in df.columns else pd.DataFrame()
-        if level_df.empty:
-            st.info(f"No locations matched the current {label} mapping for the selected period.")
-        else:
-            grouped = (
-                level_df.groupby([key, "Month"])
-                .size()
-                .unstack(fill_value=0)
-                .reindex(order)
-            )
-            for m in month_order:
-                if m not in grouped.columns:
-                    grouped[m] = 0
-            grouped["Total"] = grouped[month_order].sum(axis=1)
-            grouped_display = grouped.copy()
-            grouped_display = grouped_display.rename(columns=month_names)
-            grouped_display = grouped_display.reset_index()
-
-            col_lvl_table, col_lvl_donut = st.columns([1.2, 1])
-            colors = _palette(len(order))
-
-            with col_lvl_table:
-                st.dataframe(
-                    grouped_display,
-                    use_container_width=True,
-                    height=320,
-                    hide_index=True
-                )
-
-            with col_lvl_donut:
-                donut_values = grouped["Total"].fillna(0).values
-                donut_labels = order
-
-                fig_donut = go.Figure(data=[go.Pie(
-                    labels=donut_labels,
-                    values=donut_values,
-                    hole=0.55,
-                    marker=dict(colors=colors, line=dict(color="white", width=2)),
-                    textinfo="none",
-                    hovertemplate="%{label}<br>%{value} (%{percent})<extra></extra>"
-                )])
-                fig_donut.update_layout(
-                    title=f"{label} Wise Distribution — {department}",
-                    height=320,
-                    margin=dict(l=20, r=20, t=40, b=20),
-                    annotations=[dict(
-                        text=f"TOTAL<br><b>{int(total)}</b>",
-                        x=0.5, y=0.5,
-                        font_size=14,
-                        showarrow=False
-                    )],
-                    showlegend=True,
-                    legend=dict(orientation="v", yanchor="middle", y=0.5, x=1.05)
-                )
-                st.plotly_chart(fig_donut, use_container_width=True, key=f"donut_{key}")
-
-                st.markdown("**Legend**")
-                for i, name in enumerate(order):
-                    val = int(grouped.loc[name, "Total"]) if name in grouped.index else 0
-                    pct = (val / total * 100) if total else 0
-                    st.markdown(
-                        f"<span style='color:{colors[i]}; font-size:1.2rem;'>■</span> "
-                        f"**{name}** — {val} ({pct:.2f}%)",
-                        unsafe_allow_html=True
+                with col_lvl_table:
+                    st.dataframe(
+                        grouped_display,
+                        use_container_width=True,
+                        height=320,
+                        hide_index=True
                     )
 
-        if _idx < len(_levels) - 1:
-            st.markdown("")  # small spacer between sub-sections
+                with col_lvl_donut:
+                    donut_values = grouped["Total"].fillna(0).values
+                    donut_labels = order
 
-# ============================================================
-# FOOTER
-# ============================================================
-st.markdown("---")
-st.markdown(
-    f"""
-    <div style="background:#0C2F67; color:white; padding:0.7rem 1.2rem; border-radius:8px; font-size:0.85rem;">
-        <b>Source:</b> SARAL System &nbsp;|&nbsp;
-        <b>Reporting Department:</b> Safety Department, SUR DIVN, CR &nbsp;|&nbsp;
-        <b>Analysis Type:</b> Deficiency Analysis &nbsp;|&nbsp;
-        <b>Period:</b> {date_from.strftime('%d %b %Y')} to {date_to.strftime('%d %b %Y')} &nbsp;|&nbsp;
-        <b>Department:</b> {department}
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+                    fig_donut = go.Figure(data=[go.Pie(
+                        labels=donut_labels,
+                        values=donut_values,
+                        hole=0.55,
+                        marker=dict(colors=colors, line=dict(color="white", width=2)),
+                        textinfo="none",
+                        hovertemplate="%{label}<br>%{value} (%{percent})<extra></extra>"
+                    )])
+                    fig_donut.update_layout(
+                        title=f"{label} Wise Distribution — {department}",
+                        height=320,
+                        margin=dict(l=20, r=20, t=40, b=20),
+                        annotations=[dict(
+                            text=f"TOTAL<br><b>{int(total)}</b>",
+                            x=0.5, y=0.5,
+                            font_size=14,
+                            showarrow=False
+                        )],
+                        showlegend=True,
+                        legend=dict(orientation="v", yanchor="middle", y=0.5, x=1.05)
+                    )
+                    st.plotly_chart(fig_donut, use_container_width=True, key=f"donut_{key}")
+
+                    st.markdown("**Legend**")
+                    for i, name in enumerate(order):
+                        val = int(grouped.loc[name, "Total"]) if name in grouped.index else 0
+                        pct = (val / total * 100) if total else 0
+                        st.markdown(
+                            f"<span style='color:{colors[i]}; font-size:1.2rem;'>■</span> "
+                            f"**{name}** — {val} ({pct:.2f}%)",
+                            unsafe_allow_html=True
+                        )
+
+            if _idx < len(_levels) - 1:
+                st.markdown("")
+
+    # ============================================================
+    # FOOTER
+    # ============================================================
+    st.markdown("---")
+    st.markdown(
+        f"""
+        <div style="background:#0C2F67; color:white; padding:0.7rem 1.2rem; border-radius:8px; font-size:0.85rem;">
+            <b>Source:</b> SARAL System &nbsp;|&nbsp;
+            <b>Reporting Department:</b> Safety Department, SUR DIVN, CR &nbsp;|&nbsp;
+            <b>Analysis Type:</b> Deficiency Analysis &nbsp;|&nbsp;
+            <b>Period:</b> {date_from.strftime('%d %b %Y')} to {date_to.strftime('%d %b %Y')} &nbsp;|&nbsp;
+            <b>Department:</b> {department}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
