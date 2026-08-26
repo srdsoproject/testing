@@ -3281,7 +3281,7 @@ with tabs[3]:
         # ---------- 3. SUB-HEAD TABLE ----------
         ax_sub = fig.add_subplot(gs[2])
         ax_sub.axis("off")
-        ax_sub.set_title(f"II — CLASSIFICATION SUB HEAD DISTRIBUTION ({department})",
+        ax_sub.set_title(f"I — CLASSIFICATION SUB HEAD DISTRIBUTION ({department})",
                          loc="left", fontsize=12, fontweight="bold",
                          color="#123A7A", pad=6)
 
@@ -3317,7 +3317,7 @@ with tabs[3]:
         for i, (label, grouped, order) in enumerate(officer_tables):
             ax_t = fig.add_subplot(gs[3 + i*2])
             ax_t.axis("off")
-            ax_t.set_title(f"III — CLASSIFICATION {label} WISE ({department})",
+            ax_t.set_title(f"II — CLASSIFICATION {label} WISE ({department})",
                            loc="left", fontsize=12, fontweight="bold",
                            color="#123A7A", pad=5)
 
@@ -3532,7 +3532,7 @@ with tabs[3]:
     # SECTION II — SUB HEAD DISTRIBUTION (NO Share)
     # ============================================================
     st.markdown(
-        f'<div class="section-header">II — CLASSIFICATION SUB HEAD DISTRIBUTION ({department})</div>',
+        f'<div class="section-header">I — CLASSIFICATION SUB HEAD DISTRIBUTION ({department})</div>',
         unsafe_allow_html=True
     )
 
@@ -3587,7 +3587,7 @@ with tabs[3]:
     st.markdown("---")
 
     # ============================================================
-    # SECTION III — OFFICER LEVEL WISE (NO Share)
+    # SECTION II — OFFICER LEVEL WISE (NO Share)
     # ============================================================
     _dept_cfg = ASSISTANT_OFFICER_LEVEL.get(_normalize_dept(department))
 
