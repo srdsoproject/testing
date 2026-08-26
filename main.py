@@ -2552,8 +2552,6 @@ with tabs[3]:
         "TLT-BOT", "TLT-DUD", "TLT-HG", "TLT-NGS", "TLT-TKWD"
     }
 
-    # FIX: added missing comma after "WDS" — previously "WDS" and "MLM" were
-    # silently concatenated by Python into a single bogus key "WDSMLM".
     SR_ADEN_KWV_BG = {
         "BGVN", "BLNI", "BRB", "DHS", "JEUR", "JNTR", "KEM", "KWV", "MA", "WKA", "WDS",
         "MLM", "PPJ", "PRWD", "WSB", "KEU", 
@@ -2616,9 +2614,6 @@ with tabs[3]:
         "SEI-YSI", "YSI-BTW", "YSI-DKY", "YSI-HGL", "YSI-LUR", "YSI-OSA", "YSI-PJR", "YSI-SEI"
     }
 
-    # ------------------------------------------------------------
-    # Group dict — same group names/order as before, richer location sets
-    # ------------------------------------------------------------
     ADEN_GROUPS = {
         "ADEN/KLBG": ADEN_KLBG,
         "ADEN/LUR": ADEN_LUR,
@@ -2647,9 +2642,7 @@ with tabs[3]:
         return aden_map
 
     # ------------------------------------------------------------
-    # Action-By → officer mapping (Engineering only)
-    # Primary source of truth when the cell contains a recognisable
-    # designation; location map is only a fallback.
+    # Action-By → officer mapping (Engineering only) — STRICT
     # ------------------------------------------------------------
     def _norm_action_by(val: str) -> str:
         if not isinstance(val, str):
@@ -2659,9 +2652,7 @@ with tabs[3]:
         s = s.replace("SR.", "SR.").replace("SR ", "SR.")
         return s
 
-    # Direct matches for the ADEN level
     ACTION_BY_TO_ADEN = {
-        # exact / common variants
         "ADEN/KLBG": "ADEN/KLBG",
         "ADEN KLBG": "ADEN/KLBG",
         "ADEN/KALABURAGI": "ADEN/KLBG",
@@ -2683,17 +2674,24 @@ with tabs[3]:
         "SR.ADEN/SUR": "Sr.ADEN/N/SUR",
     }
 
-    # Direct matches for the Sr.DEN level
+    # STRICT — only clear matches. No loose fallbacks.
     ACTION_BY_TO_SRDEN = {
-        "SR.DEN/S": "Sr.DEN/S",
-        "SR.DEN S": "Sr.DEN/S",
-        "SR DEN/S": "Sr.DEN/S",
         "SR.DEN/C": "Sr.DEN/C",
         "SR.DEN C": "Sr.DEN/C",
         "SR DEN/C": "Sr.DEN/C",
+        "SR.DEN/C.": "Sr.DEN/C",
+        "SR.DENC": "Sr.DEN/C",
+
+        "SR.DEN/S": "Sr.DEN/S",
+        "SR.DEN S": "Sr.DEN/S",
+        "SR DEN/S": "Sr.DEN/S",
+        "SR.DEN/S.": "Sr.DEN/S",
+        "SR.DENS": "Sr.DEN/S",
+
         "DEN/TRACK": "DEN/TRACK",
         "DEN TRACK": "DEN/TRACK",
         "DEN/TRK": "DEN/TRACK",
+        "DEN/TRACK.": "DEN/TRACK",
     }
 
     # ============================================================
@@ -2821,18 +2819,19 @@ with tabs[3]:
         },
         "ENGINEERING": {
             "levels": [
-                {
-                    "key": "ADEN",
-                    "label": "ADEN",
-                    "order": ADEN_ORDER,
-                    "location_map": build_aden_map(),
-                },
+                # SR_DEN first so it is locked before ADEN is assigned
                 {
                     "key": "SR_DEN",
                     "label": "Sr.DEN",
                     "order": SRDEN_ORDER,
                     "parent_key": "ADEN",
                     "parent_map": ADEN_TO_SRDEN,
+                },
+                {
+                    "key": "ADEN",
+                    "label": "ADEN",
+                    "order": ADEN_ORDER,
+                    "location_map": build_aden_map(),
                 },
             ]
         },
@@ -2929,18 +2928,6 @@ with tabs[3]:
         return aliases.get(s, s)
 
     def _coalesce_duplicate_columns(frame: pd.DataFrame, col_name: str) -> pd.DataFrame:
-        """
-        FIX: If renaming produced more than one column called `col_name`
-        (e.g. the sheet has both a 'Head' and a 'Department' column, and
-        both alias to 'Head'), the old code kept only the FIRST one and
-        silently dropped the rest. If the real value happened to live in
-        the dropped column while the first was blank, those rows would
-        fail the department filter and vanish from the total — this is
-        the most likely source of a total-record mismatch.
-
-        This version merges duplicate columns by taking the first
-        non-empty value per row, then collapses back to a single column.
-        """
         if frame.columns.tolist().count(col_name) <= 1:
             return frame
 
@@ -2949,7 +2936,6 @@ with tabs[3]:
         dupe_block = dupe_block.replace({"": pd.NA, "nan": pd.NA, "None": pd.NA, "NaT": pd.NA})
         merged = dupe_block.bfill(axis=1).iloc[:, 0]
 
-        # keep only the first occurrence of col_name, drop the rest
         keep_mask = ~(frame.columns.duplicated(keep="first") & (frame.columns == col_name))
         frame = frame.loc[:, keep_mask]
         frame[col_name] = merged.values
@@ -2980,15 +2966,10 @@ with tabs[3]:
             elif cl == "status":
                 col_map[c] = "Status"
 
-        # DIAGNOSTIC: record exactly which raw sheet column(s) fed each
-        # renamed field, so a mismatch can be traced immediately from the
-        # "Filter diagnostics" expander instead of guessing blind.
         debug["head_source_columns"] = [c for c, v in col_map.items() if v == "Head"]
         debug["action_by_source_columns"] = [c for c, v in col_map.items() if v == "Action By"]
 
         df = df.rename(columns=col_map)
-
-        # FIX: coalesce instead of blind-drop for both Head and Action By
         df = _coalesce_duplicate_columns(df, "Head")
         df = _coalesce_duplicate_columns(df, "Action By")
 
@@ -3082,56 +3063,35 @@ with tabs[3]:
                 key = level["key"]
 
                 # ============================================================
-                # ENGINEERING — TOP-DOWN APPROACH (correct counts)
-                # 1. First lock Sr.DEN / DEN/TRACK from Action By
-                # 2. Then assign ADEN / Sr.ADEN under that Sr.DEN bucket
+                # ENGINEERING — STRICT TOP-DOWN
+                # Sr.DEN is locked ONLY from Action By (no location fallback)
                 # ============================================================
                 if target_norm == "ENGINEERING":
 
                     if key == "SR_DEN":
-                        # PRIMARY: Action By → Sr.DEN/C | Sr.DEN/S | DEN/TRACK
-                        from_ab = action_by_norm.map(ACTION_BY_TO_SRDEN)
-
-                        # FALLBACK: derive from location → ADEN → parent map
-                        # (only used when Action By is blank / unrecognised)
-                        loc_to_aden = df["Location"].map(build_aden_map())
-                        from_parent = loc_to_aden.map(ADEN_TO_SRDEN)
-
-                        df[key] = from_ab.fillna(from_parent)
+                        # STRICT: only Action By decides the three buckets.
+                        # This eliminates the 603 vs 581 inflation.
+                        df[key] = action_by_norm.map(ACTION_BY_TO_SRDEN)
 
                     elif key == "ADEN":
-                        # Now that SR_DEN is already set, assign the assistant
-                        # jurisdiction consistently under the Sr.DEN bucket.
-
-                        # 1. Try Action By for ADEN / Sr.ADEN
+                        # Assistant level – Action By first, then location
                         from_ab = action_by_norm.map(ACTION_BY_TO_ADEN)
-
-                        # 2. Fall back to location map
                         from_loc = df["Location"].map(level["location_map"])
-
-                        # Combine
                         candidate = from_ab.fillna(from_loc)
 
-                        # 3. Enforce consistency with the already-assigned SR_DEN
-                        #    (so a row locked to Sr.DEN/C can never show ADEN/KLBG etc.)
+                        # Keep only those consistent with the already-locked SR_DEN
                         def _consistent_aden(row):
                             aden = row.get("ADEN_candidate")
                             srden = row.get("SR_DEN")
                             if pd.isna(aden) or pd.isna(srden):
                                 return aden
-                            # Allowed ADEN values under each Sr.DEN
                             allowed = {
                                 "Sr.DEN/S": {"ADEN/KLBG", "ADEN/S/SUR"},
                                 "Sr.DEN/C": {"Sr.ADEN/N/SUR", "Sr.ADEN/BG/KWV"},
                                 "DEN/TRACK": {"ADEN/LUR", "ADEN/PVR"},
                             }
-                            if aden in allowed.get(srden, set()):
-                                return aden
-                            # If the candidate ADEN does not belong to this Sr.DEN,
-                            # leave it as NaN so it does not pollute the ADEN table
-                            return pd.NA
+                            return aden if aden in allowed.get(srden, set()) else pd.NA
 
-                        # Temporary helper columns
                         df["ADEN_candidate"] = candidate
                         df[key] = df.apply(_consistent_aden, axis=1)
                         df.drop(columns=["ADEN_candidate"], inplace=True, errors="ignore")
@@ -3140,7 +3100,7 @@ with tabs[3]:
                         df[key] = None
 
                 # ============================================================
-                # ALL OTHER DEPARTMENTS (unchanged original logic)
+                # ALL OTHER DEPARTMENTS (unchanged)
                 # ============================================================
                 else:
                     if "location_map" in level:
@@ -3159,6 +3119,11 @@ with tabs[3]:
                             ACTION_BY_TO_ADEN if key == "ADEN" else ACTION_BY_TO_SRDEN
                         ).notna().sum()
                     )
+                    if key == "SR_DEN":
+                        mapped_mask = action_by_norm.map(ACTION_BY_TO_SRDEN).notna()
+                        debug["sr_den_action_by_values"] = sorted(
+                            set(action_by_norm[mapped_mask].unique())
+                        )[:40]
         else:
             debug["officer_level"] = "not defined for this department — Section III skipped"
 
@@ -3193,7 +3158,6 @@ with tabs[3]:
         month_order = sorted(df["Month"].unique())
         month_names = {m: m.strftime("%b-%Y") for m in month_order}
 
-        # Sub-Head table (NO Share)
         sub = (
             df.groupby(["Sub Head", "Month"])
             .size()
@@ -3208,7 +3172,6 @@ with tabs[3]:
         if isinstance(sub, pd.Series):
             sub = sub.to_frame().T
 
-        # Officer levels
         officer_tables = []
         _dept_cfg = ASSISTANT_OFFICER_LEVEL.get(_normalize_dept(department))
         if _dept_cfg:
@@ -3239,7 +3202,6 @@ with tabs[3]:
         n_officer = len(officer_tables)
         n_sub_rows = min(len(sub), 15) if not sub.empty else 1
 
-        # ========== LANDSCAPE figure ==========
         fig_w = 20
         fig_h = 9.5 + 3.2 * n_officer + 0.22 * n_sub_rows
         fig = plt.figure(figsize=(fig_w, fig_h), dpi=150, facecolor="white")
