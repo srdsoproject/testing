@@ -2646,6 +2646,56 @@ with tabs[3]:
                 aden_map[loc] = group
         return aden_map
 
+    # ------------------------------------------------------------
+    # Action-By → officer mapping (Engineering only)
+    # Primary source of truth when the cell contains a recognisable
+    # designation; location map is only a fallback.
+    # ------------------------------------------------------------
+    def _norm_action_by(val: str) -> str:
+        if not isinstance(val, str):
+            return ""
+        s = val.upper().strip()
+        s = re.sub(r"\s+", " ", s)
+        s = s.replace("SR.", "SR.").replace("SR ", "SR.")
+        return s
+
+    # Direct matches for the ADEN level
+    ACTION_BY_TO_ADEN = {
+        # exact / common variants
+        "ADEN/KLBG": "ADEN/KLBG",
+        "ADEN KLBG": "ADEN/KLBG",
+        "ADEN/KALABURAGI": "ADEN/KLBG",
+        "ADEN/LUR": "ADEN/LUR",
+        "ADEN LUR": "ADEN/LUR",
+        "ADEN/PVR": "ADEN/PVR",
+        "ADEN PVR": "ADEN/PVR",
+        "ADEN/S/SUR": "ADEN/S/SUR",
+        "ADEN/S SUR": "ADEN/S/SUR",
+        "ADEN S/SUR": "ADEN/S/SUR",
+        "ADEN/S.SUR": "ADEN/S/SUR",
+        "SR.ADEN/BG/KWV": "Sr.ADEN/BG/KWV",
+        "SR.ADEN BG/KWV": "Sr.ADEN/BG/KWV",
+        "SR.ADEN/BG KWV": "Sr.ADEN/BG/KWV",
+        "SR.ADEN/KWV": "Sr.ADEN/BG/KWV",
+        "SR.ADEN/N/SUR": "Sr.ADEN/N/SUR",
+        "SR.ADEN N/SUR": "Sr.ADEN/N/SUR",
+        "SR.ADEN/N SUR": "Sr.ADEN/N/SUR",
+        "SR.ADEN/SUR": "Sr.ADEN/N/SUR",
+    }
+
+    # Direct matches for the Sr.DEN level
+    ACTION_BY_TO_SRDEN = {
+        "SR.DEN/S": "Sr.DEN/S",
+        "SR.DEN S": "Sr.DEN/S",
+        "SR DEN/S": "Sr.DEN/S",
+        "SR.DEN/C": "Sr.DEN/C",
+        "SR.DEN C": "Sr.DEN/C",
+        "SR DEN/C": "Sr.DEN/C",
+        "DEN/TRACK": "DEN/TRACK",
+        "DEN TRACK": "DEN/TRACK",
+        "DEN/TRK": "DEN/TRACK",
+    }
+
     # ============================================================
     # SSE/TRD SUPERVISOR-LEVEL LOCATION MAPPING (Electrical/TRD)
     # ============================================================
@@ -3016,16 +3066,55 @@ with tabs[3]:
         target_norm = _normalize_dept(department)
         _cfg = ASSISTANT_OFFICER_LEVEL.get(target_norm)
         if _cfg:
+            # Pre-compute a normalised Action By series once
+            if "Action By" in df.columns:
+                action_by_norm = (
+                    df["Action By"]
+                    .fillna("")
+                    .astype(str)
+                    .str.replace("\xa0", " ", regex=False)
+                    .map(_norm_action_by)
+                )
+            else:
+                action_by_norm = pd.Series([""] * len(df), index=df.index)
+
             for level in _cfg["levels"]:
                 key = level["key"]
-                if "location_map" in level:
-                    df[key] = df["Location"].map(level["location_map"])
-                elif "parent_key" in level and level["parent_key"] in df.columns:
-                    df[key] = df[level["parent_key"]].map(level["parent_map"])
+
+                # ---------- Engineering special handling ----------
+                if target_norm == "ENGINEERING":
+                    if key == "ADEN":
+                        # 1. try Action By
+                        from_ab = action_by_norm.map(ACTION_BY_TO_ADEN)
+                        # 2. fall back to location map
+                        from_loc = df["Location"].map(level["location_map"])
+                        df[key] = from_ab.fillna(from_loc)
+                    elif key == "SR_DEN":
+                        # 1. try Action By directly (highest priority)
+                        from_ab = action_by_norm.map(ACTION_BY_TO_SRDEN)
+                        # 2. otherwise derive from the ADEN we just set
+                        from_parent = df["ADEN"].map(level["parent_map"])
+                        df[key] = from_ab.fillna(from_parent)
+                    else:
+                        df[key] = None
+
+                # ---------- all other departments (original logic) ----------
                 else:
-                    df[key] = None
+                    if "location_map" in level:
+                        df[key] = df["Location"].map(level["location_map"])
+                    elif "parent_key" in level and level["parent_key"] in df.columns:
+                        df[key] = df[level["parent_key"]].map(level["parent_map"])
+                    else:
+                        df[key] = None
+
                 debug[f"with_{key}_mapped"] = int(df[key].notna().sum())
                 debug[f"{key}_unmapped"] = int(df[key].isna().sum())
+                if target_norm == "ENGINEERING" and key in ("ADEN", "SR_DEN"):
+                    debug[f"{key}_from_action_by"] = int(
+                        action_by_norm.map(
+                            ACTION_BY_TO_ADEN if key == "ADEN" else ACTION_BY_TO_SRDEN
+                        ).notna().sum()
+                    )
         else:
             debug["officer_level"] = "not defined for this department — Section III skipped"
 
