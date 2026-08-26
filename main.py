@@ -2510,8 +2510,8 @@ with tabs[3]:
     # ============================================================
 
     ADEN_KLBG = {
-        "GDGN", "GUR", "HQR", "KLBG", "KUI", "MR", "SBD", "SDB", "SVG",
-        "TJSP", "WADI", "WD", "BBD",
+        "GDGN", "GUR", "HQR", "KLBG", "KUI", "MR", , "SDB", "SVG",
+        "TJSP", "WADI", "WD", "BBD", 
         "WD-SDB-MR", "MR-HQR-KLBG-BBD-SVG",
         "WADI-SDB", "WADI-KLBG", "KLBG-WADI",
         "KLBG-SUR", "SUR-KLBG", "LC-1", "LC-3",  "LC-60", "LC-61", "LC-66", "LC-74", "LC-82", "LC-91",
@@ -2545,7 +2545,7 @@ with tabs[3]:
     }
     
     SR_ADEN_N_SUR = {
-        "AAG", "BALE", "MA", "MKPT", "MO", "MVE", "PK", "SUR", "WDS", "WKA",
+        "AAG", "BALE",  "MKPT", "MO", "MVE", "PK", "SUR", "WDS", 
         "BALE-SUR", "SUR-MO", "SUR-LTRR", "SUR-KEM", "JEUR-SUR",
         "SUR-DD", "DD-SUR", "SUR-MRJ", "SUR-KWV", "KWV-SUR",
         "SUR-PVR", "SUR-KLBG", "SUR-WADI",
@@ -2558,7 +2558,7 @@ with tabs[3]:
     }
     
     SR_ADEN_KWV_BG = {
-        "BGVN", "BLNI", "BRB", "DHS", "JEUR", "JNTR", "KEM", "KWV",
+        "BGVN", "BLNI", "BRB", "DHS", "JEUR", "JNTR", "KEM", "KWV","MA","WKA", "WDS"
         "MLM", "PPJ", "PRWD", "WSB", "KEU", 
         "JNTR-KEU",
         "SUR-JEUR", "JEUR-DD",
