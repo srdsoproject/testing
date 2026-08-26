@@ -3081,24 +3081,67 @@ with tabs[3]:
             for level in _cfg["levels"]:
                 key = level["key"]
 
-                # ---------- Engineering special handling ----------
+                # ============================================================
+                # ENGINEERING — TOP-DOWN APPROACH (correct counts)
+                # 1. First lock Sr.DEN / DEN/TRACK from Action By
+                # 2. Then assign ADEN / Sr.ADEN under that Sr.DEN bucket
+                # ============================================================
                 if target_norm == "ENGINEERING":
-                    if key == "ADEN":
-                        # 1. try Action By
-                        from_ab = action_by_norm.map(ACTION_BY_TO_ADEN)
-                        # 2. fall back to location map
-                        from_loc = df["Location"].map(level["location_map"])
-                        df[key] = from_ab.fillna(from_loc)
-                    elif key == "SR_DEN":
-                        # 1. try Action By directly (highest priority)
+
+                    if key == "SR_DEN":
+                        # PRIMARY: Action By → Sr.DEN/C | Sr.DEN/S | DEN/TRACK
                         from_ab = action_by_norm.map(ACTION_BY_TO_SRDEN)
-                        # 2. otherwise derive from the ADEN we just set
-                        from_parent = df["ADEN"].map(level["parent_map"])
+
+                        # FALLBACK: derive from location → ADEN → parent map
+                        # (only used when Action By is blank / unrecognised)
+                        loc_to_aden = df["Location"].map(build_aden_map())
+                        from_parent = loc_to_aden.map(ADEN_TO_SRDEN)
+
                         df[key] = from_ab.fillna(from_parent)
+
+                    elif key == "ADEN":
+                        # Now that SR_DEN is already set, assign the assistant
+                        # jurisdiction consistently under the Sr.DEN bucket.
+
+                        # 1. Try Action By for ADEN / Sr.ADEN
+                        from_ab = action_by_norm.map(ACTION_BY_TO_ADEN)
+
+                        # 2. Fall back to location map
+                        from_loc = df["Location"].map(level["location_map"])
+
+                        # Combine
+                        candidate = from_ab.fillna(from_loc)
+
+                        # 3. Enforce consistency with the already-assigned SR_DEN
+                        #    (so a row locked to Sr.DEN/C can never show ADEN/KLBG etc.)
+                        def _consistent_aden(row):
+                            aden = row.get("ADEN_candidate")
+                            srden = row.get("SR_DEN")
+                            if pd.isna(aden) or pd.isna(srden):
+                                return aden
+                            # Allowed ADEN values under each Sr.DEN
+                            allowed = {
+                                "Sr.DEN/S": {"ADEN/KLBG", "ADEN/S/SUR"},
+                                "Sr.DEN/C": {"Sr.ADEN/N/SUR", "Sr.ADEN/BG/KWV"},
+                                "DEN/TRACK": {"ADEN/LUR", "ADEN/PVR"},
+                            }
+                            if aden in allowed.get(srden, set()):
+                                return aden
+                            # If the candidate ADEN does not belong to this Sr.DEN,
+                            # leave it as NaN so it does not pollute the ADEN table
+                            return pd.NA
+
+                        # Temporary helper columns
+                        df["ADEN_candidate"] = candidate
+                        df[key] = df.apply(_consistent_aden, axis=1)
+                        df.drop(columns=["ADEN_candidate"], inplace=True, errors="ignore")
+
                     else:
                         df[key] = None
 
-                # ---------- all other departments (original logic) ----------
+                # ============================================================
+                # ALL OTHER DEPARTMENTS (unchanged original logic)
+                # ============================================================
                 else:
                     if "location_map" in level:
                         df[key] = df["Location"].map(level["location_map"])
@@ -3109,6 +3152,7 @@ with tabs[3]:
 
                 debug[f"with_{key}_mapped"] = int(df[key].notna().sum())
                 debug[f"{key}_unmapped"] = int(df[key].isna().sum())
+
                 if target_norm == "ENGINEERING" and key in ("ADEN", "SR_DEN"):
                     debug[f"{key}_from_action_by"] = int(
                         action_by_norm.map(
