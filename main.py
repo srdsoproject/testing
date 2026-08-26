@@ -2559,7 +2559,7 @@ with tabs[3]:
     
     SR_ADEN_KWV_BG = {
         "BGVN", "BLNI", "BRB", "DHS", "JEUR", "JNTR", "KEM", "KWV",
-        "MLM", "PPJ", "PRWD", "WSB", "KEU", "
+        "MLM", "PPJ", "PRWD", "WSB", "KEU", 
         "JNTR-KEU",
         "SUR-JEUR", "JEUR-DD",
         "MLM-BRB",
