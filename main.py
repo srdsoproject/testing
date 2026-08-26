@@ -2504,11 +2504,6 @@ with tabs[3]:
     # ============================================================
     # ADEN / Sr.DEN LOCATION MAPPING (Engineering)
     # ============================================================
-    # ============================================================
-    # ADEN / Sr.DEN LOCATION MAPPING (Engineering)
-    # — REPLACE the existing ADEN_GROUPS block in tabs[3] with this —
-    # ============================================================
-
     ADEN_KLBG = {
         "GDGN", "GUR", "HQR", "KLBG", "KUI", "MR",  "SDB", "SVG",
         "TJSP", "WADI", "WD", "BBD", 
@@ -2532,7 +2527,7 @@ with tabs[3]:
         "TJSP-WADI", "WADI-GDGN", "WADI-GUR", "WADI-HQR", "WADI-KLBG", "WADI-KUI", "WADI-MR", "WADI-SDB",
         "WADI-SVG", "WADI-TJSP"
     }
-    
+
     ADEN_S_SUR = {
         "AKOR", "BOT", "DUD", "HG", "NGS", "TKWD", "TLT",
         "DUD-SUR", "SUR-HG", "BOT-DUD", "NGS-BOT", "WADI-TLT",
@@ -2543,7 +2538,7 @@ with tabs[3]:
         "NGS-TLT", "TKWD-AKOR", "TKWD-BOT", "TKWD-DUD", "TKWD-HG", "TKWD-NGS", "TKWD-TLT", "TLT-AKOR",
         "TLT-BOT", "TLT-DUD", "TLT-HG", "TLT-NGS", "TLT-TKWD"
     }
-    
+
     SR_ADEN_N_SUR = {
         "AAG", "BALE",  "MKPT", "MO", "MVE", "PK", "SUR", "WDS", 
         "BALE-SUR", "SUR-MO", "SUR-LTRR", "SUR-KEM", "JEUR-SUR",
@@ -2556,9 +2551,11 @@ with tabs[3]:
         "NGS-TLT", "TKWD-AKOR", "TKWD-BOT", "TKWD-DUD", "TKWD-HG", "TKWD-NGS", "TKWD-TLT", "TLT-AKOR", 
         "TLT-BOT", "TLT-DUD", "TLT-HG", "TLT-NGS", "TLT-TKWD"
     }
-    
+
+    # FIX: added missing comma after "WDS" — previously "WDS" and "MLM" were
+    # silently concatenated by Python into a single bogus key "WDSMLM".
     SR_ADEN_KWV_BG = {
-        "BGVN", "BLNI", "BRB", "DHS", "JEUR", "JNTR", "KEM", "KWV","MA","WKA", "WDS"
+        "BGVN", "BLNI", "BRB", "DHS", "JEUR", "JNTR", "KEM", "KWV", "MA", "WKA", "WDS",
         "MLM", "PPJ", "PRWD", "WSB", "KEU", 
         "JNTR-KEU",
         "SUR-JEUR", "JEUR-DD",
@@ -2585,7 +2582,7 @@ with tabs[3]:
         "PPJ-JNTR", "PPJ-KEM", "PPJ-KWV", "PPJ-MLM", "PPJ-WSB", "WSB-BGVN", "WSB-BLNI", "WSB-BRB",
         "WSB-DHS", "WSB-JEUR", "WSB-JNTR", "WSB-KEM", "WSB-KWV", "WSB-MLM", "WSB-PPJ"
     }
-    
+
     ADEN_PVR = {
         "ARAG", "DLGN", "JTRD", "KVK", "MLB", "PVR", "SGLA", "SGRE",
         "SUR-PVR", "KWV-PVR", "MRJ-PVR",
@@ -2600,7 +2597,7 @@ with tabs[3]:
         "SGLA-ARAG", "SGLA-DLGN", "SGLA-JTRD", "SGLA-KVK", "SGLA-MLB", "SGLA-PVR", "SGLA-SGRE",
         "SGRE-ARAG", "SGRE-DLGN", "SGRE-JTRD", "SGRE-KVK", "SGRE-MLB", "SGRE-PVR", "SGRE-SGLA"
     }
-    
+
     ADEN_LUR = {
         "BTW", "DKY", "HGL", "LUR", "OSA", "PJR", "SEI", "UMD", "YSI",
         "KMRD", "MRX", "DRSV",
@@ -2618,7 +2615,7 @@ with tabs[3]:
         "PJR-SEI", "PJR-YSI", "SEI-BTW", "SEI-DKY", "SEI-HGL", "SEI-LUR", "SEI-OSA", "SEI-PJR",
         "SEI-YSI", "YSI-BTW", "YSI-DKY", "YSI-HGL", "YSI-LUR", "YSI-OSA", "YSI-PJR", "YSI-SEI"
     }
-    
+
     # ------------------------------------------------------------
     # Group dict — same group names/order as before, richer location sets
     # ------------------------------------------------------------
@@ -2631,7 +2628,7 @@ with tabs[3]:
         "Sr.ADEN/N/SUR": SR_ADEN_N_SUR,
     }
     ADEN_ORDER = ["ADEN/KLBG", "ADEN/LUR", "ADEN/PVR", "ADEN/S/SUR", "Sr.ADEN/BG/KWV", "Sr.ADEN/N/SUR"]
-    
+
     ADEN_TO_SRDEN = {
         "ADEN/KLBG": "Sr.DEN/S",
         "ADEN/S/SUR": "Sr.DEN/S",
@@ -2641,13 +2638,14 @@ with tabs[3]:
         "ADEN/PVR": "DEN/TRACK",
     }
     SRDEN_ORDER = ["Sr.DEN/S", "Sr.DEN/C", "DEN/TRACK"]
-    
+
     def build_aden_map():
         aden_map = {}
         for group, locs in ADEN_GROUPS.items():
             for loc in locs:
                 aden_map[loc] = group
         return aden_map
+
     # ============================================================
     # SSE/TRD SUPERVISOR-LEVEL LOCATION MAPPING (Electrical/TRD)
     # ============================================================
@@ -2880,6 +2878,33 @@ with tabs[3]:
         }
         return aliases.get(s, s)
 
+    def _coalesce_duplicate_columns(frame: pd.DataFrame, col_name: str) -> pd.DataFrame:
+        """
+        FIX: If renaming produced more than one column called `col_name`
+        (e.g. the sheet has both a 'Head' and a 'Department' column, and
+        both alias to 'Head'), the old code kept only the FIRST one and
+        silently dropped the rest. If the real value happened to live in
+        the dropped column while the first was blank, those rows would
+        fail the department filter and vanish from the total — this is
+        the most likely source of a total-record mismatch.
+
+        This version merges duplicate columns by taking the first
+        non-empty value per row, then collapses back to a single column.
+        """
+        if frame.columns.tolist().count(col_name) <= 1:
+            return frame
+
+        dupe_block = frame.loc[:, frame.columns == col_name].astype(str)
+        dupe_block = dupe_block.apply(lambda s: s.str.strip())
+        dupe_block = dupe_block.replace({"": pd.NA, "nan": pd.NA, "None": pd.NA, "NaT": pd.NA})
+        merged = dupe_block.bfill(axis=1).iloc[:, 0]
+
+        # keep only the first occurrence of col_name, drop the rest
+        keep_mask = ~(frame.columns.duplicated(keep="first") & (frame.columns == col_name))
+        frame = frame.loc[:, keep_mask]
+        frame[col_name] = merged.values
+        return frame
+
     def preprocess_data(df: pd.DataFrame, date_from: date, date_to: date, department: str):
         df = df.copy()
         debug = {}
@@ -2893,9 +2918,9 @@ with tabs[3]:
                 col_map[c] = "Sub Head"
             elif cl in ["location", "loc"]:
                 col_map[c] = "Location"
-            elif cl in ["head", "department", "dept"]:
+            elif cl in ["head", "department", "dept", "dept.", "deptt", "department name", "head of department"]:
                 col_map[c] = "Head"
-            elif cl in ["action by", "action_by", "actionby"]:
+            elif cl in ["action by", "action_by", "actionby", "action taken by", "action by dept", "action by department"]:
                 col_map[c] = "Action By"
             elif "feedback" in cl or "remark" in cl or "response" in cl:
                 if "user" in cl or "officer" in cl:
@@ -2905,16 +2930,17 @@ with tabs[3]:
             elif cl == "status":
                 col_map[c] = "Status"
 
+        # DIAGNOSTIC: record exactly which raw sheet column(s) fed each
+        # renamed field, so a mismatch can be traced immediately from the
+        # "Filter diagnostics" expander instead of guessing blind.
+        debug["head_source_columns"] = [c for c, v in col_map.items() if v == "Head"]
+        debug["action_by_source_columns"] = [c for c, v in col_map.items() if v == "Action By"]
+
         df = df.rename(columns=col_map)
-        if df.columns.tolist().count("Head") > 1:
-            cols = []
-            seen = set()
-            for c in df.columns:
-                if c == "Head" and c in seen:
-                    continue
-                cols.append(c)
-                seen.add(c)
-            df = df[cols]
+
+        # FIX: coalesce instead of blind-drop for both Head and Action By
+        df = _coalesce_duplicate_columns(df, "Head")
+        df = _coalesce_duplicate_columns(df, "Action By")
 
         debug["raw_rows"] = len(df)
 
@@ -2932,8 +2958,10 @@ with tabs[3]:
             df.loc[still_nat, "Date of Inspection"] = pd.to_datetime(
                 df.loc[still_nat, "Date of Inspection"], errors="coerce", dayfirst=False
             )
+        rows_dropped_bad_date = int(df["Date of Inspection"].isna().sum())
         df = df.dropna(subset=["Date of Inspection"])
         debug["after_date_parse"] = len(df)
+        debug["rows_dropped_unparseable_date"] = rows_dropped_bad_date
 
         mask = (
             (df["Date of Inspection"].dt.date >= date_from)
@@ -2950,11 +2978,12 @@ with tabs[3]:
             head_series = df["Head"]
             if isinstance(head_series, pd.DataFrame):
                 head_series = head_series.iloc[:, 0]
-            head_norm = head_series.fillna("").astype(str).map(_normalize_dept)
+            head_series = head_series.fillna("").astype(str).str.replace("\xa0", " ", regex=False).str.strip()
+            head_norm = head_series.map(_normalize_dept)
             df = df[head_norm == target].copy()
             debug["after_head_filter"] = len(df)
             debug["unique_heads_seen"] = sorted(
-                set(head_series.fillna("").astype(str).str.strip().unique()) - {""}
+                set(head_series.unique()) - {""}
             )[:30]
         else:
             allowed_subheads = SUBHEAD_LIST.get(department, [])
@@ -3351,7 +3380,8 @@ with tabs[3]:
             st.json(debug_info)
             st.caption(
                 f"Showing **{len(df)}** rows for **{department}** "
-                f"between {date_from.strftime('%d-%m-%Y')} and {date_to.strftime('%d-%m-%Y')}."
+                f"between {date_from.strftime('%d-%m-%Y')} and {date_to.strftime('%d-%m-%Y')}. "
+                f"Raw sheet row count (before any filtering): **{len(raw_df)}**."
             )
 
     # ============================================================
