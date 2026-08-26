@@ -2514,7 +2514,7 @@ with tabs[3]:
         "TJSP", "WADI", "WD", "BBD",
         "WD-SDB-MR", "MR-HQR-KLBG-BBD-SVG",
         "WADI-SDB", "WADI-KLBG", "KLBG-WADI",
-        "KLBG-SUR", "SUR-KLBG",
+        "KLBG-SUR", "SUR-KLBG", "LC-1", "LC-3",  "LC-60", "LC-61", "LC-66", "LC-74", "LC-82", "LC-91",
         "DUD-KLBG", "KLBG-DUD",
         "SUR-WADI", "WADI-SUR",
         "SUR-SBD", "SBD-SUR",
@@ -2553,17 +2553,17 @@ with tabs[3]:
         "AKOR-TLT", "BOT-AKOR", "BOT-DUD", "BOT-HG", "BOT-NGS", "BOT-TKWD", "BOT-TLT", "DUD-AKOR",
         "DUD-BOT", "DUD-HG", "DUD-NGS", "DUD-TKWD", "DUD-TLT", "HG-AKOR", "HG-BOT", "HG-DUD",
         "HG-NGS", "HG-TKWD", "HG-TLT", "NGS-AKOR", "NGS-BOT", "NGS-DUD", "NGS-HG", "NGS-TKWD",
-        "NGS-TLT", "TKWD-AKOR", "TKWD-BOT", "TKWD-DUD", "TKWD-HG", "TKWD-NGS", "TKWD-TLT", "TLT-AKOR",
+        "NGS-TLT", "TKWD-AKOR", "TKWD-BOT", "TKWD-DUD", "TKWD-HG", "TKWD-NGS", "TKWD-TLT", "TLT-AKOR", 
         "TLT-BOT", "TLT-DUD", "TLT-HG", "TLT-NGS", "TLT-TKWD"
     }
     
     SR_ADEN_KWV_BG = {
         "BGVN", "BLNI", "BRB", "DHS", "JEUR", "JNTR", "KEM", "KWV",
-        "MLM", "PPJ", "PRWD", "WSB", "KEU",
+        "MLM", "PPJ", "PRWD", "WSB", "KEU", "
         "JNTR-KEU",
         "SUR-JEUR", "JEUR-DD",
         "MLM-BRB",
-        "KWV-DD", "DD-KWV",
+        "KWV-DD", "DD-KWV", 'LC-19', 'LC-19A', 'LC-21', 'LC-40', 'LC-42', 
         "KWV-MRJ",
         "KWV-PVR",
         "KWV-OSA",
@@ -2589,7 +2589,7 @@ with tabs[3]:
     ADEN_PVR = {
         "ARAG", "DLGN", "JTRD", "KVK", "MLB", "PVR", "SGLA", "SGRE",
         "SUR-PVR", "KWV-PVR", "MRJ-PVR",
-        "KWV-DLGN", "KWV-MLB", "KWV-SGRE", "SGRE-KWV",
+        "KWV-DLGN", "KWV-MLB", "KWV-SGRE", "SGRE-KWV", 'LC-22', 'LC-24', 'LC-31', 'LC-49', 'LC-70',
         "MLB-PVR", "SGRE-KVK",
         "ARAG-DLGN", "ARAG-JTRD", "ARAG-KVK", "ARAG-MLB", "ARAG-PVR", "ARAG-SGLA", "ARAG-SGRE",
         "DLGN-ARAG", "DLGN-JTRD", "DLGN-KVK", "DLGN-MLB", "DLGN-PVR", "DLGN-SGLA", "DLGN-SGRE",
@@ -2606,7 +2606,7 @@ with tabs[3]:
         "KMRD", "MRX", "DRSV",
         "KWV-LUR", "LUR-KWV",
         "KWV-OSA",
-        "KWV-SEI",
+        "KWV-SEI", 'LC-2', 'LC-4', 'LC-5', 'LC-6', 'LC-10', 'LC-34', 'LC-36', 'LC-39', 'LC-47', 'LC-55', 'LC-59', 
         "KWV-LTRR", "LTRR-KWV",
         "SUR-LTRR",
         "HGL-KWV", "KWV-HGL",
