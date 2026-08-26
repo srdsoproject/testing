@@ -2504,16 +2504,134 @@ with tabs[3]:
     # ============================================================
     # ADEN / Sr.DEN LOCATION MAPPING (Engineering)
     # ============================================================
+    # ============================================================
+    # ADEN / Sr.DEN LOCATION MAPPING (Engineering)
+    # — REPLACE the existing ADEN_GROUPS block in tabs[3] with this —
+    # ============================================================
+
+    ADEN_KLBG = {
+        "GDGN", "GUR", "HQR", "KLBG", "KUI", "MR", "SBD", "SDB", "SVG",
+        "TJSP", "WADI", "WD", "BBD",
+        "WD-SDB-MR", "MR-HQR-KLBG-BBD-SVG",
+        "WADI-SDB", "WADI-KLBG", "KLBG-WADI",
+        "KLBG-SUR", "SUR-KLBG",
+        "DUD-KLBG", "KLBG-DUD",
+        "SUR-WADI", "WADI-SUR",
+        "SUR-SBD", "SBD-SUR",
+        "SUR-GUR", "KLBG-TJSP",
+        "GDGN-GUR", "GDGN-HQR", "GDGN-KLBG", "GDGN-KUI", "GDGN-MR", "GDGN-SDB", "GDGN-SVG", "GDGN-TJSP",
+        "GDGN-WADI", "GUR-GDGN", "GUR-HQR", "GUR-KLBG", "GUR-KUI", "GUR-MR", "GUR-SDB", "GUR-SVG",
+        "GUR-TJSP", "GUR-WADI", "HQR-GDGN", "HQR-GUR", "HQR-KLBG", "HQR-KUI", "HQR-MR", "HQR-SDB",
+        "HQR-SVG", "HQR-TJSP", "HQR-WADI", "KLBG-GDGN", "KLBG-GUR", "KLBG-HQR", "KLBG-KUI", "KLBG-MR",
+        "KLBG-SDB", "KLBG-SVG", "KLBG-TJSP", "KLBG-WADI", "KUI-GDGN", "KUI-GUR", "KUI-HQR", "KUI-KLBG",
+        "KUI-MR", "KUI-SDB", "KUI-SVG", "KUI-TJSP", "KUI-WADI", "MR-GDGN", "MR-GUR", "MR-HQR",
+        "MR-KLBG", "MR-KUI", "MR-SDB", "MR-SVG", "MR-TJSP", "MR-WADI", "SDB-GDGN", "SDB-GUR",
+        "SDB-HQR", "SDB-KLBG", "SDB-KUI", "SDB-MR", "SDB-SVG", "SDB-TJSP", "SDB-WADI", "SVG-GDGN",
+        "SVG-GUR", "SVG-HQR", "SVG-KLBG", "SVG-KUI", "SVG-MR", "SVG-SDB", "SVG-TJSP", "SVG-WADI",
+        "TJSP-GDGN", "TJSP-GUR", "TJSP-HQR", "TJSP-KLBG", "TJSP-KUI", "TJSP-MR", "TJSP-SDB", "TJSP-SVG",
+        "TJSP-WADI", "WADI-GDGN", "WADI-GUR", "WADI-HQR", "WADI-KLBG", "WADI-KUI", "WADI-MR", "WADI-SDB",
+        "WADI-SVG", "WADI-TJSP"
+    }
+    
+    ADEN_S_SUR = {
+        "AKOR", "BOT", "DUD", "HG", "NGS", "TKWD", "TLT",
+        "DUD-SUR", "SUR-HG", "BOT-DUD", "NGS-BOT", "WADI-TLT",
+        "KWV-DUD", "SUR-BOT", "SUR-NGS", "AKOR-BOT", "AKOR-DUD", "AKOR-HG", "AKOR-NGS", "AKOR-TKWD",
+        "AKOR-TLT", "BOT-AKOR", "BOT-DUD", "BOT-HG", "BOT-NGS", "BOT-TKWD", "BOT-TLT", "DUD-AKOR",
+        "DUD-BOT", "DUD-HG", "DUD-NGS", "DUD-TKWD", "DUD-TLT", "HG-AKOR", "HG-BOT", "HG-DUD",
+        "HG-NGS", "HG-TKWD", "HG-TLT", "NGS-AKOR", "NGS-BOT", "NGS-DUD", "NGS-HG", "NGS-TKWD",
+        "NGS-TLT", "TKWD-AKOR", "TKWD-BOT", "TKWD-DUD", "TKWD-HG", "TKWD-NGS", "TKWD-TLT", "TLT-AKOR",
+        "TLT-BOT", "TLT-DUD", "TLT-HG", "TLT-NGS", "TLT-TKWD"
+    }
+    
+    SR_ADEN_N_SUR = {
+        "AAG", "BALE", "MA", "MKPT", "MO", "MVE", "PK", "SUR", "WDS", "WKA",
+        "BALE-SUR", "SUR-MO", "SUR-LTRR", "SUR-KEM", "JEUR-SUR",
+        "SUR-DD", "DD-SUR", "SUR-MRJ", "SUR-KWV", "KWV-SUR",
+        "SUR-PVR", "SUR-KLBG", "SUR-WADI",
+        "AAG-MKPT", "BGVN-SUR", "SUR-BGVN", "AKOR-BOT", "AKOR-DUD", "AKOR-HG", "AKOR-NGS", "AKOR-TKWD",
+        "AKOR-TLT", "BOT-AKOR", "BOT-DUD", "BOT-HG", "BOT-NGS", "BOT-TKWD", "BOT-TLT", "DUD-AKOR",
+        "DUD-BOT", "DUD-HG", "DUD-NGS", "DUD-TKWD", "DUD-TLT", "HG-AKOR", "HG-BOT", "HG-DUD",
+        "HG-NGS", "HG-TKWD", "HG-TLT", "NGS-AKOR", "NGS-BOT", "NGS-DUD", "NGS-HG", "NGS-TKWD",
+        "NGS-TLT", "TKWD-AKOR", "TKWD-BOT", "TKWD-DUD", "TKWD-HG", "TKWD-NGS", "TKWD-TLT", "TLT-AKOR",
+        "TLT-BOT", "TLT-DUD", "TLT-HG", "TLT-NGS", "TLT-TKWD"
+    }
+    
+    SR_ADEN_KWV_BG = {
+        "BGVN", "BLNI", "BRB", "DHS", "JEUR", "JNTR", "KEM", "KWV",
+        "MLM", "PPJ", "PRWD", "WSB", "KEU",
+        "JNTR-KEU",
+        "SUR-JEUR", "JEUR-DD",
+        "MLM-BRB",
+        "KWV-DD", "DD-KWV",
+        "KWV-MRJ",
+        "KWV-PVR",
+        "KWV-OSA",
+        "KWV-SEI",
+        "KWV-LTRR", "LTRR-KWV",
+        "BGVN-JNTR",
+        "KWV-DHS", "BGVN-BLNI", "BGVN-BRB", "BGVN-DHS", "BGVN-JEUR", "BGVN-JNTR", "BGVN-KEM", "BGVN-KWV",
+        "BGVN-MLM", "BGVN-PPJ", "BGVN-WSB", "BLNI-BGVN", "BLNI-BRB", "BLNI-DHS", "BLNI-JEUR", "BLNI-JNTR",
+        "BLNI-KEM", "BLNI-KWV", "BLNI-MLM", "BLNI-PPJ", "BLNI-WSB", "BRB-BGVN", "BRB-BLNI", "BRB-DHS",
+        "BRB-JEUR", "BRB-JNTR", "BRB-KEM", "BRB-KWV", "BRB-MLM", "BRB-PPJ", "BRB-WSB", "DHS-BGVN",
+        "DHS-BLNI", "DHS-BRB", "DHS-JEUR", "DHS-JNTR", "DHS-KEM", "DHS-KWV", "DHS-MLM", "DHS-PPJ",
+        "DHS-WSB", "JEUR-BGVN", "JEUR-BLNI", "JEUR-BRB", "JEUR-DHS", "JEUR-JNTR", "JEUR-KEM", "JEUR-KWV",
+        "JEUR-MLM", "JEUR-PPJ", "JEUR-WSB", "JNTR-BGVN", "JNTR-BLNI", "JNTR-BRB", "JNTR-DHS", "JNTR-JEUR",
+        "JNTR-KEM", "JNTR-KWV", "JNTR-MLM", "JNTR-PPJ", "JNTR-WSB", "KEM-BGVN", "KEM-BLNI", "KEM-BRB",
+        "KEM-DHS", "KEM-JEUR", "KEM-JNTR", "KEM-KWV", "KEM-MLM", "KEM-PPJ", "KEM-WSB", "KWV-BGVN",
+        "KWV-BLNI", "KWV-BRB", "KWV-DHS", "KWV-JEUR", "KWV-JNTR", "KWV-KEM", "KWV-MLM", "KWV-PPJ",
+        "KWV-WSB", "MLM-BGVN", "MLM-BLNI", "MLM-BRB", "MLM-DHS", "MLM-JEUR", "MLM-JNTR", "MLM-KEM",
+        "MLM-KWV", "MLM-PPJ", "MLM-WSB", "PPJ-BGVN", "PPJ-BLNI", "PPJ-BRB", "PPJ-DHS", "PPJ-JEUR",
+        "PPJ-JNTR", "PPJ-KEM", "PPJ-KWV", "PPJ-MLM", "PPJ-WSB", "WSB-BGVN", "WSB-BLNI", "WSB-BRB",
+        "WSB-DHS", "WSB-JEUR", "WSB-JNTR", "WSB-KEM", "WSB-KWV", "WSB-MLM", "WSB-PPJ"
+    }
+    
+    ADEN_PVR = {
+        "ARAG", "DLGN", "JTRD", "KVK", "MLB", "PVR", "SGLA", "SGRE",
+        "SUR-PVR", "KWV-PVR", "MRJ-PVR",
+        "KWV-DLGN", "KWV-MLB", "KWV-SGRE", "SGRE-KWV",
+        "MLB-PVR", "SGRE-KVK",
+        "ARAG-DLGN", "ARAG-JTRD", "ARAG-KVK", "ARAG-MLB", "ARAG-PVR", "ARAG-SGLA", "ARAG-SGRE",
+        "DLGN-ARAG", "DLGN-JTRD", "DLGN-KVK", "DLGN-MLB", "DLGN-PVR", "DLGN-SGLA", "DLGN-SGRE",
+        "JTRD-ARAG", "JTRD-DLGN", "JTRD-KVK", "JTRD-MLB", "JTRD-PVR", "JTRD-SGLA", "JTRD-SGRE",
+        "KVK-ARAG", "KVK-DLGN", "KVK-JTRD", "KVK-MLB", "KVK-PVR", "KVK-SGLA", "KVK-SGRE",
+        "MLB-ARAG", "MLB-DLGN", "MLB-JTRD", "MLB-KVK", "MLB-PVR", "MLB-SGLA", "MLB-SGRE",
+        "PVR-ARAG", "PVR-DLGN", "PVR-JTRD", "PVR-KVK", "PVR-MLB", "PVR-SGLA", "PVR-SGRE",
+        "SGLA-ARAG", "SGLA-DLGN", "SGLA-JTRD", "SGLA-KVK", "SGLA-MLB", "SGLA-PVR", "SGLA-SGRE",
+        "SGRE-ARAG", "SGRE-DLGN", "SGRE-JTRD", "SGRE-KVK", "SGRE-MLB", "SGRE-PVR", "SGRE-SGLA"
+    }
+    
+    ADEN_LUR = {
+        "BTW", "DKY", "HGL", "LUR", "OSA", "PJR", "SEI", "UMD", "YSI",
+        "KMRD", "MRX", "DRSV",
+        "KWV-LUR", "LUR-KWV",
+        "KWV-OSA",
+        "KWV-SEI",
+        "KWV-LTRR", "LTRR-KWV",
+        "SUR-LTRR",
+        "HGL-KWV", "KWV-HGL",
+        "BTW-DKY", "BTW-HGL", "BTW-LUR", "BTW-OSA", "BTW-PJR", "BTW-SEI", "BTW-YSI", "DKY-BTW",
+        "DKY-HGL", "DKY-LUR", "DKY-OSA", "DKY-PJR", "DKY-SEI", "DKY-YSI", "HGL-BTW", "HGL-DKY",
+        "HGL-LUR", "HGL-OSA", "HGL-PJR", "HGL-SEI", "HGL-YSI", "LUR-BTW", "LUR-DKY", "LUR-HGL",
+        "LUR-OSA", "LUR-PJR", "LUR-SEI", "LUR-YSI", "OSA-BTW", "OSA-DKY", "OSA-HGL", "OSA-LUR",
+        "OSA-PJR", "OSA-SEI", "OSA-YSI", "PJR-BTW", "PJR-DKY", "PJR-HGL", "PJR-LUR", "PJR-OSA",
+        "PJR-SEI", "PJR-YSI", "SEI-BTW", "SEI-DKY", "SEI-HGL", "SEI-LUR", "SEI-OSA", "SEI-PJR",
+        "SEI-YSI", "YSI-BTW", "YSI-DKY", "YSI-HGL", "YSI-LUR", "YSI-OSA", "YSI-PJR", "YSI-SEI"
+    }
+    
+    # ------------------------------------------------------------
+    # Group dict — same group names/order as before, richer location sets
+    # ------------------------------------------------------------
     ADEN_GROUPS = {
-        "ADEN/KLBG": {"GDGN", "GUR", "HQR", "KLBG", "KUI", "MR", "SBD", "SDB", "SVG", "TJSP", "WADI"},
-        "ADEN/LUR": {"BTW", "DKY", "HGL", "LUR", "OSA", "PJR", "SEI", "UMD", "YSI"},
-        "ADEN/PVR": {"ARAG", "DLGN", "JTRD", "KVK", "MLB", "PVR", "SGLA", "SGRE"},
-        "ADEN/S/SUR": {"AKOR", "BOT", "DUD", "HG", "NGS", "TKWD", "TLT"},
-        "Sr.ADEN/BG/KWV": {"BGVN", "BLNI", "BRB", "DHS", "JEUR", "JNTR", "KEM", "KWV", "MLM", "PPJ", "PRWD", "WSB"},
-        "Sr.ADEN/N/SUR": {"AAG", "BALE", "MA", "MKPT", "MO", "MVE", "PK", "SUR", "WDS", "WKA"},
+        "ADEN/KLBG": ADEN_KLBG,
+        "ADEN/LUR": ADEN_LUR,
+        "ADEN/PVR": ADEN_PVR,
+        "ADEN/S/SUR": ADEN_S_SUR,
+        "Sr.ADEN/BG/KWV": SR_ADEN_KWV_BG,
+        "Sr.ADEN/N/SUR": SR_ADEN_N_SUR,
     }
     ADEN_ORDER = ["ADEN/KLBG", "ADEN/LUR", "ADEN/PVR", "ADEN/S/SUR", "Sr.ADEN/BG/KWV", "Sr.ADEN/N/SUR"]
-
+    
     ADEN_TO_SRDEN = {
         "ADEN/KLBG": "Sr.DEN/S",
         "ADEN/S/SUR": "Sr.DEN/S",
@@ -2523,14 +2641,13 @@ with tabs[3]:
         "ADEN/PVR": "DEN/TRACK",
     }
     SRDEN_ORDER = ["Sr.DEN/S", "Sr.DEN/C", "DEN/TRACK"]
-
+    
     def build_aden_map():
         aden_map = {}
         for group, locs in ADEN_GROUPS.items():
             for loc in locs:
                 aden_map[loc] = group
         return aden_map
-
     # ============================================================
     # SSE/TRD SUPERVISOR-LEVEL LOCATION MAPPING (Electrical/TRD)
     # ============================================================
