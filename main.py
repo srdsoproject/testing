@@ -2253,7 +2253,7 @@ with tabs[2]:
         # ============================================================
         ax_sub = fig.add_subplot(gs[2])
         ax_sub.axis("off")
-        ax_sub.set_title(f"II — CLASSIFICATION SUB HEAD DISTRIBUTION ({department})",
+        ax_sub.set_title(f"I — CLASSIFICATION SUB HEAD DISTRIBUTION ({department})",
                          loc="left", fontsize=12, fontweight="bold",
                          color="#123A7A", pad=6)
 
@@ -2292,7 +2292,7 @@ with tabs[2]:
             # Table
             ax_t = fig.add_subplot(gs[3 + i*2])
             ax_t.axis("off")
-            ax_t.set_title(f"III — CLASSIFICATION {label} WISE ({department})",
+            ax_t.set_title(f"II — CLASSIFICATION {label} WISE ({department})",
                            loc="left", fontsize=12, fontweight="bold",
                            color="#123A7A", pad=5)
 
