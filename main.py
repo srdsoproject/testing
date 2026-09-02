@@ -1131,23 +1131,24 @@ def build_excel_export(export_df, sheet_name):
         export_df.to_excel(writer, index=False, sheet_name=sheet_name)
         ws = writer.sheets[sheet_name]
 
-        date_style = NamedStyle(name=f"date_style_{sheet_name}", number_format="DD-MM-YYYY")
         thin_border = Border(
             left=Side(style='thin'), right=Side(style='thin'),
             top=Side(style='thin'), bottom=Side(style='thin')
         )
 
+        # Apply border + wrap alignment to every cell first
         for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
             for cell in row:
                 cell.alignment = Alignment(wrap_text=True, vertical="top")
                 cell.border = thin_border
 
+        # Then layer the date format on top WITHOUT touching border/alignment
         if "Date of Inspection" in export_df.columns:
             date_col_idx = export_df.columns.get_loc("Date of Inspection") + 1
             for row in ws.iter_rows(min_row=2, min_col=date_col_idx, max_col=date_col_idx,
                                      max_row=len(export_df) + 1):
                 for cell in row:
-                    cell.style = date_style
+                    cell.number_format = "DD-MM-YYYY"   # <-- direct format, not cell.style
 
         for col in ws.columns:
             max_length = 0
