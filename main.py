@@ -1610,7 +1610,7 @@ with tabs[0]:
             wrapText=True,
             autoHeight=True,
             resizable=True,
-            suppressMovable=True,  # helps on touch devices
+            suppressMovable=False,  # helps on touch devices
         )
         if "User Feedback/Remark" in grid_display_df.columns:
             gb.configure_column(
