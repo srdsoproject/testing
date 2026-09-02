@@ -1605,20 +1605,47 @@ with tabs[0]:
         # ---- AgGrid configuration ----
         grid_display_df = editable_df.drop(columns=["_status_plain"], errors="ignore")
         gb = GridOptionsBuilder.from_dataframe(grid_display_df)
+        
+        # flex=1 is the default "share" every column gets of the available width;
+        # columns below override that share so wide/narrow content is proportioned
+        # sensibly, but everything still always fits the screen width.
         gb.configure_default_column(
             editable=False,
             wrapText=True,
             autoHeight=True,
             resizable=True,
-            suppressMovable=False,  # helps on touch devices
+            suppressMovable=False,
+            flex=1,
+            minWidth=90,
         )
+        
+        col_flex = {
+            "Date of Inspection": (1.0, 110),
+            "Type of Inspection": (1.2, 140),
+            "Head": (1.0, 110),
+            "Sub Head": (1.2, 130),
+            "Location": (1.0, 100),
+            "Deficiencies Noted": (3.0, 260),   # gets the most room, but still bounded
+            "Inspection By": (1.3, 140),
+            "Action By": (1.3, 140),
+            "Feedback": (1.5, 160),
+            "User Feedback/Remark": (2.0, 180),
+            "Status": (0.8, 100),
+            TIMESTAMP_COL_NAME: (1.3, 150),
+        }
+        for col_name, (flex_val, min_w) in col_flex.items():
+            if col_name in grid_display_df.columns:
+                gb.configure_column(col_name, flex=flex_val, minWidth=min_w)
+        
         if "User Feedback/Remark" in grid_display_df.columns:
             gb.configure_column(
                 "User Feedback/Remark",
                 editable=True, wrapText=True, autoHeight=True,
                 cellEditor="agTextCellEditor", cellEditorPopup=False,
-                cellEditorParams={"maxLength": 4000}
+                cellEditorParams={"maxLength": 4000},
+                flex=2, minWidth=180,
             )
+        
         gb.configure_column("_original_sheet_index", hide=True)
         gb.configure_column("_sheet_row", hide=True)
         gb.configure_grid_options(
@@ -1627,28 +1654,17 @@ with tabs[0]:
             enableCellTextSelection=True,
             ensureDomOrder=True,
         )
-
-        auto_size_js = JsCode("""
-        function(params) {
-            let allColumnIds = [];
-            params.columnApi.getAllColumns().forEach(function(column) {
-                allColumnIds.push(column.getColId());
-            });
-            params.columnApi.autoSizeColumns(allColumnIds);
-        }
-        """)
-        gb.configure_grid_options(onFirstDataRendered=auto_size_js)
         grid_options = gb.build()
-
+        
         st.markdown("#### 🚈 Inspection Details")
-        st.caption("Type your compliance in 'User Feedback/Remark' column. Use column headers to sort. On mobile you can scroll the grid horizontally.")
+        st.caption("Type your compliance in 'User Feedback/Remark' column. Use column headers to sort. Columns auto-fit the screen width — drag a header edge if you'd still like to fine-tune one.")
         grid_response = AgGrid(
             grid_display_df,
             gridOptions=grid_options,
             update_mode=GridUpdateMode.VALUE_CHANGED,
-            height=500,                 # CSS will reduce this further on small screens
+            height=500,
             allow_unsafe_jscode=True,
-            fit_columns_on_grid_load=False,
+            fit_columns_on_grid_load=True,
             theme="streamlit",
         )
         edited_df = pd.DataFrame(grid_response["data"])
