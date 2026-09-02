@@ -1181,6 +1181,8 @@ def build_excel_export(export_df, sheet_name):
 # =========================================================================
 def render_pie_breakdown(df, group_col, chart_title, caption_parts, threshold=0.02):
     """Pie chart with leader lines + labels, and a counts table on the right.
+    Labels are evenly spaced top-to-bottom on each side so they never overlap,
+    and the figure/table scale with the number of categories.
     """
     work = df.copy()
     work[group_col] = work[group_col].fillna("").astype(str).str.strip()
@@ -1206,6 +1208,8 @@ def render_pie_breakdown(df, group_col, chart_title, caption_parts, threshold=0.
             [major, pd.DataFrame([{group_col: "Others", "Count": int(minor["Count"].sum())}])],
             ignore_index=True,
         )
+    major = major.sort_values("Count", ascending=False).reset_index(drop=True)
+    n_slices = len(major)
 
     base_colors = [
         "#4E79A7", "#F28E2B", "#E15759", "#76B7B2", "#59A14F",
@@ -1213,67 +1217,76 @@ def render_pie_breakdown(df, group_col, chart_title, caption_parts, threshold=0.
         "#1F77B4", "#FF7F0E", "#2CA02C", "#D62728", "#9467BD",
         "#8C564B", "#E377C2", "#7F7F7F", "#BCBD22", "#17BECF",
     ]
-    colors = [base_colors[i % len(base_colors)] for i in range(len(major))]
+    colors = [base_colors[i % len(base_colors)] for i in range(n_slices)]
 
-    # Table rows: name + count only
     table_rows = [[str(r[group_col]), int(r["Count"])] for _, r in summary.iterrows()]
     table_rows.append(["TOTAL", total])
+    n_table_rows = len(table_rows)
 
-    # Layout: pie left (with room for labels), table right
-    fig = plt.figure(figsize=(12, 5.5), facecolor="white")
-    ax_pie = fig.add_axes([0.02, 0.12, 0.50, 0.78])
-    ax_tbl = fig.add_axes([0.58, 0.10, 0.40, 0.80])
+    # ---- Dynamic sizing so nothing gets cramped as category count grows ----
+    fig_height = max(5.5, 0.34 * n_table_rows + 2.0, 0.5 * n_slices + 2.5)
+    fig = plt.figure(figsize=(13, fig_height), facecolor="white")
+    ax_pie = fig.add_axes([0.03, 0.08, 0.46, 0.84])
+    ax_tbl = fig.add_axes([0.58, 0.06, 0.40, 0.88])
     ax_tbl.axis("off")
 
     wedges, texts, autotexts = ax_pie.pie(
         major["Count"].tolist(),
         colors=colors,
         startangle=90,
-        autopct="%1.1f%%",
-        pctdistance=0.55,
-        textprops=dict(color="black", fontsize=8),
+        autopct=lambda pct: f"{pct:.1f}%" if pct >= 4 else "",  # hide autopct on tiny slivers to cut clutter
+        pctdistance=0.72,
+        textprops=dict(color="white", fontsize=8, fontweight="bold"),
         wedgeprops=dict(edgecolor="white", linewidth=1.2),
     )
-    for t in autotexts:
-        t.set_fontsize(8)
-        t.set_fontweight("bold")
 
-    # Leader lines + labels — alternate left/right around the pie
-    for i, (wedge, (_, row)) in enumerate(zip(wedges, major.iterrows())):
-        ang = (wedge.theta2 + wedge.theta1) / 2.0
-        x = np.cos(np.deg2rad(ang))
-        y = np.sin(np.deg2rad(ang))
+    # Angle (deg) and unit-circle x/y for each wedge's midpoint
+    angles = [(w.theta1 + w.theta2) / 2.0 for w in wedges]
+    xs = [np.cos(np.deg2rad(a)) for a in angles]
+    ys = [np.sin(np.deg2rad(a)) for a in angles]
 
-        # Prefer left side for labels so they stay away from the table
-        # but allow right-side labels only for slices clearly on the right
-        # and keep them close to the pie (short lines)
-        if x >= 0:
-            lx = 1.25
-            ha = "left"
-        else:
-            lx = -1.25
-            ha = "right"
-        ly = 1.15 * y
+    # Split slices into right-side / left-side labels, ordered top-to-bottom
+    right_idx = sorted([i for i in range(n_slices) if xs[i] >= 0], key=lambda i: -ys[i])
+    left_idx = sorted([i for i in range(n_slices) if xs[i] < 0], key=lambda i: -ys[i])
 
-        label = f"{row[group_col]} ({int(row['Count'])})"
-        ax_pie.annotate(
-            label,
-            xy=(0.92 * x, 0.92 * y),
-            xytext=(lx, ly),
-            ha=ha,
-            va="center",
-            fontsize=8,
-            bbox=dict(boxstyle="round,pad=0.25", facecolor="white", edgecolor="#AAAAAA", alpha=0.9),
-            arrowprops=dict(arrowstyle="-", color="#555555", lw=0.8,
-                            connectionstyle="arc3,rad=0"),
-        )
+    # Vertical range for labels scales with how many need to fit on the busiest side
+    max_labels_per_side = max(len(right_idx), len(left_idx), 1)
+    label_span = max(1.15, 0.24 * (max_labels_per_side - 1))
+    font_size = 8 if max_labels_per_side <= 10 else 7
 
-    ax_pie.set_xlim(-1.7, 1.7)
-    ax_pie.set_ylim(-1.5, 1.5)
+    def place_labels(idx_list, side):
+        n = len(idx_list)
+        if n == 0:
+            return
+        label_ys = [0.0] if n == 1 else np.linspace(label_span, -label_span, n)
+        lx = 1.42 if side == "right" else -1.42
+        ha = "left" if side == "right" else "right"
+        rad = 0.05 if side == "right" else -0.05
+        for label_y, i in zip(label_ys, idx_list):
+            row = major.iloc[i]
+            label = f"{row[group_col]} ({int(row['Count'])})"
+            ax_pie.annotate(
+                label,
+                xy=(0.95 * xs[i], 0.95 * ys[i]),
+                xytext=(lx, label_y),
+                ha=ha, va="center", fontsize=font_size,
+                bbox=dict(boxstyle="round,pad=0.25", facecolor="white", edgecolor="#AAAAAA", alpha=0.95),
+                arrowprops=dict(arrowstyle="-", color="#777777", lw=0.7,
+                                 connectionstyle=f"arc3,rad={rad}"),
+            )
+
+    place_labels(right_idx, "right")
+    place_labels(left_idx, "left")
+
+    ax_pie.set_xlim(-2.1, 2.1)
+    ax_pie.set_ylim(-(label_span + 0.35), label_span + 0.35)
     ax_pie.set_aspect("equal")
 
-    # Table
+    # ---- Table ----
     col_labels = [group_col, "Count"]
+    table_font = 9 if n_table_rows <= 20 else 7.5
+    row_scale = 1.5 if n_table_rows <= 20 else max(0.9, 22.0 / n_table_rows)
+
     table = ax_tbl.table(
         cellText=table_rows,
         colLabels=col_labels,
@@ -1281,27 +1294,26 @@ def render_pie_breakdown(df, group_col, chart_title, caption_parts, threshold=0.
         cellLoc="left",
     )
     table.auto_set_font_size(False)
-    table.set_fontsize(9)
-    table.scale(1.05, 1.5)
+    table.set_fontsize(table_font)
+    table.scale(1.05, row_scale)
 
     n_data = len(table_rows) - 1  # exclude TOTAL
     for j in range(2):
         cell = table[(0, j)]
         cell.set_facecolor("#1F4E79")
-        cell.set_text_props(color="white", fontweight="bold", fontsize=9, ha="center")
+        cell.set_text_props(color="white", fontweight="bold", fontsize=table_font, ha="center")
 
     for i in range(1, n_data + 1):
         alt = "#F5F7FA" if i % 2 == 0 else "#FFFFFF"
         table[(i, 0)].set_facecolor(alt)
-        table[(i, 0)].set_text_props(ha="left", fontsize=9)
+        table[(i, 0)].set_text_props(ha="left", fontsize=table_font)
         table[(i, 1)].set_facecolor(alt)
-        table[(i, 1)].set_text_props(ha="center", fontsize=9)
+        table[(i, 1)].set_text_props(ha="center", fontsize=table_font)
 
-    # TOTAL
     last = n_data + 1
     for j in range(2):
         table[(last, j)].set_facecolor("#E8F0FE")
-        table[(last, j)].set_text_props(fontweight="bold", fontsize=9,
+        table[(last, j)].set_text_props(fontweight="bold", fontsize=table_font,
                                         ha="center" if j == 1 else "left")
 
     for i in range(last + 1):
@@ -1312,8 +1324,8 @@ def render_pie_breakdown(df, group_col, chart_title, caption_parts, threshold=0.
         cell.set_edgecolor("#D0D7DE")
         cell.set_linewidth(0.6)
 
-    fig.suptitle(chart_title, fontsize=14, fontweight="bold", y=0.97, color="#1A1A1A")
-    fig.text(0.5, 0.02, " | ".join(caption_parts), ha="center", fontsize=7.5, color="#666666")
+    fig.suptitle(chart_title, fontsize=14, fontweight="bold", y=0.98, color="#1A1A1A")
+    fig.text(0.5, 0.015, " | ".join(caption_parts), ha="center", fontsize=7.5, color="#666666")
 
     buf = BytesIO()
     plt.savefig(buf, format="png", dpi=160, bbox_inches="tight", facecolor="white")
@@ -1329,7 +1341,6 @@ def render_pie_breakdown(df, group_col, chart_title, caption_parts, threshold=0.
         key=f"dl_{group_col}_{chart_title}",
         use_container_width=True,
     )
-
 
 
 # =========================================================================
