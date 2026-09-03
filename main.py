@@ -2533,12 +2533,6 @@ def classify_status(feedback: str, user_remark: str = "") -> str:
     return "No Response"
 
 
-st.set_page_config(
-    page_title="Safety Deficiencies Dashboard",
-    page_icon="rail",
-    layout="wide",
-)
-
 st.title("Safety Deficiencies Dashboard Generator")
 st.caption("Solapur Division · Central Railway · Google Sheet")
 
