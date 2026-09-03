@@ -2444,7 +2444,7 @@ with tabs[3]:
     WIDTH, HEIGHT = 14, 8
 
     # ============================================================
-    # STATUS FROM FEEDBACK
+    # STATUS CLASSIFICATION
     # ============================================================
     def classify_status(feedback, user_remark=""):
         text = f"{str(feedback or '')} {str(user_remark or '')}".lower().strip()
@@ -2487,27 +2487,8 @@ with tabs[3]:
                 return "Pending"
         return "No Response"
 
-    def prepare_df(df):
-        df = df.copy()
-        df.columns = [str(c).strip() for c in df.columns]
-
-        # Create Status
-        fb = "Feedback" if "Feedback" in df.columns else None
-        rm = "User Feedback/Remark" if "User Feedback/Remark" in df.columns else None
-        statuses = []
-        for _, row in df.iterrows():
-            f = row.get(fb, "") if fb else ""
-            r = row.get(rm, "") if rm else ""
-            statuses.append(classify_status(f, r))
-        df["Status"] = statuses
-
-        for col in ["Date of Inspection", "Head", "Sub Head", "Location", "Deficiencies Noted", "Status"]:
-            if col not in df.columns:
-                df[col] = ""
-        return df
-
     # ============================================================
-    # DRAWING HELPERS (original style)
+    # DRAWING HELPERS
     # ============================================================
     def draw_box(ax, x, y, w, h, facecolor="white", edgecolor=GRID, radius=0.05):
         ax.add_patch(FancyBboxPatch((x, y), w, h,
@@ -2537,11 +2518,11 @@ with tabs[3]:
         add_text(ax, 1.02, 7.24, "CENTRAL RAILWAY", 10.5, "bold", NAVY)
         y = 7.62
         for i, line in enumerate(title_lines):
-            add_text(ax, 7, y - i*0.23, line, 15 if i < 2 else 12, "bold", NAVY, "center")
+            add_text(ax, 7, y - i * 0.23, line, 15 if i < 2 else 12, "bold", NAVY, "center")
         add_text(ax, 7, 6.98, subtitle, 8.5, "bold", NAVY, "center")
 
     def draw_kpi_cards(ax, total, resolved, pending, no_response, y=6.20):
-        rate = (resolved / total * 100) if total else 0
+        rate = (resolved / total * 100) if total else 0.0
         cards = [
             ("TOTAL RECORDS", total, "100% of Total", NAVY, "■"),
             ("RESOLVED", resolved, f"{rate:.2f}%", GREEN, "✓"),
@@ -2552,11 +2533,11 @@ with tabs[3]:
         for i, (title, value, sub, color, icon) in enumerate(cards):
             x = 0.20 + i * 2.76
             draw_box(ax, x, y, 2.60, 0.65)
-            ax.add_patch(Circle((x+0.35, y+0.32), 0.19, facecolor=color, edgecolor="white", linewidth=1))
-            add_text(ax, x+0.35, y+0.32, icon, 15, "bold", "white", "center")
-            add_text(ax, x+0.66, y+0.44, title, 7.5, "bold", color)
-            add_text(ax, x+0.66, y+0.23, str(value), 18, "bold", color)
-            add_text(ax, x+0.66, y+0.06, sub, 7.2, "bold", TEXT)
+            ax.add_patch(Circle((x + 0.35, y + 0.32), 0.19, facecolor=color, edgecolor="white", linewidth=1))
+            add_text(ax, x + 0.35, y + 0.32, icon, 15, "bold", "white", "center")
+            add_text(ax, x + 0.66, y + 0.44, title, 7.5, "bold", color)
+            add_text(ax, x + 0.66, y + 0.23, str(value), 18, "bold", color)
+            add_text(ax, x + 0.66, y + 0.06, sub, 7.2, "bold", TEXT)
 
     def draw_footer(ax, dept_text, data_as_on):
         draw_rect(ax, 0, 0, WIDTH, 0.34, DARK_NAVY)
@@ -2567,20 +2548,20 @@ with tabs[3]:
 
     def status_counts(df):
         total = len(df)
-        resolved = df["Status"].str.contains("Resolved", case=False, na=False).sum()
-        pending = df["Status"].str.contains("Pending", case=False, na=False).sum()
-        no_resp = df["Status"].str.contains("No Response", case=False, na=False).sum()
-        return total, int(resolved), int(pending), int(no_resp)
+        resolved = int(df["Status"].str.contains("Resolved", case=False, na=False).sum())
+        pending = int(df["Status"].str.contains("Pending", case=False, na=False).sum())
+        no_resp = int(df["Status"].str.contains("No Response", case=False, na=False).sum())
+        return total, resolved, pending, no_resp
 
     def save_fig(fig, path):
         plt.savefig(path, dpi=180, bbox_inches="tight", pad_inches=0.03, facecolor="white")
         plt.close(fig)
 
     # ============================================================
-    # GOOGLE SHEET LOADER
+    # LOAD + CLEAN DATA (blank dates remove)
     # ============================================================
     @st.cache_data(ttl=60)
-    def load_sheet():
+    def load_and_clean():
         try:
             info = dict(st.secrets["gcp_service_account"])
             if "private_key" in info:
@@ -2596,28 +2577,51 @@ with tabs[3]:
             data = ws.get_all_values()
             if not data or len(data) < 2:
                 return pd.DataFrame()
-            return pd.DataFrame(data[1:], columns=[str(c).strip() for c in data[0]])
+
+            df = pd.DataFrame(data[1:], columns=[str(c).strip() for c in data[0]])
+
+            # ★★★ Blank Date of Inspection hatao ★★★
+            if "Date of Inspection" not in df.columns:
+                st.error("Date of Inspection column not found")
+                return pd.DataFrame()
+
+            df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce", dayfirst=True)
+            df = df.dropna(subset=["Date of Inspection"]).copy()   # blank dates removed
+
+            # Status banao
+            fb_col = "Feedback" if "Feedback" in df.columns else None
+            rm_col = "User Feedback/Remark" if "User Feedback/Remark" in df.columns else None
+            statuses = []
+            for _, row in df.iterrows():
+                f = row.get(fb_col, "") if fb_col else ""
+                r = row.get(rm_col, "") if rm_col else ""
+                statuses.append(classify_status(f, r))
+            df["Status"] = statuses
+
+            # required columns ensure
+            for col in ["Head", "Sub Head", "Location", "Deficiencies Noted"]:
+                if col not in df.columns:
+                    df[col] = ""
+
+            return df
         except Exception as e:
-            st.error(f"Sheet error: {e}")
+            st.error(f"Load error: {e}")
             return pd.DataFrame()
 
     # ============================================================
-    # DETAILED IMAGE GENERATOR (Original Format)
+    # DETAILED IMAGE (original style)
     # ============================================================
     def generate_detailed_image(df, department, period_title, section_period, data_as_on, report_months):
         df = df.copy()
-        df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
-        df = df.dropna(subset=["Date of Inspection"])
         df["Month"] = df["Date of Inspection"].dt.month
-
-        # Filter by months
         df = df[df["Month"].isin(report_months)].copy()
+
         if df.empty:
-            raise ValueError("No records in selected period")
+            raise ValueError("No records in selected period after filtering")
 
         total, resolved, pending, no_response = status_counts(df)
 
-        # Sub-head table
+        # Sub-head
         sub = df.groupby(["Sub Head", "Month"]).size().unstack(fill_value=0)
         for m in report_months:
             if m not in sub.columns:
@@ -2626,81 +2630,121 @@ with tabs[3]:
         sub["Share"] = (sub["Total"] / total * 100) if total else 0
         sub = sub.sort_values("Total", ascending=False)
 
-        # ---- DRAW ----
         fig, ax = new_canvas()
         draw_header(ax, [
-            f"SAFETY DEFICIENCIES ANALYSIS OF",
+            "SAFETY DEFICIENCIES ANALYSIS OF",
             f"{department} DEPARTMENT",
             period_title
         ])
         draw_kpi_cards(ax, total, resolved, pending, no_response)
 
-        # Sub-head table box
+        # Left - Sub Head table
         x, y, w, h = 0.15, 3.40, 6.55, 2.55
         draw_box(ax, x, y, w, h)
-        draw_rect(ax, x, y+h-0.28, w, 0.28, NAVY)
-        add_text(ax, x+w/2, y+h-0.14,
-                 f"II - CLASSIFICATION SUB HEAD DISTRIBUTION ({section_period})",
-                 9.5, "bold", "white", "center")
+        draw_rect(ax, x, y + h - 0.28, w, 0.28, NAVY)
+        add_text(ax, x + w/2, y + h - 0.14,
+                 f"II - SUB HEAD DISTRIBUTION ({section_period})", 9.5, "bold", "white", "center")
 
-        # Header row
-        add_text(ax, x+0.15, y+h-0.50, "Sub Head", 7, "bold", NAVY)
-        add_text(ax, x+4.8, y+h-0.50, "Total", 7, "bold", NAVY)
-        add_text(ax, x+5.6, y+h-0.50, "% Share", 7, "bold", NAVY)
+        add_text(ax, x + 0.15, y + h - 0.50, "Sub Head", 7, "bold", NAVY)
+        add_text(ax, x + 4.6, y + h - 0.50, "Total", 7, "bold", NAVY)
+        add_text(ax, x + 5.5, y + h - 0.50, "% Share", 7, "bold", NAVY)
 
         for i, (sh, row) in enumerate(sub.head(11).iterrows()):
             yy = y + h - 0.70 - i * 0.16
-            add_text(ax, x+0.15, yy, str(sh)[:32], 6.5, "normal", TEXT)
-            add_text(ax, x+4.8, yy, str(int(row["Total"])), 6.5, "bold", TEXT)
-            add_text(ax, x+5.6, yy, f"{row['Share']:.1f}%", 6.5, "normal", TEXT)
+            add_text(ax, x + 0.15, yy, str(sh)[:30], 6.5, "normal", TEXT)
+            add_text(ax, x + 4.6, yy, str(int(row["Total"])), 6.5, "bold", TEXT)
+            add_text(ax, x + 5.5, yy, f"{row['Share']:.1f}%", 6.5, "normal", TEXT)
 
-        # Bar chart box
+        # Right - Bar
         x2, y2, w2, h2 = 6.88, 3.40, 6.97, 2.55
         draw_box(ax, x2, y2, w2, h2)
-        draw_rect(ax, x2, y2+h2-0.28, w2, 0.28, NAVY)
-        add_text(ax, x2+w2/2, y2+h2-0.14,
-                 f"SUB HEAD WISE DISTRIBUTION ({section_period})",
-                 9.5, "bold", "white", "center")
+        draw_rect(ax, x2, y2 + h2 - 0.28, w2, 0.28, NAVY)
+        add_text(ax, x2 + w2/2, y2 + h2 - 0.14,
+                 f"SUB HEAD WISE ({section_period})", 9.5, "bold", "white", "center")
 
         plot = sub.head(10)
-        left, right = x2+2.3, x2+5.9
-        top, bottom = y2+h2-0.55, y2+0.35
-        step = (top - bottom) / max(len(plot)-1, 1)
+        left, right = x2 + 2.4, x2 + 5.9
+        top, bottom = y2 + h2 - 0.55, y2 + 0.35
+        step = (top - bottom) / max(len(plot) - 1, 1)
         maximum = max(plot["Total"].max(), 1)
 
         for i, (sh, row) in enumerate(plot.iterrows()):
             yy = top - i * step
-            label = str(sh)[:26] + ("..." if len(str(sh)) > 26 else "")
-            add_text(ax, left-0.1, yy, label, 6.5, "bold", TEXT, "right")
-            bw = row["Total"] / maximum * (right - left)
-            draw_rect(ax, left, yy-0.05, bw, 0.10, NAVY)
-            add_text(ax, right+0.15, yy, str(int(row["Total"])), 7, "bold", TEXT)
+            label = str(sh)[:24] + ("..." if len(str(sh)) > 24 else "")
+            add_text(ax, left - 0.1, yy, label, 6.5, "bold", TEXT, "right")
+            bw = (row["Total"] / maximum) * (right - left)
+            draw_rect(ax, left, yy - 0.05, bw, 0.10, NAVY)
+            add_text(ax, right + 0.12, yy, str(int(row["Total"])), 7, "bold", TEXT)
 
-        # Status summary box (bottom)
+        # Bottom - Status
         x3, y3, w3, h3 = 0.15, 0.50, 13.7, 2.70
         draw_box(ax, x3, y3, w3, h3)
-        draw_rect(ax, x3, y3+h3-0.28, w3, 0.28, NAVY)
-        add_text(ax, x3+w3/2, y3+h3-0.14, "III - STATUS SUMMARY", 10, "bold", "white", "center")
+        draw_rect(ax, x3, y3 + h3 - 0.28, w3, 0.28, NAVY)
+        add_text(ax, x3 + w3/2, y3 + h3 - 0.14, "III - STATUS SUMMARY", 10, "bold", "white", "center")
 
-        # Simple status boxes
-        status_data = [
+        for i, (name, val, col) in enumerate([
             ("Resolved", resolved, GREEN),
             ("Pending", pending, ORANGE),
-            ("No Response", no_response, RED),
-        ]
-        for i, (name, val, col) in enumerate(status_data):
-            xx = 1.5 + i * 4.0
-            draw_box(ax, xx, y3+0.8, 3.2, 1.3)
-            add_text(ax, xx+1.6, y3+1.7, name, 11, "bold", col, "center")
-            add_text(ax, xx+1.6, y3+1.2, str(val), 22, "bold", col, "center")
-            pct = (val/total*100) if total else 0
-            add_text(ax, xx+1.6, y3+0.95, f"{pct:.1f}%", 10, "normal", TEXT, "center")
+            ("No Response", no_response, RED)
+        ]):
+            xx = 1.8 + i * 4.0
+            draw_box(ax, xx, y3 + 0.7, 3.0, 1.4)
+            add_text(ax, xx + 1.5, y3 + 1.7, name, 12, "bold", col, "center")
+            add_text(ax, xx + 1.5, y3 + 1.2, str(val), 24, "bold", col, "center")
+            pct = (val / total * 100) if total else 0
+            add_text(ax, xx + 1.5, y3 + 0.9, f"{pct:.1f}%", 11, "normal", TEXT, "center")
 
         draw_footer(ax, f"Reporting Department: {department}, SUR DIVN, CR", data_as_on)
 
-        out = str(OUTPUT_FOLDER / f"{department.replace('/', '_').replace(' ', '_')}_Dashboard.png")
-        save_fig(fig, out)
-        return out
+        path = str(OUTPUT_FOLDER / f"DETAILED_{department.replace('/', '_').replace(' ', '_')}.png")
+        save_fig(fig, path)
+        return path
+
+    # ============================================================
+    # GENERAL IMAGE (simple + pending focus)
+    # ============================================================
+    def generate_general_image(df, department, period_title, data_as_on, report_months):
+        df = df.copy()
+        df["Month"] = df["Date of Inspection"].dt.month
+        df = df[df["Month"].isin(report_months)].copy()
+
+        if df.empty:
+            raise ValueError("No records for General image")
+
+        total, resolved, pending, no_response = status_counts(df)
+        rate = (resolved / total * 100) if total else 0
+
+        fig, ax = new_canvas()
+        draw_header(ax, [
+            "GENERAL SAFETY DEFICIENCIES SUMMARY",
+            f"{department} DEPARTMENT",
+            period_title
+        ])
+        draw_kpi_cards(ax, total, resolved, pending, no_response)
+
+        # Big status boxes
+        y = 3.8
+        for i, (name, val, col) in enumerate([
+            ("RESOLVED", resolved, GREEN),
+            ("PENDING", pending, ORANGE),
+            ("NO RESPONSE", no_response, RED)
+        ]):
+            x = 1.2 + i * 4.1
+            draw_box(ax, x, y, 3.6, 2.2)
+            add_text(ax, x + 1.8, y + 1.7, name, 14, "bold", col, "center")
+            add_text(ax, x + 1.8, y + 1.1, str(val), 32, "bold", col, "center")
+            pct = (val / total * 100) if total else 0
+            add_text(ax, x + 1.8, y + 0.5, f"{pct:.1f}% of Total", 12, "normal", TEXT, "center")
+
+        # Footer note
+        add_text(ax, 7, 1.3, f"Total Records in Period: {total}   |   Resolution Rate: {rate:.1f}%", 12, "bold", NAVY, "center")
+        add_text(ax, 7, 0.9, "This is General Summary. For detailed Sub-Head & Jurisdiction analysis use Detailed mode.", 9, "normal", GRAY, "center")
+
+        draw_footer(ax, f"Reporting Department: {department}, SUR DIVN, CR", data_as_on)
+
+        path = str(OUTPUT_FOLDER / f"GENERAL_{department.replace('/', '_').replace(' ', '_')}.png")
+        save_fig(fig, path)
+        return path
 
     # ============================================================
     # UI
@@ -2712,91 +2756,79 @@ with tabs[3]:
 
     col1, col2 = st.columns([2, 1])
     with col1:
-        department = st.selectbox("Select Department", DEPARTMENT_OPTIONS, key="img_dept")
+        department = st.selectbox("Select Department", DEPARTMENT_OPTIONS, key="final_dept")
     with col2:
-        mode = st.radio("Mode", ["Detailed only", "General only", "Both (Detailed + General)"], index=0, key="img_mode")
+        mode = st.radio("Mode", ["Both (Detailed + General)", "Detailed only", "General only"], index=0, key="final_mode")
 
     c1, c2 = st.columns(2)
     with c1:
-        start_date = st.date_input("From", value=date(2026, 4, 1), key="img_from")
+        start_date = st.date_input("From", value=date(2026, 4, 1), key="final_from")
     with c2:
-        end_date = st.date_input("To", value=date(2026, 7, 31), key="img_to")
+        end_date = st.date_input("To", value=date(2026, 7, 31), key="final_to")
 
     if end_date < start_date:
         st.error("To date cannot be before From date")
         st.stop()
 
-    # months list
+    # months
     report_months = []
-    y, m = start_date.year, start_date.month
-    while (y, m) <= (end_date.year, end_date.month):
-        report_months.append(m)
-        m = 1 if m == 12 else m + 1
-        if m == 1: y += 1
+    yy, mm = start_date.year, start_date.month
+    while (yy, mm) <= (end_date.year, end_date.month):
+        report_months.append(mm)
+        if mm == 12:
+            yy += 1
+            mm = 1
+        else:
+            mm += 1
     report_months = list(dict.fromkeys(report_months))
 
     period_title = f"FOR THE PERIOD {start_date.strftime('%d %b %Y').upper()} TO {end_date.strftime('%d %b %Y').upper()}"
     section_period = f"{start_date.strftime('%d %b').upper()} TO {end_date.strftime('%d %b %Y').upper()}"
     data_as_on = end_date.strftime("%d %B %Y").upper()
 
-    st.info(f"**Period:** {start_date.strftime('%d %b %Y')} → {end_date.strftime('%d %b %Y')}  |  **Months:** {report_months}")
+    st.info(f"**Period:** {start_date.strftime('%d %b %Y')} → {end_date.strftime('%d %b %Y')}  |  Months: {report_months}")
 
-    if st.button("Generate Dashboard Image", type="primary", use_container_width=True, key="img_gen"):
-        with st.spinner("Generating original format dashboard image..."):
+    if st.button("Generate Dashboard Images", type="primary", use_container_width=True, key="final_gen"):
+        with st.spinner("Loading data & generating images..."):
             try:
-                raw = load_sheet()
+                raw = load_and_clean()
                 if raw.empty:
-                    st.error("No data from Google Sheet")
+                    st.error("No valid data (blank Date of Inspection records already removed)")
                     st.stop()
 
-                df = prepare_df(raw)
-
-                # Filter department
-                head_clean = df["Head"].astype(str).str.upper().str.replace(" ", "", regex=False)
-                dept_clean = department.upper().replace(" ", "").replace("&", "")
+                # Department filter
+                head = raw["Head"].astype(str).str.upper().str.replace(" ", "", regex=False)
                 if department == "SIGNAL & TELECOM":
-                    mask = head_clean.str.contains("SIGNAL|S&T|SNT|TELECOM", case=False, na=False)
+                    mask = head.str.contains("SIGNAL|S&T|SNT|TELECOM", case=False, na=False)
                 elif department == "OPTG":
-                    mask = head_clean.str.contains("OPTG|OPERATING", case=False, na=False)
+                    mask = head.str.contains("OPTG|OPERATING", case=False, na=False)
                 else:
-                    mask = head_clean.str.contains(dept_clean, case=False, na=False)
-                df = df[mask].copy()
+                    mask = head.str.contains(department.upper().replace(" ", "").replace("/", ""), case=False, na=False)
 
+                df = raw[mask].copy()
                 if df.empty:
-                    st.warning(f"No records found for {department}")
+                    st.warning(f"No records found for **{department}**")
                     st.stop()
 
-                # ----- DETAILED IMAGE -----
-                if mode in ["Detailed only", "Both (Detailed + General)"]:
-                    path = generate_detailed_image(
-                        df, department, period_title, section_period, data_as_on, report_months
-                    )
-                    st.success("Detailed Dashboard Image Generated")
-                    st.image(path, use_column_width=True)
-                    with open(path, "rb") as f:
-                        st.download_button(
-                            "Download Detailed PNG",
-                            f.read(),
-                            file_name=Path(path).name,
-                            mime="image/png",
-                            key="dl_detailed_img"
-                        )
+                st.success(f"Valid records (blank dates removed): **{len(df)}**")
 
-                # ----- GENERAL (simple pending list) -----
-                if mode in ["General only", "Both (Detailed + General)"]:
-                    st.markdown("---")
-                    st.subheader("General — Pending Records")
-                    pending_df = df[df["Status"] == "Pending"]
-                    st.write(f"Pending records: **{len(pending_df)}**")
-                    if pending_df.empty:
-                        st.success("No pending records")
-                    else:
-                        cols = [c for c in ["Date of Inspection", "Location", "Sub Head", "Deficiencies Noted", "Feedback"] if c in pending_df.columns]
-                        st.dataframe(pending_df[cols], use_container_width=True)
-                        csv = pending_df.to_csv(index=False).encode("utf-8-sig")
-                        st.download_button("Download Pending CSV", csv,
-                                           file_name=f"pending_{department.replace('/', '_')}.csv",
-                                           mime="text/csv", key="dl_pending_csv")
+                # ----- DETAILED -----
+                if mode in ["Both (Detailed + General)", "Detailed only"]:
+                    path_d = generate_detailed_image(df, department, period_title, section_period, data_as_on, report_months)
+                    st.subheader("Detailed Dashboard")
+                    st.image(path_d, use_column_width=True)
+                    with open(path_d, "rb") as f:
+                        st.download_button("Download Detailed PNG", f.read(),
+                                           file_name=Path(path_d).name, mime="image/png", key="dl_det")
+
+                # ----- GENERAL -----
+                if mode in ["Both (Detailed + General)", "General only"]:
+                    path_g = generate_general_image(df, department, period_title, data_as_on, report_months)
+                    st.subheader("General Dashboard")
+                    st.image(path_g, use_column_width=True)
+                    with open(path_g, "rb") as f:
+                        st.download_button("Download General PNG", f.read(),
+                                           file_name=Path(path_g).name, mime="image/png", key="dl_gen")
 
             except Exception as e:
                 st.exception(e)
