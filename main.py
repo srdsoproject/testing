@@ -2693,37 +2693,39 @@ with tabs[3]:
     # ============================================================
     # Google Sheet loader
     # ============================================================
+    @st.cache_data(ttl=60)
+    def load_google_sheet():
+        """Load data using the same service account that is already working in the main app."""
+        try:
+            # Re-use the same secrets that your main app is already using
+            service_account_info = dict(st.secrets["gcp_service_account"])
+            if "private_key" in service_account_info:
+                service_account_info["private_key"] = service_account_info["private_key"].replace("\\n", "\n")
     
-    @st.cache_data(ttl=300)
-    def load_google_sheet() -> pd.DataFrame:
-        """Load data from Google Sheet (public or service account)."""
-        if USE_SERVICE_ACCOUNT:
-            try:
-                import gspread
-                from google.oauth2.service_account import Credentials
-                scopes = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
-                creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=scopes)
-                gc = gspread.authorize(creds)
-                sh = gc.open_by_key(GOOGLE_SHEET_ID)
-                ws = sh.get_worksheet(0)
-                data = ws.get_all_records()
-                df = pd.DataFrame(data)
-            except Exception as e:
-                st.error(f"Service account load failed: {e}")
-                raise
-        else:
-            # Public sheet CSV export
-            url = f"https://docs.google.com/spreadsheets/d/{GOOGLE_SHEET_ID}/export?format=csv&gid={GOOGLE_SHEET_GID}"
-            try:
-                df = pd.read_csv(url)
-            except Exception as e:
-                st.error(f"Could not load public Google Sheet. Check Sheet ID & sharing settings.\n{e}")
-                raise
+            scopes = [
+                "https://www.googleapis.com/auth/spreadsheets",
+                "https://www.googleapis.com/auth/drive",
+            ]
+            creds = Credentials.from_service_account_info(service_account_info, scopes=scopes)
+            gc = gspread.authorize(creds)
     
-        # Clean column names
-        df.columns = df.columns.astype(str).str.strip().str.replace(r"\s+", " ", regex=True)
-        return df
+            # Use the same sheet_id and sheet_name from secrets
+            sheet_id = st.secrets["google_sheets"]["sheet_id"]
+            sheet_name = st.secrets["google_sheets"]["sheet_name"]
     
+            ws = gc.open_by_key(sheet_id).worksheet(sheet_name)
+            data = ws.get_all_values()
+    
+            if not data or len(data) < 2:
+                return pd.DataFrame()
+    
+            headers = [str(c).strip() for c in data[0]]
+            df = pd.DataFrame(data[1:], columns=headers)
+            return df
+    
+        except Exception as e:
+            st.error(f"Google Sheet load failed (service account): {e}")
+            return pd.DataFrame()    
     # ============================================================
     # Department generators (kept from original – only key ones shown fully)
     # You can paste remaining generators (elect_trd, mechanical, operating, commercial, elect_tro, snt)
