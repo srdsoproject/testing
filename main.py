@@ -2424,7 +2424,7 @@ Safety Deficiencies Dashboard - Google Sheet version
 (Uses existing secrets + keeps combinations.py / master_code.py working)
 """
 
-from __future__ import annotations
+
 
 import io
 import sys
