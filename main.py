@@ -1656,14 +1656,11 @@ with tabs[0]:
         
         gb.configure_column("_original_sheet_index", hide=True)
         gb.configure_column("_sheet_row", hide=True)
-        gb.configure_selection(selection_mode="multiple", use_checkbox=True)
         gb.configure_grid_options(
             singleClickEdit=True,
             suppressHorizontalScroll=False,
-            enableCellTextSelection=True,
+            enableCellTextSelection=False,   # or just delete this line
             ensureDomOrder=True,
-            rowSelection="multiple",
-            suppressRowClickSelection=False,
         )
         grid_options = gb.build()
         
