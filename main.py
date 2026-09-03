@@ -2897,7 +2897,7 @@ with tabs[3]:
                         data_as_on
                     )
                     st.success("Dashboard generated successfully!")
-                    st.image(path, use_container_width=True)
+                    st.image(path, use_column_width=True)
                     with open(path, "rb") as f:
                         st.download_button(
                             "Download PNG",
