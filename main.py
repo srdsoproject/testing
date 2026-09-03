@@ -1,4 +1,5 @@
 #inspectionviewer
+from __future__ import annotations
 import streamlit as st
 import pandas as pd
 import gspread
@@ -20,7 +21,7 @@ from urllib.parse import quote
 import re
 import plotly.express as px
 import plotly.graph_objects as go
-from __future__ import annotations
+
 
 import io
 import os
