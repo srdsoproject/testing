@@ -44,8 +44,8 @@ from PIL import Image
 # ---------- 1. FILES / FOLDERS ----------
 BASE_DIR = r"C:\Users\USER1.DSONC\PycharmProjects\PythonProject1"
 EXCEL_FILE_NAME = "DATA.xlsx"
-LOGO_FILE_NAME = "indian_railways_logo.png"
-TRAIN_FILE_NAME = "train.png"
+LOGO_FILE_NAME = "https://raw.githubusercontent.com/srdsoproject/testing/main/indian_railways_logo.png"
+TRAIN_FILE_NAME = "https://raw.githubusercontent.com/srdsoproject/testing/main/train.png"
 OUTPUT_FOLDER_NAME = "DEPARTMENT_DASHBOARDS"
 
 # ---------- 2. MONTHS (controls ALL table columns & rows) ----------
