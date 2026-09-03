@@ -3065,11 +3065,6 @@ with tabs[3]:
     # Streamlit UI
     # ============================================================
     
-    st.set_page_config(
-        page_title="Safety Deficiencies Dashboard",
-        page_icon="🚂",
-        layout="wide",
-    )
     
     st.title("Safety Deficiencies Dashboard Generator")
     st.caption("Solapur Division · Central Railway · Google Sheet + GitHub assets")
