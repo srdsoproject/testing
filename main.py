@@ -20,6 +20,24 @@ from urllib.parse import quote
 import re
 import plotly.express as px
 import plotly.graph_objects as go
+from __future__ import annotations
+
+import io
+import os
+import re
+import sys
+import tempfile
+from datetime import date, datetime
+from pathlib import Path
+from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from matplotlib.patches import FancyBboxPatch, Rectangle, Circle
+from PIL import Image
+import streamlit as st
+import requests
 # =========================================================================
 # CONFIG
 # =========================================================================
@@ -2415,24 +2433,7 @@ with tabs[3]:
         streamlit run app.py
     """
     
-    from __future__ import annotations
-    
-    import io
-    import os
-    import re
-    import sys
-    import tempfile
-    from datetime import date, datetime
-    from pathlib import Path
-    from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple
-    
-    import numpy as np
-    import pandas as pd
-    import matplotlib.pyplot as plt
-    from matplotlib.patches import FancyBboxPatch, Rectangle, Circle
-    from PIL import Image
-    import streamlit as st
-    import requests
+
     
     # ============================================================
     # ★★★  EASY SETTINGS  ★★★
