@@ -2419,48 +2419,21 @@ with tabs[2]:
         buf.seek(0)
         return buf
 with tabs[3]:
-    # ============================================================
-    # Safety Deficiencies Dashboard Generator
-    # ============================================================
-
-    st.title("Safety Deficiencies Dashboard Generator")
-    st.caption("Solapur Division · Central Railway · Google Sheet")
+    st.title("Safety Deficiencies Dashboard")
+    st.caption("Solapur Division · Central Railway · SARAL")
 
     st.markdown("---")
 
-    # ---------- Settings ----------
-    OUTPUT_FOLDER = Path("DEPARTMENT_DASHBOARDS")
-    OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
-
-    LOGO_URL = "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/indian_railways_logo.png"
-    TRAIN_URL = "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/train.png"
-
-    NAVY = "#123A7A"
-    DARK_NAVY = "#0C2F67"
-    GRID = "#D4DDE8"
-    LIGHT_BLUE = "#EEF4FA"
-    PALE_YELLOW = "#FFF3D4"
-    GREEN = "#11833B"
-    RED = "#C81E2A"
-    ORANGE = "#D97706"
-    PURPLE = "#56319A"
-    TEXT = "#222222"
-    GRAY = "#6B7280"
-
-    WIDTH, HEIGHT = 14, 8
-
-    MONTH_NAMES = {
-        1: "January", 2: "February", 3: "March", 4: "April",
-        5: "May", 6: "June", 7: "July", 8: "August",
-        9: "September", 10: "October", 11: "November", 12: "December"
-    }
-
     # ============================================================
-    # Status classification (from Feedback)
+    # CONFIG & HELPERS
     # ============================================================
+    DEPARTMENT_OPTIONS = [
+        "ELECT/G", "ELECT/TRD", "ELECT/TRO", "SIGNAL & TELECOM",
+        "OPTG", "MECHANICAL", "ENGINEERING", "COMMERCIAL"
+    ]
+
     def classify_status(feedback: str, user_remark: str = "") -> str:
         text = f"{str(feedback or '')} {str(user_remark or '')}".lower().strip()
-
         if not text or text in ["nan", "none", ""]:
             return "No Response"
 
@@ -2479,7 +2452,6 @@ with tabs[3]:
             "attend dt", "attend dt.", "operational feasibility", "will be provided",
             "will be supplied shortly", "advised to ubl", "updated"
         ]
-
         pending_kw = [
             "work is going on", "tdc given", "target date", "expected by", "likely by", "planned by",
             "will be", "needful", "to be", "pending", "not done", "awaiting", "waiting", "yet to", "next time",
@@ -2502,15 +2474,88 @@ with tabs[3]:
                 return "Pending"
         return "No Response"
 
-    def prepare_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-        """Map columns + create Status from Feedback."""
+    def _normalize_dept(name: str) -> str:
+        if not isinstance(name, str):
+            return ""
+        s = name.upper().strip()
+        s = re.sub(r"\s+", " ", s)
+        aliases = {
+            "S&T": "SIGNAL & TELECOM", "S & T": "SIGNAL & TELECOM",
+            "SIGNAL AND TELECOM": "SIGNAL & TELECOM",
+            "MECH": "MECHANICAL", "MECH.": "MECHANICAL",
+            "ENGG": "ENGINEERING", "ENGG.": "ENGINEERING",
+            "TRD": "ELECT/TRD", "ELECT TRD": "ELECT/TRD",
+            "ELECT G": "ELECT/G", "ELECT-G": "ELECT/G",
+            "OPTG": "OPTG", "OPERATING": "OPTG",
+        }
+        return aliases.get(s, s)
+
+    @st.cache_data(ttl=60)
+    def load_sheet():
+        try:
+            service_account_info = dict(st.secrets["gcp_service_account"])
+            if "private_key" in service_account_info:
+                service_account_info["private_key"] = service_account_info["private_key"].replace("\\n", "\n")
+            scopes = [
+                "https://www.googleapis.com/auth/spreadsheets",
+                "https://www.googleapis.com/auth/drive",
+            ]
+            creds = Credentials.from_service_account_info(service_account_info, scopes=scopes)
+            gc = gspread.authorize(creds)
+            sheet_id = st.secrets["google_sheets"]["sheet_id"]
+            sheet_name = st.secrets["google_sheets"]["sheet_name"]
+            ws = gc.open_by_key(sheet_id).worksheet(sheet_name)
+            data = ws.get_all_values()
+            if not data or len(data) < 2:
+                return pd.DataFrame()
+            headers = [str(c).strip() for c in data[0]]
+            return pd.DataFrame(data[1:], columns=headers)
+        except Exception as e:
+            st.error(f"Sheet load error: {e}")
+            return pd.DataFrame()
+
+    def preprocess(df, date_from, date_to, department):
         df = df.copy()
         df.columns = [str(c).strip() for c in df.columns]
+
+        # Rename common columns
+        col_map = {}
+        for c in df.columns:
+            cl = c.lower()
+            if "date" in cl and "inspection" in cl:
+                col_map[c] = "Date of Inspection"
+            elif cl in ["sub head", "subhead"]:
+                col_map[c] = "Sub Head"
+            elif cl == "location":
+                col_map[c] = "Location"
+            elif cl in ["head", "department"]:
+                col_map[c] = "Head"
+            elif "feedback" in cl and "user" not in cl:
+                col_map[c] = "Feedback"
+            elif "user feedback" in cl or "user remark" in cl:
+                col_map[c] = "User Feedback/Remark"
+            elif cl == "status":
+                col_map[c] = "Status"
+        df = df.rename(columns=col_map)
+
+        # Date filter
+        df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce", dayfirst=True)
+        df = df.dropna(subset=["Date of Inspection"])
+        mask = (df["Date of Inspection"].dt.date >= date_from) & (df["Date of Inspection"].dt.date <= date_to)
+        df = df[mask].copy()
+
+        # Department filter
+        target = _normalize_dept(department)
+        if "Head" in df.columns:
+            head_norm = df["Head"].fillna("").astype(str).map(_normalize_dept)
+            df = df[head_norm == target].copy()
+
+        if df.empty:
+            return df
 
         # Create Status
         fb_col = "Feedback" if "Feedback" in df.columns else None
         rm_col = "User Feedback/Remark" if "User Feedback/Remark" in df.columns else None
-
         statuses = []
         for _, row in df.iterrows():
             fb = row.get(fb_col, "") if fb_col else ""
@@ -2518,398 +2563,198 @@ with tabs[3]:
             statuses.append(classify_status(fb, rm))
         df["Status"] = statuses
 
-        # Ensure required columns exist
-        required = ["Date of Inspection", "Head", "Sub Head", "Location", "Deficiencies Noted", "Status"]
-        for col in required:
-            if col not in df.columns:
-                df[col] = ""
-
+        df["Month"] = df["Date of Inspection"].dt.to_period("M")
+        df["Month Name"] = df["Date of Inspection"].dt.strftime("%b-%Y")
         return df
 
     # ============================================================
-    # Drawing helpers
+    # UI – FILTERS
     # ============================================================
-    def download_image(url: str, suffix: str = ".png") -> str:
-        try:
-            r = requests.get(url, timeout=20)
-            r.raise_for_status()
-            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-            tmp.write(r.content)
-            tmp.close()
-            return tmp.name
-        except Exception:
-            # Return empty string if fail → header will skip image
-            return ""
+    col1, col2, col3 = st.columns([1.2, 1.2, 1.5])
 
-    def draw_box(ax, x, y, w, h, facecolor="white", edgecolor=GRID, radius=0.05):
-        ax.add_patch(FancyBboxPatch(
-            (x, y), w, h,
-            boxstyle=f"round,pad=0.012,rounding_size={radius}",
-            facecolor=facecolor, edgecolor=edgecolor, linewidth=0.8,
-        ))
-
-    def draw_rect(ax, x, y, w, h, color, edgecolor=None):
-        ax.add_patch(Rectangle((x, y), w, h, facecolor=color,
-                               edgecolor=edgecolor or color, linewidth=0.5))
-
-    def add_text(ax, x, y, text, size=8, weight="normal", color=TEXT, ha="left", va="center"):
-        ax.text(x, y, str(text), fontsize=size, fontweight=weight,
-                color=color, ha=ha, va=va, family="DejaVu Sans")
-
-    def new_canvas():
-        fig = plt.figure(figsize=(WIDTH, HEIGHT), dpi=170)
-        fig.patch.set_facecolor("white")
-        ax = fig.add_axes([0, 0, 1, 1])
-        ax.set_xlim(0, WIDTH)
-        ax.set_ylim(0, HEIGHT)
-        ax.axis("off")
-        return fig, ax
-
-    def draw_header(ax, title_lines, subtitle="Source: SARAL"):
-        # Try logo
-        try:
-            logo_path = download_image(LOGO_URL)
-            if logo_path:
-                logo = Image.open(logo_path).convert("RGBA")
-                ax.imshow(logo, extent=[0.08, 0.88, 7.18, 7.94], aspect="auto", zorder=10)
-        except Exception:
-            pass
-
-        add_text(ax, 1.02, 7.72, "INDIAN RAILWAYS", 13, "bold", NAVY)
-        add_text(ax, 1.02, 7.46, "SOLAPUR DIVISION", 10.5, "bold", NAVY)
-        add_text(ax, 1.02, 7.24, "CENTRAL RAILWAY", 10.5, "bold", NAVY)
-
-        y = 7.62
-        for i, line in enumerate(title_lines):
-            add_text(ax, 7, y - i * 0.23, line, 15 if i < 2 else 12, "bold", NAVY, "center")
-        add_text(ax, 7, 6.98, subtitle, 8.5, "bold", NAVY, "center")
-
-        # Try train
-        try:
-            train_path = download_image(TRAIN_URL)
-            if train_path:
-                train = Image.open(train_path).convert("RGBA")
-                ax.imshow(train, extent=[12.25, 13.88, 7.20, 7.83], aspect="auto", zorder=10)
-        except Exception:
-            pass
-
-    def draw_kpi_cards(ax, total, resolved, pending, no_response, y=6.20):
-        resolution_rate = (resolved / total * 100) if total else 0.0
-        cards = [
-            ("TOTAL RECORDS", total, "100% of Total", NAVY, "■"),
-            ("RESOLVED", resolved, f"{resolution_rate:.2f}%", GREEN, "✓"),
-            ("NO RESPONSE", no_response,
-             f"{no_response / total * 100:.2f}%" if total else "0.00%", RED, "..."),
-            ("PENDING", pending,
-             f"{pending / total * 100:.2f}%" if total else "0.00%", ORANGE, "P"),
-            ("OVERALL RESOLUTION RATE", f"{resolution_rate:.2f}%",
-             "(Resolved / Total)", PURPLE, "↗"),
-        ]
-        for i, (title, value, sub_t, color, icon) in enumerate(cards):
-            x = 0.20 + i * 2.76
-            draw_box(ax, x, y, 2.60, 0.65)
-            ax.add_patch(Circle((x + 0.35, y + 0.32), 0.19, facecolor=color,
-                                edgecolor="white", linewidth=1))
-            add_text(ax, x + 0.35, y + 0.32, icon, 15, "bold", "white", "center")
-            add_text(ax, x + 0.66, y + 0.44, title, 7.5, "bold", color)
-            add_text(ax, x + 0.66, y + 0.23, str(value), 18, "bold", color)
-            add_text(ax, x + 0.66, y + 0.06, sub_t, 7.2, "bold", TEXT)
-        return resolution_rate
-
-    def draw_footer(ax, dept_text, data_as_on="31 JULY 2026"):
-        draw_rect(ax, 0, 0, WIDTH, 0.34, DARK_NAVY)
-        add_text(ax, 0.22, 0.17, "Source: SARAL System", 8, color="white")
-        add_text(ax, 3.25, 0.17, dept_text, 7.5, color="white")
-        add_text(ax, 8.55, 0.17, "Analysis Type: Deficiency Analysis", 8, color="white")
-        add_text(ax, 11.35, 0.17, f"Data as on: {data_as_on}", 8, color="white")
-
-    def status_counts(df):
-        total = len(df)
-        resolved = df["Status"].str.contains("Resolved", case=False, na=False).sum()
-        pending = df["Status"].str.contains("Pending", case=False, na=False).sum()
-        no_response = df["Status"].str.contains("No Response", case=False, na=False).sum()
-        return total, int(resolved), int(pending), int(no_response)
-
-    def filter_months(df, months, start_date=None, end_date=None):
-        df = df.copy()
-        df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
-        df["Month"] = df["Date of Inspection"].dt.month
-
-        if start_date or end_date:
-            mask = df["Date of Inspection"].notna()
-            if start_date:
-                mask &= df["Date of Inspection"] >= pd.to_datetime(start_date)
-            if end_date:
-                end_ts = pd.to_datetime(end_date) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
-                mask &= df["Date of Inspection"] <= end_ts
-            return df[mask].copy()
-        else:
-            return df[df["Month"].isin(months)].copy()
-
-    def subhead_table(df, months):
-        sub = df.groupby(["Sub Head", "Month"]).size().unstack(fill_value=0)
-        for m in months:
-            if m not in sub.columns:
-                sub[m] = 0
-        sub["Total"] = sub[months].sum(axis=1)
-        total = len(df)
-        sub["Share"] = (sub["Total"] / total * 100) if total else 0.0
-        return sub.sort_values("Total", ascending=False)
-
-    def save_fig(fig, path):
-        plt.savefig(path, dpi=180, bbox_inches="tight", pad_inches=0.03, facecolor="white")
-        plt.close(fig)
-
-    # ============================================================
-    # Google Sheet loader (reuses existing service account)
-    # ============================================================
-    @st.cache_data(ttl=60)
-    def load_google_sheet_for_dashboard():
-        try:
-            service_account_info = dict(st.secrets["gcp_service_account"])
-            if "private_key" in service_account_info:
-                service_account_info["private_key"] = service_account_info["private_key"].replace("\\n", "\n")
-
-            scopes = [
-                "https://www.googleapis.com/auth/spreadsheets",
-                "https://www.googleapis.com/auth/drive",
-            ]
-            creds = Credentials.from_service_account_info(service_account_info, scopes=scopes)
-            gc = gspread.authorize(creds)
-
-            sheet_id = st.secrets["google_sheets"]["sheet_id"]
-            sheet_name = st.secrets["google_sheets"]["sheet_name"]
-
-            ws = gc.open_by_key(sheet_id).worksheet(sheet_name)
-            data = ws.get_all_values()
-
-            if not data or len(data) < 2:
-                return pd.DataFrame()
-
-            headers = [str(c).strip() for c in data[0]]
-            df = pd.DataFrame(data[1:], columns=headers)
-            return df
-        except Exception as e:
-            st.error(f"Google Sheet load failed: {e}")
-            return pd.DataFrame()
-
-    # ============================================================
-    # ELECT/G Generator (example – others can be added similarly)
-    # ============================================================
-    def generate_elect_g(df, report_months, period_title, section_period, data_as_on):
-        required = ["Date of Inspection", "Head", "Sub Head", "Location", "Deficiencies Noted", "Status"]
-        for c in required:
-            if c not in df.columns:
-                raise KeyError(f"Required column '{c}' missing. Available: {df.columns.tolist()}")
-
-        df = df.copy()
-        df["Date of Inspection"] = pd.to_datetime(df["Date of Inspection"], errors="coerce")
-        for c in ["Head", "Sub Head", "Location", "Deficiencies Noted", "Status"]:
-            df[c] = df[c].fillna("").astype(str).str.strip()
-
-        head_clean = df["Head"].str.upper().str.replace(" ", "", regex=False)
-        df = df[head_clean.isin(["ELECT/G", "ELECT/G.", "ELECT-G", "ELECTG"])].copy()
-        if len(df) == 0:
-            raise ValueError("No records found for Head = ELECT/G")
-
-        df = filter_months(df, report_months)
-        if len(df) == 0:
-            raise ValueError("No ELECT/G records in selected period")
-
-        # --- Jurisdiction maps ---
-        SSE_ELECT_KWV = {
-            "KWV", "DHS", "KEM", "BLNI", "BTW", "SEI", "PPJ", "WSB", "KEU", "JNTR",
-            "BGVN", "MLM", "BRB", "DD", "MLB", "PVR", "SGLA", "DLGN", "JTRD", "SGRE",
-            "ARAG", "KVK", "MRJ", "MKPT", "AAG", "WKA", "MA", "WDS", "WSD",
-        }
-        SSE_ELECT_SUR = {
-            "MKPT", "MA", "AAG", "WKA", "WDS", "DUD", "NGS", "BOT", "AKOR", "SUR",
-            "JEUR", "PK", "BALE", "MVE", "MO", "TKWD", "HG", "TLT",
-        }
-        SSE_ELECT_KLBG = {
-            "DUD", "KUI", "GDGN", "GUR", "SVG", "BBD", "KLBG", "TJSP", "HQR", "MR",
-            "SDB", "SBD", "WADI", "ME",
-        }
-        SSE_ELECT_WADI = {"SBD", "SDB", "WADI"}
-        SSE_ELECT_LUR = {
-            "PJR", "LTRR", "YSI", "DKY", "OSA", "HGL", "LUR", "DRSV", "KMRD",
-        }
-        ELECT_G_ORDER = [
-            "SSE/ELECT/KWV", "SSE/ELECT/SUR", "SSE/ELECT/KLBG",
-            "SSE/ELECT/WADI", "SSE/ELECT/LUR",
-        ]
-
-        station_map = {}
-        for loc in SSE_ELECT_KWV:
-            station_map[loc] = "SSE/ELECT/KWV"
-        for loc in SSE_ELECT_SUR:
-            station_map.setdefault(loc, "SSE/ELECT/SUR")
-        for loc in SSE_ELECT_KLBG:
-            station_map.setdefault(loc, "SSE/ELECT/KLBG")
-        for loc in SSE_ELECT_WADI:
-            station_map.setdefault(loc, "SSE/ELECT/WADI")
-        for loc in SSE_ELECT_LUR:
-            station_map.setdefault(loc, "SSE/ELECT/LUR")
-
-        def normalize_location(value):
-            value = str(value).upper().strip()
-            return value.replace(" ", "").replace("_", "-").replace("–", "-").replace("—", "-")
-
-        def classify_record(location, deficiency):
-            location = normalize_location(location)
-            if location in station_map:
-                return station_map[location]
-            # simple fallback
-            for station, juris in station_map.items():
-                if station in location or station in str(deficiency).upper():
-                    return juris
-            return "Unclassified"
-
-        df["ELECT_G"] = df.apply(
-            lambda row: classify_record(row["Location"], row["Deficiencies Noted"]), axis=1
-        )
-        if (df["ELECT_G"] == "Unclassified").any() and "Unclassified" not in ELECT_G_ORDER:
-            ELECT_G_ORDER = list(ELECT_G_ORDER) + ["Unclassified"]
-
-        total, resolved, pending, no_response = status_counts(df)
-        sub = subhead_table(df, report_months)
-
-        elect_g = (
-            df.groupby(["ELECT_G", "Month"]).size().unstack(fill_value=0)
-            .reindex(ELECT_G_ORDER, fill_value=0)
-        )
-        for m in report_months:
-            if m not in elect_g.columns:
-                elect_g[m] = 0
-        elect_g["Total"] = elect_g[list(report_months)].sum(axis=1)
-
-        # ---- Draw ----
-        fig, ax = new_canvas()
-        draw_header(ax, [
-            "SAFETY DEFICIENCIES ANALYSIS OF ELECTRICAL /",
-            "GENERAL DEPARTMENT",
-            period_title,
-        ])
-        draw_kpi_cards(ax, total, resolved, pending, no_response)
-
-        # Sub-head table (simplified for space)
-        x, y, w, h = 0.15, 3.45, 6.55, 2.48
-        draw_box(ax, x, y, w, h)
-        draw_rect(ax, x, y + h - 0.28, w, 0.28, NAVY)
-        add_text(ax, x + w / 2, y + h - 0.14,
-                 f"II - CLASSIFICATION SUB HEAD DISTRIBUTION ({section_period})",
-                 9.5, "bold", "white", "center")
-
-        # Simple table header
-        add_text(ax, x + 0.2, y + h - 0.55, "Sub Head", 7, "bold", NAVY)
-        add_text(ax, x + 4.5, y + h - 0.55, "Total", 7, "bold", NAVY)
-
-        for i, (sub_head, row) in enumerate(sub.head(10).iterrows()):
-            yy = y + h - 0.75 - i * 0.18
-            add_text(ax, x + 0.2, yy, str(sub_head)[:35], 6.5, "normal", TEXT)
-            add_text(ax, x + 4.5, yy, str(int(row["Total"])), 6.5, "bold", TEXT)
-
-        # Jurisdiction summary
-        x3, y3, w3, h3 = 0.15, 0.50, 13.7, 2.7
-        draw_box(ax, x3, y3, w3, h3)
-        draw_rect(ax, x3, y3 + h3 - 0.28, w3, 0.28, NAVY)
-        add_text(ax, x3 + w3 / 2, y3 + h3 - 0.14, "III - SSE/ELECT WISE SUMMARY",
-                 10, "bold", "white", "center")
-
-        for i, j in enumerate(ELECT_G_ORDER):
-            val = int(elect_g.loc[j, "Total"]) if j in elect_g.index else 0
-            pct = (val / total * 100) if total else 0
-            yy = y3 + h3 - 0.55 - i * 0.35
-            add_text(ax, x3 + 0.3, yy, j, 8, "bold", TEXT)
-            add_text(ax, x3 + 6.0, yy, f"{val}  ({pct:.1f}%)", 8, "bold", TEXT)
-
-        draw_footer(ax, "Reporting Department: Electrical / General, SUR DIVN, CR", data_as_on)
-
-        out = str(OUTPUT_FOLDER / "ELECT_G_Dashboard.png")
-        save_fig(fig, out)
-        return out
-
-    # ============================================================
-    # UI
-    # ============================================================
-    DEPARTMENT_OPTIONS = {
-        "ELECT / G": "elect_g",
-        # Baaki departments baad me add kar sakte ho
-    }
-
-    col1, col2 = st.columns([2, 1])
     with col1:
-        dept_label = st.selectbox("Select department", list(DEPARTMENT_OPTIONS.keys()), key="dash_dept")
-        dept_key = DEPARTMENT_OPTIONS[dept_label]
+        date_from = st.date_input("From", value=date(2026, 4, 1), key="d_from")
     with col2:
-        st.write("")  # spacer
+        date_to = st.date_input("To", value=date(2026, 7, 31), key="d_to")
+    with col3:
+        department = st.selectbox("Department", DEPARTMENT_OPTIONS, key="d_dept")
 
-    st.subheader("Report period")
-    c1, c2 = st.columns(2)
-    with c1:
-        start_date = st.date_input("From date", value=date(2026, 4, 1), format="DD/MM/YYYY", key="dash_from")
-    with c2:
-        end_date = st.date_input("To date", value=date(2026, 7, 31), format="DD/MM/YYYY", key="dash_to")
+    mode = st.radio(
+        "What to generate",
+        ["Both (Detailed + General)", "Detailed only", "General only"],
+        index=0,
+        horizontal=True,
+        key="d_mode"
+    )
 
-    if end_date < start_date:
-        st.error("To date cannot be before From date.")
+    if date_from > date_to:
+        st.error("From date cannot be after To date")
         st.stop()
 
-    # Compute months
-    report_months = []
-    y, m = start_date.year, start_date.month
-    while (y, m) <= (end_date.year, end_date.month):
-        report_months.append(m)
-        if m == 12:
-            y += 1
-            m = 1
-        else:
-            m += 1
-    report_months = list(dict.fromkeys(report_months))
+    generate = st.button("Generate Dashboard", type="primary", use_container_width=True, key="d_gen")
 
-    period_title = f"FOR THE PERIOD {start_date.strftime('%d %b %Y').upper()} TO {end_date.strftime('%d %b %Y').upper()}"
-    section_period = f"{start_date.strftime('%d %b').upper()} TO {end_date.strftime('%d %b %Y').upper()}"
-    data_as_on = end_date.strftime("%d %B %Y").upper()
+    if not generate:
+        st.info("Select filters and click **Generate Dashboard**")
+        st.stop()
 
-    st.info(f"**From:** {start_date.strftime('%d %B %Y')}  |  **To:** {end_date.strftime('%d %B %Y')}  |  **Months:** {report_months}")
+    # ============================================================
+    # LOAD + PROCESS
+    # ============================================================
+    with st.spinner("Loading data from Google Sheet..."):
+        raw = load_sheet()
+        if raw.empty:
+            st.error("No data loaded from Google Sheet")
+            st.stop()
 
-    generate = st.button("Generate Dashboard", type="primary", use_container_width=True, key="dash_generate")
+        df = preprocess(raw, date_from, date_to, department)
 
-    if generate:
-        with st.spinner("Loading Google Sheet & generating dashboard..."):
-            try:
-                df_raw = load_google_sheet_for_dashboard()
-                if df_raw is None or df_raw.empty:
-                    st.error("No data loaded from Google Sheet")
-                    st.stop()
+    if df.empty:
+        st.warning(f"No records found for **{department}** in selected date range.")
+        st.stop()
 
-                # ★★★ Important: create Status column ★★★
-                df_raw = prepare_dataframe(df_raw)
+    # KPI
+    total = len(df)
+    resolved = (df["Status"] == "Resolved").sum()
+    pending = (df["Status"] == "Pending").sum()
+    no_response = (df["Status"] == "No Response").sum()
+    resolution_rate = (resolved / total * 100) if total else 0
 
-                st.success(f"Loaded {len(df_raw)} rows | Status column created")
-
-                if dept_key == "elect_g":
-                    path = generate_elect_g(
-                        df_raw,
-                        report_months,
-                        period_title,
-                        section_period,
-                        data_as_on
-                    )
-                    st.success("Dashboard generated successfully!")
-                    st.image(path, use_column_width=True)
-                    with open(path, "rb") as f:
-                        st.download_button(
-                            "Download PNG",
-                            f.read(),
-                            file_name="ELECT_G_Dashboard.png",
-                            mime="image/png",
-                            key="dl_dash"
-                        )
-                else:
-                    st.warning("Selected department generator not yet implemented in this tab.")
-            except Exception as e:
-                st.exception(e)
+    # ============================================================
+    # KPI CARDS
+    # ============================================================
+    st.markdown("### Key Performance Indicators")
+    k1, k2, k3, k4, k5 = st.columns(5)
+    k1.metric("TOTAL", total, "100%")
+    k2.metric("RESOLVED", resolved, f"{resolution_rate:.1f}%")
+    k3.metric("PENDING", pending, f"{(pending/total*100) if total else 0:.1f}%")
+    k4.metric("NO RESPONSE", no_response, f"{(no_response/total*100) if total else 0:.1f}%")
+    k5.metric("RESOLUTION RATE", f"{resolution_rate:.1f}%")
 
     st.markdown("---")
-    st.caption("Data source: Google Sheet · Status derived from Feedback + User Feedback/Remark")
+
+    # ============================================================
+    # DETAILED SECTION
+    # ============================================================
+    if mode in ["Both (Detailed + General)", "Detailed only"]:
+        st.subheader(f"Detailed Analysis — {department}")
+
+        # ----- Sub Head Table + Bar -----
+        st.markdown("#### I — Sub Head Distribution")
+
+        month_order = sorted(df["Month"].unique())
+        sub = df.groupby(["Sub Head", "Month"]).size().unstack(fill_value=0)
+        for m in month_order:
+            if m not in sub.columns:
+                sub[m] = 0
+        sub["Total"] = sub[month_order].sum(axis=1)
+        sub = sub.sort_values("Total", ascending=False)
+
+        display_sub = sub.copy()
+        display_sub.columns = [m.strftime("%b-%Y") if hasattr(m, "strftime") else str(m) for m in display_sub.columns]
+        display_sub = display_sub.reset_index()
+
+        c1, c2 = st.columns([1.2, 1])
+        with c1:
+            st.dataframe(display_sub, use_container_width=True, height=400)
+        with c2:
+            top = sub.head(10).reset_index()
+            fig_bar = px.bar(
+                top, x="Total", y="Sub Head", orientation="h",
+                text="Total", color_discrete_sequence=["#123A7A"],
+                title="Top 10 Sub Heads"
+            )
+            fig_bar.update_layout(yaxis={"categoryorder": "total ascending"}, height=400, showlegend=False)
+            fig_bar.update_traces(textposition="outside")
+            st.plotly_chart(fig_bar, use_container_width=True)
+
+        st.markdown("---")
+
+        # ----- Status Distribution -----
+        st.markdown("#### II — Status Distribution")
+        status_counts = df["Status"].value_counts().reset_index()
+        status_counts.columns = ["Status", "Count"]
+
+        c3, c4 = st.columns(2)
+        with c3:
+            fig_pie = px.pie(
+                status_counts, names="Status", values="Count",
+                color="Status",
+                color_discrete_map={"Resolved": "#159447", "Pending": "#E58A00", "No Response": "#D91F2D"},
+                hole=0.45, title="Status Wise"
+            )
+            fig_pie.update_traces(textinfo="label+percent+value")
+            st.plotly_chart(fig_pie, use_container_width=True)
+        with c4:
+            fig_bar2 = px.bar(
+                status_counts, x="Status", y="Count",
+                color="Status",
+                color_discrete_map={"Resolved": "#159447", "Pending": "#E58A00", "No Response": "#D91F2D"},
+                text="Count", title="Status Count"
+            )
+            fig_bar2.update_layout(showlegend=False)
+            st.plotly_chart(fig_bar2, use_container_width=True)
+
+        st.markdown("---")
+
+        # ----- Month wise trend -----
+        st.markdown("#### III — Month-wise Trend")
+        month_trend = df.groupby("Month Name").size().reset_index(name="Count")
+        # keep chronological order
+        month_trend["sort"] = pd.to_datetime(month_trend["Month Name"], format="%b-%Y", errors="coerce")
+        month_trend = month_trend.sort_values("sort")
+
+        fig_line = px.bar(
+            month_trend, x="Month Name", y="Count",
+            text="Count", color_discrete_sequence=["#1D4FA3"],
+            title="Records per Month"
+        )
+        fig_line.update_traces(textposition="outside")
+        st.plotly_chart(fig_line, use_container_width=True)
+
+        st.markdown("---")
+
+        # Download detailed records
+        st.markdown("#### Download Detailed Records")
+        csv = df.to_csv(index=False).encode("utf-8-sig")
+        st.download_button(
+            "Download Filtered Records (CSV)",
+            csv,
+            file_name=f"{department.replace(' ', '_')}_detailed_{date_from}_{date_to}.csv",
+            mime="text/csv",
+            key="dl_detailed"
+        )
+
+    # ============================================================
+    # GENERAL SECTION (simple summary)
+    # ============================================================
+    if mode in ["Both (Detailed + General)", "General only"]:
+        st.subheader(f"General Summary — {department}")
+
+        st.markdown(f"""
+        **Period:** {date_from.strftime('%d %b %Y')} to {date_to.strftime('%d %b %Y')}  
+        **Total Records:** {total}  
+        **Resolved:** {resolved} ({resolution_rate:.1f}%)  
+        **Pending:** {pending}  
+        **No Response:** {no_response}
+        """)
+
+        # Pending only table
+        pending_df = df[df["Status"] == "Pending"]
+        st.markdown(f"#### Pending Items ({len(pending_df)})")
+        if pending_df.empty:
+            st.success("No pending records in this period.")
+        else:
+            show_cols = [c for c in ["Date of Inspection", "Location", "Sub Head", "Deficiencies Noted", "Action By", "Feedback"] if c in pending_df.columns]
+            st.dataframe(pending_df[show_cols], use_container_width=True, height=350)
+
+            csv_p = pending_df.to_csv(index=False).encode("utf-8-sig")
+            st.download_button(
+                "Download Pending Records (CSV)",
+                csv_p,
+                file_name=f"{department.replace(' ', '_')}_pending_{date_from}_{date_to}.csv",
+                mime="text/csv",
+                key="dl_pending"
+            )
+
+    st.markdown("---")
+    st.caption(f"Source: SARAL · Department: {department} · Period: {date_from} to {date_to}")
