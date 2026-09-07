@@ -802,7 +802,7 @@ def total_row_values(df: pd.DataFrame, with_share: bool = False):
     return vals
 
 
-def sub_row_values(sub_head, row, with_share: bool = False)):
+def sub_row_values(sub_head, row, with_share: bool = False):
     vals = [sub_head] + [int(row.get(m, 0)) for m in REPORT_MONTHS] + [int(row["Total"])]
     if with_share:
         vals.append(f"{row['Share']:.2f}%")
