@@ -2801,7 +2801,6 @@ with tabs[3]:
                         summary["% Resolved"] = (
                             summary["Resolved"] / summary["Total"] * 100
                         ).round(2)
-                    item["summary_df"] = summary
                     item["full_df"] = work[orig_cols]
                     item["per_subhead_dfs"] = [
                         {"name": sh, "df": work[work["Sub Head"] == sh][orig_cols]}
