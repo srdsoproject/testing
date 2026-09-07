@@ -67,25 +67,15 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter
 # 1. FILE PATHS  (office – edit only this block)
 # ============================================================
 
-BASE_DIR = Path(
-    r"C:\Users\krishna\PycharmProjects\PythonProject6"
-)
+BASE_DIR = Path(__file__).resolve().parent
 BASE_DIR_STR = str(BASE_DIR)
 
-EXCEL_FILE = Path(
-    r"C:\Users\krishna\PycharmProjects\PythonProject6"
-    r"\DATA.xlsx"
+EXCEL_FILE = BASE_DIR/"DATA.xlsx"
 )
 
-LOGO_FILE = (
-    r"C:\Users\krishna\PycharmProjects\PythonProject6"
-    r"\indian_railways_logo.png"
-)
+LOGO_FILE = str(BASE_DIR / "indian_railways_logo.png")
+TRAIN_FILE = str(BASE_DIR / "train.png")
 
-TRAIN_FILE = (
-    r"C:\Users\krishna\PycharmProjects\PythonProject6"
-    r"\train.png"
-)
 
 OUTPUT_FOLDER = BASE_DIR / "DEPARTMENT_DASHBOARDS"
 OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
