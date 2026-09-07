@@ -174,11 +174,31 @@ KEY_MAP = {
     "signal": ("SIGNAL & TELECOM", None),
 }
 
-FONT_BOLD = r"C:\Windows\Fonts\arialbd.ttf"
-FONT_REG = r"C:\Windows\Fonts\arial.ttf"
-if not Path(FONT_BOLD).exists():
-    FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed-Bold.ttf"
-    FONT_REG = "/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed.ttf"
+SCRIPT_DIR = Path(_file_).resolve().parent
+FONT_DIR = SCRIPT_DIR / "fonts"
+
+candidates_bold = [
+    FONT_DIR / "arialbd.ttf",
+    FONT_DIR / "DejaVuSans-Bold.ttf",
+    FONT_DIR / "NotoSans-Bold.ttf",
+    Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+    Path("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"),
+    Path("/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed-Bold.ttf"),
+    Path(r"C:\Windows\Fonts\arialbd.ttf"),
+]
+
+candidates_reg = [
+    FONT_DIR / "arial.ttf",
+    FONT_DIR / "DejaVuSans.ttf",
+    FONT_DIR / "NotoSans-Regular.ttf",
+    Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+    Path("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"),
+    Path("/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed.ttf"),
+    Path(r"C:\Windows\Fonts\arial.ttf"),
+]
+
+FONT_BOLD = next((str(p) for p in candidates_bold if p.exists()), None)
+FONT_REG  = next((str(p) for p in candidates_reg  if p.exists()), None)
 
 
 # =============================================================================
@@ -197,11 +217,18 @@ def clean_file_name(value: str) -> str:
 
 def get_font(size: int, bold: bool = False):
     path = FONT_BOLD if bold else FONT_REG
+    if path:
+        try:
+            return ImageFont.truetype(path, size)
+        except OSError:
+            pass
+    # Fallback – still respects size better than load_default()
     try:
-        return ImageFont.truetype(path, size)
+        return ImageFont.truetype(
+            "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf", size
+        )
     except OSError:
         return ImageFont.load_default()
-
 
 def normalize_action_by(value: str) -> str:
     return str(value).strip().upper().replace(" ", "").replace("\\", "/")
