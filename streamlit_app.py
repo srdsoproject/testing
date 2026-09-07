@@ -25,12 +25,7 @@ import streamlit as st
 # ---------------------------------------------------------------------------
 # Import unified dashboard module (same folder or on PYTHONPATH)
 # ---------------------------------------------------------------------------
-import railway_safety_unified as rs
-st.set_page_config(
-    page_title="Safety Deficiencies Dashboard – Solapur Division",
-    page_icon="🚆",
-    layout="wide",
-)
+
 
 
 # ---------------------------------------------------------------------------
