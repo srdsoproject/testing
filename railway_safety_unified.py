@@ -843,8 +843,8 @@ def subhead_table(df: pd.DataFrame, months: Optional[Sequence[int]] = None) -> p
         if m not in sub.columns:
             sub[m] = 0
     sub["Total"] = sub[months].sum(axis=1)
-    total = len(df)
-    sub["Share"] = (sub["Total"] / total * 100) if total else 0.0
+    #total = len(df)
+    #sub["Share"] = (sub["Total"] / total * 100) if total else 0.0
     return sub.sort_values("Total", ascending=False)
 
 
