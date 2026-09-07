@@ -174,7 +174,7 @@ KEY_MAP = {
     "signal": ("SIGNAL & TELECOM", None),
 }
 
-SCRIPT_DIR = Path(_file_).resolve().parent
+SCRIPT_DIR = Path(__file__).resolve().parent
 FONT_DIR = SCRIPT_DIR / "fonts"
 
 candidates_bold = [
