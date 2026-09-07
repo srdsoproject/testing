@@ -1,4 +1,13 @@
 #inspectionviewer
+import io
+import os
+import tempfile
+from datetime import date, datetime
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
+import pandas as pd
+import streamlit as st
 from __future__ import annotations
 import streamlit as st
 import pandas as pd
@@ -2150,15 +2159,7 @@ with tabs[2]:
 with tabs[3]:
 
 
-    import io
-    import os
-    import tempfile
-    from datetime import date, datetime
-    from pathlib import Path
-    from typing import Dict, List, Optional, Tuple
-    
-    import pandas as pd
-    import streamlit as st
+
     
     # ---------------------------------------------------------------------------
     # Import unified dashboard module (same folder or on PYTHONPATH)
