@@ -2856,7 +2856,7 @@ with tabs[3]:
             if item.get("detailed_error"):
                 st.error(f"Detailed: {item['detailed_error']}")
             if item.get("detailed_path") and Path(item["detailed_path"]).exists():
-                st.image(item["detailed_path"], use_container_width=True)
+                st.image(item["detailed_path"], use_column_width=True)
                 with open(item["detailed_path"], "rb") as f:
                     st.download_button(
                         "⬇ Download detailed image (PNG)",
