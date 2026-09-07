@@ -67,14 +67,25 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter
 # 1. FILE PATHS  (office – edit only this block)
 # ============================================================
 
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(
+    r"C:\Users\krishna\PycharmProjects\PythonProject6"
+)
 BASE_DIR_STR = str(BASE_DIR)
 
-EXCEL_FILE = BASE_DIR/"DATA.xlsx"
+EXCEL_FILE = Path(
+    r"C:\Users\krishna\PycharmProjects\PythonProject6"
+    r"\DATA.xlsx"
+)
 
+LOGO_FILE = (
+    r"C:\Users\krishna\PycharmProjects\PythonProject6"
+    r"\indian_railways_logo.png"
+)
 
-LOGO_FILE = str(BASE_DIR / "indian_railways_logo.png")
-TRAIN_FILE = str(BASE_DIR / "train.png")
+TRAIN_FILE = (
+    r"C:\Users\krishna\PycharmProjects\PythonProject6"
+    r"\train.png"
+)
 
 OUTPUT_FOLDER = BASE_DIR / "DEPARTMENT_DASHBOARDS"
 OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
@@ -843,7 +854,7 @@ def subhead_table(df: pd.DataFrame, months: Optional[Sequence[int]] = None) -> p
         if m not in sub.columns:
             sub[m] = 0
     sub["Total"] = sub[months].sum(axis=1)
-    #total = len(df)
+    total = len(df)
     sub["Share"] = (sub["Total"] / total * 100) if total else 0.0
     return sub.sort_values("Total", ascending=False)
 
@@ -1051,7 +1062,7 @@ def generate_elect_g(excel: str = EXCEL_FILE) -> str:
     add_text(ax, x + w / 2, y + h - 0.14,
              f"II - CLASSIFICATION SUB HEAD DISTRIBUTION ({_section_period()})",
              9.8, "bold", "white", "center")
-    columns = subhead_columns(2.25, 0.72, 0.65, 0.82)
+    columns = subhead_columns(2.25, 0.72, 0.65, 0.82, with_share=False)
     start_x = x + 0.07
     header_y = y + h - 0.56
     row_height = 0.155
@@ -1737,7 +1748,7 @@ def generate_elect_trd(excel: str = EXCEL_FILE) -> str:
     add_text(ax, x + w / 2, y + h - 0.14,
              f"II - CLASSIFICATION SUB HEAD DISTRIBUTION ({_section_period()})",
              9.8, "bold", "white", "center")
-    columns = subhead_columns(2.25, 0.72, 0.65, 0.82)
+    columns = subhead_columns(2.25, 0.72, 0.65, 0.82, with_share=False)
     start_x, header_y, row_height = x + 0.07, y + h - 0.56, 0.165
     cx = start_x
     for name, cw in columns:
@@ -2183,7 +2194,7 @@ def generate_operating(excel: str = EXCEL_FILE) -> str:
     add_text(ax, x + w / 2, y + h - 0.14,
              f"II - CLASSIFICATION SUB HEAD DISTRIBUTION ({_section_period()})",
              9.8, "bold", "white", "center")
-    columns = subhead_columns(2.25, 0.72, 0.65, 0.82)
+    columns = subhead_columns(2.25, 0.72, 0.65, 0.82, with_share=False)
     start_x, header_y, row_height = x + 0.07, y + h - 0.56, 0.155
     cx = start_x
     for name, cw in columns:
@@ -2763,7 +2774,7 @@ def generate_snt(excel: str = EXCEL_FILE) -> str:
     # Filter S&T / Signal heads if present; otherwise use full file (original S&T script did not filter Head)
     if "Head" in df.columns:
         head_norm = df["Head"].fillna("").astype(str).str.upper().str.replace(r"[\s./_-]+", "", regex=True)
-        snt_mask = head_norm.str.contains("S&T|SNT|SIGNAL|TELECOM|TELECOMMUNICATION|SIGNAL & TELECOM", regex=True, na=False)
+        snt_mask = head_norm.str.contains("S&T|SNT|SIGNAL|TELECOM|TELECOMMUNICATION", regex=True, na=False)
         if snt_mask.any():
             df = df[snt_mask].copy()
             print(f"S&T records after Head filter: {len(df)}")
@@ -2865,7 +2876,7 @@ def generate_snt(excel: str = EXCEL_FILE) -> str:
     add_text(ax, x + w / 2, y + h - 0.14,
              f"II - CLASSIFICATION SUB HEAD DISTRIBUTION ({_section_period()})",
              9.8, "bold", "white", "center")
-    columns = subhead_columns(2.25, 0.72, 0.65, 0.82)
+    columns = subhead_columns(2.25, 0.72, 0.65, 0.82, with_share=False)
     start_x, header_y, row_height = x + 0.07, y + h - 0.56, 0.155
     cx = start_x
     for name, cw in columns:
