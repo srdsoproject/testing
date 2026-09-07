@@ -43,11 +43,7 @@ import requests
 # CONFIG
 # =========================================================================
 import railway_safety_unified as rs
-st.set_page_config(
-    page_title="Safety Deficiencies Dashboard – Solapur Division",
-    page_icon="🚆",
-    layout="wide",
-)
+
 st.set_page_config(
     page_title="S.A.R.A.L Inspection App",
     layout="wide",
