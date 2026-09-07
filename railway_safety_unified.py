@@ -420,8 +420,8 @@ def create_dashboard(
     shadow_box(img, draw, (32, 20, W - 32, 91), radius=20, fill="#f8f9fc")
     title1 = "ANALYSIS OF SAFETY DEFICIENCIES"
     title2 = title_dept
-    f_title = get_font(42, True)
-    f_title2 = get_font(38, True)
+    f_title = get_font(45, True)
+    f_title2 = get_font(45, True)
     bbox1 = draw.textbbox((0, 0), title1, font=f_title)
     bbox2 = draw.textbbox((0, 0), title2, font=f_title2)
     w1 = bbox1[2] - bbox1[0]
