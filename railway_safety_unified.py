@@ -844,7 +844,7 @@ def subhead_table(df: pd.DataFrame, months: Optional[Sequence[int]] = None) -> p
             sub[m] = 0
     sub["Total"] = sub[months].sum(axis=1)
     #total = len(df)
-    #sub["Share"] = (sub["Total"] / total * 100) if total else 0.0
+    sub["Share"] = (sub["Total"] / total * 100) if total else 0.0
     return sub.sort_values("Total", ascending=False)
 
 
@@ -1064,7 +1064,7 @@ def generate_elect_g(excel: str = EXCEL_FILE) -> str:
     for r, (sub_head, row) in enumerate(sub_display.iterrows()):
         row_y = header_y - (r + 1) * row_height
         cx = start_x
-        values = sub_row_values(sub_head, row, with_share=True)
+        values = sub_row_values(sub_head, row, with_share=False)
         for c, (_, cw) in enumerate(columns):
             draw_rect(ax, cx, row_y - row_height / 2, cw, row_height,
                       PALE_YELLOW if r == len(sub_display) - 1 else "white", GRID)
@@ -1074,7 +1074,7 @@ def generate_elect_g(excel: str = EXCEL_FILE) -> str:
             cx += cw
     row_y = header_y - (len(sub_display) + 1) * row_height
     cx = start_x
-    total_values = total_row_values(df, with_share=True)
+    total_values = total_row_values(df, with_share=False)
     for c, (_, cw) in enumerate(columns):
         draw_rect(ax, cx, row_y - row_height / 2, cw, row_height, PALE_YELLOW, GRID)
         add_text(ax, cx + (0.035 if c == 0 else cw / 2), row_y, str(total_values[c]),
@@ -1748,7 +1748,7 @@ def generate_elect_trd(excel: str = EXCEL_FILE) -> str:
     for r, (sub_head, row) in enumerate(sub_display.iterrows()):
         row_y = header_y - (r + 1) * row_height
         cx = start_x
-        values = sub_row_values(sub_head, row, with_share=True)
+        values = sub_row_values(sub_head, row, with_share=False)
         for c, (_, cw) in enumerate(columns):
             draw_rect(ax, cx, row_y - row_height / 2, cw, row_height, "white", GRID)
             add_text(ax, cx + (0.035 if c == 0 else cw / 2), row_y, str(values[c]),
@@ -1756,7 +1756,7 @@ def generate_elect_trd(excel: str = EXCEL_FILE) -> str:
             cx += cw
     row_y = header_y - (len(sub_display) + 1) * row_height
     cx = start_x
-    total_values = total_row_values(df, with_share=True)
+    total_values = total_row_values(df, with_share=False)
     for c, (_, cw) in enumerate(columns):
         draw_rect(ax, cx, row_y - row_height / 2, cw, row_height, PALE_YELLOW, GRID)
         add_text(ax, cx + (0.035 if c == 0 else cw / 2), row_y, str(total_values[c]),
@@ -1905,7 +1905,7 @@ def generate_mechanical(excel: str = EXCEL_FILE) -> str:
     add_text(ax, x + w / 2, y + h - 0.14,
              f"II - CLASSIFICATION SUB HEAD DISTRIBUTION ({_section_period()})",
              10.2, "bold", "white", "center")
-    cols = subhead_columns(2.25, 0.72, 0.65, 0.82, with_share=True)
+    cols = subhead_columns(2.25, 0.72, 0.65, 0.82, with_share=False)
     start_x, header_y, row_h = x + 0.07, y + h - 0.56, 0.155
     cx = start_x
     for name, cw in cols:
@@ -1915,7 +1915,7 @@ def generate_mechanical(excel: str = EXCEL_FILE) -> str:
     sub_display = sub.head(11)
     for i, (sub_head, row) in enumerate(sub_display.iterrows()):
         ry = header_y - (i + 1) * row_h
-        values = sub_row_values(sub_head, row, with_share=True)
+        values = sub_row_values(sub_head, row, with_share=False)
         cx = start_x
         for j, (_, cw) in enumerate(cols):
             draw_rect(ax, cx, ry - row_h / 2, cw, row_h, "white", GRID)
@@ -1923,7 +1923,7 @@ def generate_mechanical(excel: str = EXCEL_FILE) -> str:
                      7.0, "bold" if j == 0 else "normal", TEXT, "left" if j == 0 else "center")
             cx += cw
     ry = header_y - (len(sub_display) + 1) * row_h
-    totals = total_row_values(df, with_share=True)
+    totals = total_row_values(df, with_share=False)
     cx = start_x
     for j, (_, cw) in enumerate(cols):
         draw_rect(ax, cx, ry - row_h / 2, cw, row_h, PALE_YELLOW, GRID)
@@ -2194,7 +2194,7 @@ def generate_operating(excel: str = EXCEL_FILE) -> str:
     for r, (sub_head, row) in enumerate(sub_display.iterrows()):
         row_y = header_y - (r + 1) * row_height
         cx = start_x
-        values = sub_row_values(sub_head, row, with_share=True)
+        values = sub_row_values(sub_head, row, with_share=False)
         for c, (_, cw) in enumerate(columns):
             draw_rect(ax, cx, row_y - row_height / 2, cw, row_height, "white", GRID)
             add_text(ax, cx + (0.035 if c == 0 else cw / 2), row_y, str(values[c]),
@@ -2202,7 +2202,7 @@ def generate_operating(excel: str = EXCEL_FILE) -> str:
             cx += cw
     row_y = header_y - (len(sub_display) + 1) * row_height
     cx = start_x
-    total_values = total_row_values(df, with_share=True)
+    total_values = total_row_values(df, with_share=False)
     for c, (_, cw) in enumerate(columns):
         draw_rect(ax, cx, row_y - row_height / 2, cw, row_height, PALE_YELLOW, GRID)
         add_text(ax, cx + (0.035 if c == 0 else cw / 2), row_y, str(total_values[c]),
@@ -2358,7 +2358,7 @@ def generate_commercial(excel: str = EXCEL_FILE) -> str:
     add_text(ax, x + w / 2, y + h - 0.14,
              f"II - CLASSIFICATION SUB HEAD DISTRIBUTION ({_section_period()})",
              9.8, "bold", "white", "center")
-    cols = subhead_columns(2.25, 0.72, 0.65, 0.82, with_share=True)
+    cols = subhead_columns(2.25, 0.72, 0.65, 0.82, with_share=False)
     sx, hy, rh = x + 0.07, y + h - 0.56, 0.155
     cx = sx
     for name, cw in cols:
@@ -2367,7 +2367,7 @@ def generate_commercial(excel: str = EXCEL_FILE) -> str:
         cx += cw
     for r, (sh, row) in enumerate(sub.head(11).iterrows()):
         ry = hy - (r + 1) * rh
-        vals = sub_row_values(sh, row, with_share=True)
+        vals = sub_row_values(sh, row, with_share=False)
         cx = sx
         for c, (_, cw) in enumerate(cols):
             draw_rect(ax, cx, ry - rh / 2, cw, rh, "white", GRID)
@@ -2375,7 +2375,7 @@ def generate_commercial(excel: str = EXCEL_FILE) -> str:
                      7.2, "bold" if c == 0 else "normal", TEXT, "left" if c == 0 else "center")
             cx += cw
     ry = hy - (len(sub.head(11)) + 1) * rh
-    tvals = total_row_values(df, with_share=True)
+    tvals = total_row_values(df, with_share=False)
     cx = sx
     for c, (_, cw) in enumerate(cols):
         draw_rect(ax, cx, ry - rh / 2, cw, rh, PALE_YELLOW, GRID)
@@ -2876,7 +2876,7 @@ def generate_snt(excel: str = EXCEL_FILE) -> str:
     for r, (sub_head, row) in enumerate(sub_display.iterrows()):
         row_y = header_y - (r + 1) * row_height
         cx = start_x
-        values = sub_row_values(sub_head, row, with_share=True)
+        values = sub_row_values(sub_head, row, with_share=False)
         for c, (_, cw) in enumerate(columns):
             draw_rect(ax, cx, row_y - row_height / 2, cw, row_height,
                       PALE_YELLOW if r == len(sub_display) - 1 else "white", GRID)
@@ -2886,7 +2886,7 @@ def generate_snt(excel: str = EXCEL_FILE) -> str:
             cx += cw
     row_y = header_y - (len(sub_display) + 1) * row_height
     cx = start_x
-    total_values = total_row_values(df, with_share=True)
+    total_values = total_row_values(df, with_share=False)
     for c, (_, cw) in enumerate(columns):
         draw_rect(ax, cx, row_y - row_height / 2, cw, row_height, PALE_YELLOW, GRID)
         add_text(ax, cx + (0.035 if c == 0 else cw / 2), row_y, str(total_values[c]),
