@@ -1,4 +1,5 @@
 #inspectionviewer
+from __future__ import annotations
 import io
 import os
 import tempfile
@@ -8,7 +9,7 @@ from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
 import streamlit as st
-from __future__ import annotations
+
 import streamlit as st
 import pandas as pd
 import gspread
