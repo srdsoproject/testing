@@ -2763,7 +2763,7 @@ def generate_snt(excel: str = EXCEL_FILE) -> str:
     # Filter S&T / Signal heads if present; otherwise use full file (original S&T script did not filter Head)
     if "Head" in df.columns:
         head_norm = df["Head"].fillna("").astype(str).str.upper().str.replace(r"[\s./_-]+", "", regex=True)
-        snt_mask = head_norm.str.contains("S&T|SNT|SIGNAL|TELECOM|TELECOMMUNICATION", regex=True, na=False)
+        snt_mask = head_norm.str.contains("S&T|SNT|SIGNAL|TELECOM|TELECOMMUNICATION|SIGNAL & TELECOM", regex=True, na=False)
         if snt_mask.any():
             df = df[snt_mask].copy()
             print(f"S&T records after Head filter: {len(df)}")
