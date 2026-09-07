@@ -2570,12 +2570,7 @@ with tabs[3]:
     # =============================================================================
     # Streamlit page
     # =============================================================================
-    
-    st.set_page_config(
-        page_title="Safety Deficiencies Dashboard – Solapur Division",
-        page_icon="🚆",
-        layout="wide",
-    )
+
     
     st.markdown(
         """
