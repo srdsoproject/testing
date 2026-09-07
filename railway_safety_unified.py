@@ -1051,7 +1051,7 @@ def generate_elect_g(excel: str = EXCEL_FILE) -> str:
     add_text(ax, x + w / 2, y + h - 0.14,
              f"II - CLASSIFICATION SUB HEAD DISTRIBUTION ({_section_period()})",
              9.8, "bold", "white", "center")
-    columns = subhead_columns(2.25, 0.72, 0.65, 0.82, with_share=True)
+    columns = subhead_columns(2.25, 0.72, 0.65, 0.82)
     start_x = x + 0.07
     header_y = y + h - 0.56
     row_height = 0.155
@@ -1737,7 +1737,7 @@ def generate_elect_trd(excel: str = EXCEL_FILE) -> str:
     add_text(ax, x + w / 2, y + h - 0.14,
              f"II - CLASSIFICATION SUB HEAD DISTRIBUTION ({_section_period()})",
              9.8, "bold", "white", "center")
-    columns = subhead_columns(2.25, 0.72, 0.65, 0.82, with_share=True)
+    columns = subhead_columns(2.25, 0.72, 0.65, 0.82)
     start_x, header_y, row_height = x + 0.07, y + h - 0.56, 0.165
     cx = start_x
     for name, cw in columns:
@@ -2183,7 +2183,7 @@ def generate_operating(excel: str = EXCEL_FILE) -> str:
     add_text(ax, x + w / 2, y + h - 0.14,
              f"II - CLASSIFICATION SUB HEAD DISTRIBUTION ({_section_period()})",
              9.8, "bold", "white", "center")
-    columns = subhead_columns(2.25, 0.72, 0.65, 0.82, with_share=True)
+    columns = subhead_columns(2.25, 0.72, 0.65, 0.82)
     start_x, header_y, row_height = x + 0.07, y + h - 0.56, 0.155
     cx = start_x
     for name, cw in columns:
@@ -2865,7 +2865,7 @@ def generate_snt(excel: str = EXCEL_FILE) -> str:
     add_text(ax, x + w / 2, y + h - 0.14,
              f"II - CLASSIFICATION SUB HEAD DISTRIBUTION ({_section_period()})",
              9.8, "bold", "white", "center")
-    columns = subhead_columns(2.25, 0.72, 0.65, 0.82, with_share=True)
+    columns = subhead_columns(2.25, 0.72, 0.65, 0.82)
     start_x, header_y, row_height = x + 0.07, y + h - 0.56, 0.155
     cx = start_x
     for name, cw in columns:
