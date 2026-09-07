@@ -778,7 +778,7 @@ def draw_footer(ax, dept_text: str, data_as_on: Optional[str] = None):
 
 def subhead_columns(sub_head_width: float = 2.25, month_width: float = 0.72,
                     total_width: float = 0.65, share_width: float = 0.82,
-                    with_share: bool = True):
+                    with_share: bool = False):
     """Build table column list from REPORT_MONTHS (office-friendly CONFIG)."""
     cols = [("Sub Head", sub_head_width)]
     for m in REPORT_MONTHS:
@@ -794,7 +794,7 @@ def month_pairs():
     return [(MONTH_LABELS.get(m, str(m)), m) for m in REPORT_MONTHS]
 
 
-def total_row_values(df: pd.DataFrame, with_share: bool = True):
+def total_row_values(df: pd.DataFrame, with_share: bool = False):
     """Total-row cells: label + per-month counts + grand total [+ 100%]."""
     vals = ["Total"] + [int((df["Month"] == m).sum()) for m in REPORT_MONTHS] + [len(df)]
     if with_share:
@@ -802,7 +802,7 @@ def total_row_values(df: pd.DataFrame, with_share: bool = True):
     return vals
 
 
-def sub_row_values(sub_head, row, with_share: bool = True):
+def sub_row_values(sub_head, row, with_share: bool = False)):
     vals = [sub_head] + [int(row.get(m, 0)) for m in REPORT_MONTHS] + [int(row["Total"])]
     if with_share:
         vals.append(f"{row['Share']:.2f}%")
