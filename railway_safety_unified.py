@@ -71,7 +71,6 @@ BASE_DIR = Path(__file__).resolve().parent
 BASE_DIR_STR = str(BASE_DIR)
 
 EXCEL_FILE = BASE_DIR/"DATA.xlsx"
-)
 
 LOGO_FILE = str(BASE_DIR / "indian_railways_logo.png")
 TRAIN_FILE = str(BASE_DIR / "train.png")
