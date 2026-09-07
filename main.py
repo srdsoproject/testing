@@ -2934,7 +2934,7 @@ with tabs[3]:
             if item.get("general_error"):
                 st.error(f"General: {item['general_error']}")
             if item.get("general_path") and Path(item["general_path"]).exists():
-                st.image(item["general_path"], use_container_width=True)
+                st.image(item["general_path"], use_column_width=True)
                 with open(item["general_path"], "rb") as f:
                     st.download_button(
                         "⬇ Download general image (PNG)",
