@@ -26,6 +26,12 @@ import streamlit as st
 # Import unified dashboard module (same folder or on PYTHONPATH)
 # ---------------------------------------------------------------------------
 import railway_safety_unified as rs
+st.set_page_config(
+    page_title="Safety Deficiencies Dashboard – Solapur Division",
+    page_icon="🚆",
+    layout="wide",
+)
+
 
 # ---------------------------------------------------------------------------
 # Department catalogue
@@ -433,11 +439,6 @@ def general_output_name(dept_key: str) -> str:
 # Streamlit page
 # =============================================================================
 
-st.set_page_config(
-    page_title="Safety Deficiencies Dashboard – Solapur Division",
-    page_icon="🚆",
-    layout="wide",
-)
 
 st.markdown(
     """
