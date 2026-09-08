@@ -11,3 +11,4 @@ matplotlib==3.9.2
 openpyxl
 reportlab==4.2.2
 Pillow
+pandas
