@@ -536,26 +536,48 @@ def create_dashboard(
             if resolved > 0:
                 draw.rectangle((bar_x1, cy - bar_h / 2, bar_x1 + rw, cy + bar_h / 2),
                                fill="#079444")
-                if rw >= 100:
+                # Adaptive text for Resolved so it stays clear even at 96%+
+                if rw >= 160:
                     centered_text(draw, f"{resolved} ({pct:.1f}%)",
                                   (bar_x1, cy - bar_h / 2, bar_x1 + rw, cy + bar_h / 2),
-                                  get_font(18, True), "white")
+                                  get_font(16, True), "white")
+                elif rw >= 90:
+                    centered_text(draw, f"{resolved} ({pct:.1f}%)",
+                                  (bar_x1, cy - bar_h / 2, bar_x1 + rw, cy + bar_h / 2),
+                                  get_font(14, True), "white")
+                elif rw >= 50:
+                    centered_text(draw, str(resolved),
+                                  (bar_x1, cy - bar_h / 2, bar_x1 + rw, cy + bar_h / 2),
+                                  get_font(15, True), "white")
+                else:
+                    centered_text(draw, str(resolved),
+                                  (bar_x1, cy - bar_h / 2, bar_x1 + max(rw, 28), cy + bar_h / 2),
+                                  get_font(14, True), "white")
             if pending > 0:
                 draw.rectangle((bar_x1 + rw, cy - bar_h / 2,
                                 bar_x1 + rw + pw, cy + bar_h / 2), fill="#e31b1b")
-                if pw >= 45:
+                if pw >= 22:
                     centered_text(draw, str(pending),
                                   (bar_x1 + rw, cy - bar_h / 2,
                                    bar_x1 + rw + pw, cy + bar_h / 2),
-                                  get_font(17, True), "white")
+                                  get_font(16, True), "white")
+                else:
+                    centered_text(draw, str(pending),
+                                  (bar_x1 + rw - 2, cy - bar_h / 2,
+                                   bar_x1 + rw + max(pw, 26), cy + bar_h / 2),
+                                  get_font(15, True), "white")
             if no_resp > 0:
                 draw.rectangle((bar_x1 + rw + pw, cy - bar_h / 2, bar_x2, cy + bar_h / 2),
                                fill="#ed8c00")
-                if nw >= 45:
+                if nw >= 22:
                     centered_text(draw, str(no_resp),
                                   (bar_x1 + rw + pw, cy - bar_h / 2, bar_x2, cy + bar_h / 2),
-                                  get_font(17, True), "white")
-
+                                  get_font(16, True), "white")
+                else:
+                    centered_text(draw, str(no_resp),
+                                  (bar_x1 + rw + pw - 2, cy - bar_h / 2,
+                                   bar_x1 + rw + pw + max(nw, 26), cy + bar_h / 2),
+                                  get_font(15, True), "white")
         ty = table_start + idx * table_row_h
         draw.rectangle((table_x1, ty, table_x2, ty + table_row_h),
                        fill="#ffffff", outline="#777777", width=1)
