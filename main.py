@@ -2208,60 +2208,15 @@ with tabs[3]:
     # Helpers
     # =============================================================================
     
-    def resolve_paths() -> Tuple[Path, Path, Path, Path]:
-        """Prefer paths from unified module; fall back to script directory."""
+    def resolve_output_paths() -> Tuple[Path, Path, Path]:
+        """Just resolve the base/logo/output folder from the unified module.
+        No Excel-file resolution is needed any more — Smart Analysis now reads
+        live from the same Google Sheet as the rest of the app."""
         base = Path(rs.BASE_DIR)
-        excel = Path(rs.EXCEL_FILE)
         logo = Path(rs.LOGO_FILE)
         out = Path(rs.OUTPUT_FOLDER)
-        # If Windows path does not exist on this machine, use local project folder
-        script_dir = Path(__file__).resolve().parent
-        if not excel.exists():
-            local_excel = script_dir / "DATA.xlsx"
-            if local_excel.exists():
-                excel = local_excel
-                base = script_dir
-                out = script_dir / "DEPARTMENT_DASHBOARDS"
-                out.mkdir(parents=True, exist_ok=True)
-                rs.EXCEL_FILE = excel
-                rs.BASE_DIR = base
-                rs.OUTPUT_FOLDER = out
-                rs.OUTPUT_FOLDER_STR = str(out)
-                # logo / train optional for PIL general; detailed needs them
-                for name, attr in [
-                    ("indian_railways_logo.png", "LOGO_FILE"),
-                    ("train.png", "TRAIN_FILE"),
-                ]:
-                    p = script_dir / name
-                    if p.exists():
-                        setattr(rs, attr, str(p))
-        return base, excel, logo, out
-    
-    
-    def load_raw_excel(excel: Path) -> pd.DataFrame:
-        """Load first usable sheet (same idea as general load_data)."""
-        xls = pd.ExcelFile(excel)
-        preferred_cols = [
-            "Date of Inspection", "Head", "Sub Head", "Status",
-            "Location", "Deficiencies Noted", "Action By", "Action by",
-        ]
-        best = None
-        best_score = -1
-        for sheet in xls.sheet_names:
-            try:
-                tmp = pd.read_excel(excel, sheet_name=sheet)
-                tmp.columns = (
-                    tmp.columns.astype(str).str.strip().str.replace(r"\s+", " ", regex=True)
-                )
-                score = sum(1 for c in preferred_cols if c in tmp.columns)
-                if score > best_score:
-                    best_score = score
-                    best = tmp
-            except Exception:
-                continue
-        if best is None:
-            raise ValueError("Could not read any sheet from Excel.")
-        return best
+        out.mkdir(parents=True, exist_ok=True)
+        return base, logo, out
     
     
     def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -2274,6 +2229,36 @@ with tabs[3]:
             df["Date of Inspection"] = pd.to_datetime(
                 df["Date of Inspection"], errors="coerce", dayfirst=True
             )
+        return df
+    
+    
+    @st.cache_data(ttl=30, show_spinner=False)
+    def load_smart_analysis_data() -> pd.DataFrame:
+        """Pull the live deficiencies Google Sheet (via the same `load_data()`
+        used by the View Records / Analytics tabs) and compute a 'Status'
+        column with the SAME keyword-based classify_feedback() logic used
+        everywhere else in this app — instead of requiring an uploaded Excel
+        file that already had a pre-typed 'Status' column.
+
+        Bucketing rules (identical to the View Records tab):
+          - Feedback blank            -> "No Response"
+          - Feedback/remark present   -> classify_feedback() -> "Resolved" / "Pending"
+        """
+        raw = load_data()  # cached live Google Sheet read, defined earlier in this file
+        df = normalize_columns(raw)
+
+        for col in ["Feedback", "User Feedback/Remark", "Head", "Sub Head",
+                    "Location", "Deficiencies Noted", "Action By"]:
+            if col not in df.columns:
+                df[col] = ""
+
+        def _row_status(row) -> str:
+            fb = str(row.get("Feedback", "")).strip()
+            if not fb:
+                return "No Response"
+            return classify_feedback(row.get("Feedback", ""), row.get("User Feedback/Remark", ""))
+
+        df["Status"] = df.apply(_row_status, axis=1)
         return df
     
     
@@ -2372,7 +2357,12 @@ with tabs[3]:
     
     
     def classify_status_series(s: pd.Series) -> pd.Series:
-        return s.apply(rs.classify_status)
+        """The 'Status' column arriving here was already bucketed into
+        Resolved / Pending / No Response by load_smart_analysis_data(),
+        using the same keyword-based classify_feedback() logic as the
+        View Records tab — so this just normalises stray blanks instead
+        of re-classifying free text."""
+        return s.fillna("Pending").astype(str).str.strip().replace({"": "Pending"})
     
     
     def _original_columns(df: pd.DataFrame) -> List[str]:
@@ -2594,32 +2584,17 @@ with tabs[3]:
         unsafe_allow_html=True,
     )
     
-    base, excel_path, logo_path, out_dir = resolve_paths()
+    base, logo_path, out_dir = resolve_output_paths()
     
     # ---- Sidebar / controls ----
     with st.sidebar:
         st.header("⚙️ Settings")
     
-        st.subheader("0. Data file")
-        uploaded = st.file_uploader(
-            "Upload Excel for analysis (optional)",
-            type=["xlsx", "xls"],
-            help="If you upload a file, it is used instead of DATA.xlsx on disk.",
-        )
-        if uploaded is not None:
-            # Save upload to temp and use for this session
-            up_path = Path(tempfile.gettempdir()) / f"streamlit_upload_{uploaded.name}"
-            up_path.write_bytes(uploaded.getvalue())
-            excel_path = up_path
-            st.success(f"Using uploaded: **{uploaded.name}**")
-            # bust cache when new file uploaded
-            st.session_state["_upload_name"] = uploaded.name
-            st.session_state["_upload_mtime"] = float(up_path.stat().st_mtime)
-        else:
-            st.caption(f"Default Excel: `{excel_path.name}`")
-            if not excel_path.exists():
-                st.error(f"Excel not found:\n{excel_path}\nUpload a file above or place DATA.xlsx in the project folder.")
-                st.stop()
+        st.subheader("Data source")
+        st.success("🔗 Connected live to the Google Sheet — no upload needed.")
+        if st.button("🔄 Refresh data from Google Sheet", key="smart_refresh_btn", use_container_width=True):
+            load_smart_analysis_data.clear()
+            st.rerun()
     
         st.subheader("1. Department")
         dept_options = {k: v[0] for k, v in DEPARTMENTS.items()}
@@ -2650,24 +2625,18 @@ with tabs[3]:
     
         run_btn = st.button("▶ Generate dashboards", type="primary", use_container_width=True)
     
-    # ---- Load & preview data ----
-    @st.cache_data(show_spinner=False)
-    def cached_load(path_str: str, mtime: float) -> pd.DataFrame:
-        return normalize_columns(load_raw_excel(Path(path_str)))
-    
-    
+    # ---- Load live data straight from the Google Sheet ----
     try:
-        mtime = float(st.session_state.get("_upload_mtime", excel_path.stat().st_mtime))
-        raw_df = cached_load(str(excel_path), mtime)
+        raw_df = load_smart_analysis_data()
     except Exception as e:
-        st.error(f"Failed to read Excel: {e}")
+        st.error(f"Failed to load data from Google Sheets: {e}")
         st.stop()
     
     filtered_df = filter_by_date(raw_df, start_date, end_date)
     
     with st.expander("📊 Data preview (after date filter)", expanded=False):
         st.write(
-            f"Total rows in file: **{len(raw_df)}** · "
+            f"Total rows in sheet: **{len(raw_df)}** · "
             f"After date filter ({start_date} → {end_date}): **{len(filtered_df)}**"
         )
         st.dataframe(filtered_df.head(30), use_container_width=True)
