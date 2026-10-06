@@ -1299,7 +1299,7 @@ def generate_engineering(target_den: Optional[str] = "Sr.DEN/C",
         "AAG", "BALE", "MA", "MKPT", "MO", "MVE", "PK", "SUR", "WDS", "WKA",
         "BALE-SUR", "SUR-MO", "SUR-LTRR", "SUR-KEM", "JEUR-SUR", "SUR-DD", "DD-SUR",
         "SUR-MRJ", "SUR-KWV", "KWV-SUR", "SUR-PVR", "SUR-KLBG", "SUR-WADI",
-        "AAG-MKPT", "BGVN-SUR", "SUR-BGVN", "BGVN-SUR"
+        "AAG-MKPT", "BGVN-SUR", "SUR-BGVN"
     }
     SR_ADEN_KWV_BG = {
         "BGVN", "BLNI", "BRB", "DHS", "JEUR", "JNTR", "KEM", "KWV", "MLM", "PPJ", "PRWD", "WSB", "KEU",
@@ -2854,7 +2854,7 @@ def generate_snt(excel: str = EXCEL_FILE) -> str:
         "SUR-KWV", "KWV-MLB", "MLB-MRJ", "TKWD-MKPT",
     }
     KWV_I = {
-        "KWV", "DHS", "KEM", "BLNI", "JEUR", "PPJ", "WSB", "KEU", "JNTR", "BGVN", "SUR-BGVN",
+        "KWV", "DHS", "KEM", "BLNI", "JEUR", "PPJ", "WSB", "KEU", "JNTR", "BGVN", "SUR-BGVN", "BGVN-SUR",
         "MLM", "BRB", "WDS", "MLM-BRB", "DD-KWV", "BGVN-JNTR", "SUR-KEM", "KWV-SUR",
         "JEUR-SUR", "SUR-JEUR", "WSD", "KWV-BRB", "MA", "WDS"
     }
