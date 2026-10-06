@@ -932,7 +932,7 @@ def normalize_str(text):
     return re.sub(r'\s+', ' ', text.lower()).strip()
 
 
-def classify_feedback(feedback, user_remark="", strict=False):
+def classify_feedback(feedback, user_remark=""):
     if isinstance(feedback, str) and feedback.strip() == "`":
         return ""
 
@@ -989,7 +989,7 @@ def classify_feedback(feedback, user_remark="", strict=False):
         return "Resolved"
     if a == "Pending" or b == "Pending":
         return "Pending"
-    return None if strict else "Pending"   # strict=True -> report "no keyword matched"
+    return "Pending"
 
 
 def get_status(feedback, remark):
@@ -2371,7 +2371,7 @@ with tabs[3]:
                 "Deficiency_Clean", "Status_Clean", "ACTION_BY_NORMALIZED",
                 "Location_Norm", "ADSTE", "ELECT_G", "Classification_Method",
                 "JURISDICTION", "Lobby/Running Room", "Lobby Keyword",
-                "Running Room Keyword"}
+                "Running Room Keyword", "ADEN", "ELECT_TRD", "OPERATING_TI"}
         cols = [c for c in df.columns if c not in drop]
         return cols if cols else list(df.columns)
     
@@ -2521,35 +2521,6 @@ with tabs[3]:
         return buf.getvalue()
     
     
-    def get_unclassified_df(df: pd.DataFrame, dept_key: str) -> pd.DataFrame:
-        """Rows that HAVE feedback text but matched no resolved/pending keyword
-        (and no !/# marker), i.e. rows classify_feedback() could only default."""
-        work = head_filter_for_dept(df, dept_key)
-        if work.empty:
-            return work
-        work = work.copy()
-        fb = work["Feedback"].fillna("").astype(str).str.strip()
-        rm = work["User Feedback/Remark"].fillna("").astype(str).str.strip()
-        unmatched = pd.Series(
-            [classify_feedback(f, r, strict=True) is None for f, r in zip(fb, rm)],
-            index=work.index,
-        )
-        out = work[(fb != "") & unmatched]
-        return out[_original_columns(out)] if len(out) else out.head(0)
-
-
-    def build_unclassified_excel(df: pd.DataFrame, dept_key: str) -> bytes:
-        out = get_unclassified_df(df, dept_key)
-        buf = io.BytesIO()
-        with pd.ExcelWriter(buf, engine="openpyxl") as writer:
-            if out.empty:
-                pd.DataFrame({"Message": ["No unclassified records for this department / date range"]}
-                             ).to_excel(writer, sheet_name="Unclassified_Records", index=False)
-            else:
-                out.to_excel(writer, sheet_name="Unclassified_Records", index=False)
-        return buf.getvalue()
-
-
     def find_latest_image(out_dir: Path, hint: str, after_ts: float) -> Optional[Path]:
         """Find newest PNG in output folder matching hint, created after after_ts."""
         if not out_dir.exists():
@@ -2713,6 +2684,12 @@ with tabs[3]:
             rs.EXCEL_FILE = temp_excel
             rs._cached_df = None
     
+            ukey = {
+                "engg": f"engg:{rs.ENGG_DEFAULT_DEN}", "engg_s": "engg:Sr.DEN/S",
+                "engg_track": "engg:DEN/TRACK", "engg_full": "engg:None",
+            }.get(key, key)
+            rs.UNCLASSIFIED_RECORDS.pop(ukey, None)
+
             # Detailed — call with excel= explicitly (defaults are bound at import time)
             if mode in ("Both", "Detailed only") and detailed_key:
                 try:
@@ -2821,11 +2798,21 @@ with tabs[3]:
             except Exception as exc:
                 item["general_error"] = (item["general_error"] or "") + f" | Pending Excel: {exc}"
     
+            # Records that could not be mapped to a jurisdiction (shown under General Analysis)
+            item["unclassified_df"] = None
+            item["unclassified_xlsx"] = None
             try:
-                item["unclassified_df"] = get_unclassified_df(filtered_df, key)
-                item["unclassified_xlsx"] = build_unclassified_excel(filtered_df, key)
+                _u = rs.UNCLASSIFIED_RECORDS.get(ukey)
+                if _u is not None:
+                    _u = _u[_original_columns(_u)]
+                    item["unclassified_df"] = _u
+                    _ub = io.BytesIO()
+                    (_u if len(_u) else pd.DataFrame(
+                        {"Message": ["No unclassified records for this department / date range"]}
+                    )).to_excel(_ub, index=False, sheet_name="Unclassified_Records")
+                    item["unclassified_xlsx"] = _ub.getvalue()
             except Exception as exc:
-                item["general_error"] = (item["general_error"] or "") + f" | Unclassified Excel: {exc}"
+                item["general_error"] = (item["general_error"] or "") + f" | Unclassified: {exc}"
 
             results.append(item)
     
@@ -2974,21 +2961,26 @@ with tabs[3]:
                     key=f"dl_pend_{item['key']}",
                 )
     
-        if item.get("unclassified_xlsx"):
-            st.markdown("#### 🏷️ Unclassified records (feedback not recognised)")
-            udf = item.get("unclassified_df")
-            if udf is not None and len(udf):
-                st.caption(f"{len(udf)} record(s) have feedback that matched no keyword rule.")
+        if mode == "General only" and item.get("unclassified_df") is None:
+            st.info("Unclassified records are worked out by the Detailed analysis - "
+                    "choose 'Both' or 'Detailed only' to see them.")
+        elif item.get("unclassified_df") is not None:
+            st.markdown("#### 🏷️ Unclassified records")
+            udf = item["unclassified_df"]
+            if len(udf):
+                st.caption(f"{len(udf)} record(s) could not be mapped to a jurisdiction "
+                           "(they are counted as 'Unclassified' in the Detailed analysis).")
                 st.dataframe(udf, use_container_width=True, hide_index=True)
             else:
                 st.info("No unclassified records for this selection.")
-            st.download_button(
-                "⬇ Download Unclassified records Excel",
-                data=item["unclassified_xlsx"],
-                file_name=f"{item['key']}_Unclassified_Records.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key=f"dl_uncl_{item['key']}",
-            )
+            if item.get("unclassified_xlsx"):
+                st.download_button(
+                    "⬇ Download Unclassified records Excel",
+                    data=item["unclassified_xlsx"],
+                    file_name=f"{item['key']}_Unclassified_Records.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key=f"dl_uncl_{item['key']}",
+                )
 
     st.markdown("---")
     st.caption("Source: SARAL · Solapur Division, Central Railway · Generated via Streamlit UI")
