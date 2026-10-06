@@ -58,6 +58,14 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import FancyBboxPatch, Rectangle, Circle
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
+# Rows that could not be mapped to a jurisdiction, filled by each detailed
+# generator and read by the Streamlit app ("Smart Analysis" tab).
+UNCLASSIFIED_RECORDS: Dict[str, pd.DataFrame] = {}
+
+
+def _record_unclassified(key: str, df: "pd.DataFrame", col: str) -> None:
+    UNCLASSIFIED_RECORDS[key] = df[df[col] == "Unclassified"].copy()
+
 # =============================================================================
 # ★★★  SHARED EASY SETTINGS (office use)  ★★★
 # Paths used by BOTH families. Edit only this block for office use.
@@ -1048,7 +1056,7 @@ def generate_elect_g(excel: str = EXCEL_FILE) -> str:
         location = normalize_location(location)
         if location == "":
             j, m = classify_from_deficiency(deficiency)
-            return (j, "DEFICIENCY-" + m) if j else (None, "NO-MATCH")
+            return (j, "DEFICIENCY-" + m) if j else (None, "UNCLASSIFIED")
         if location in SECTION_MAP:
             return SECTION_MAP[location], "LOCATION-SECTION"
         if location in station_map:
@@ -1062,12 +1070,15 @@ def generate_elect_g(excel: str = EXCEL_FILE) -> str:
         if location_clean in SECTION_MAP:
             return SECTION_MAP[location_clean], "LOCATION-SECTION"
         j, m = classify_from_deficiency(deficiency)
-        return (j, "DEFICIENCY-" + m) if j else (None, "NO-MATCH")
+        return (j, "DEFICIENCY-" + m) if j else (None, "UNCLASSIFIED")
 
     results = df.apply(lambda row: classify_record(row["Location"], row["Deficiencies Noted"]), axis=1)
     df["ELECT_G"] = results.apply(lambda x: x[0])
     df["Classification_Method"] = results.apply(lambda x: x[1])
-    df = df[df["ELECT_G"].notna()].copy()
+    df["ELECT_G"] = df["ELECT_G"].fillna("Unclassified")
+    _record_unclassified("elect_g", df, "ELECT_G")
+    if (df["ELECT_G"] == "Unclassified").any() and "Unclassified" not in ELECT_G_ORDER:
+        ELECT_G_ORDER = list(ELECT_G_ORDER) + ["Unclassified"]
 
     total, resolved, pending, no_response = status_counts(df)
     sub = subhead_table(df)
@@ -1450,7 +1461,7 @@ def generate_engineering(target_den: Optional[str] = "Sr.DEN/C",
 
     ALL_ADEN_ORDER = [
         "ADEN KLBG", "ADEN S SUR", "Sr.ADEN N SUR",
-        "Sr.ADEN KWV BG", "ADEN/PVR", "ADEN/LUR",
+        "Sr.ADEN KWV BG", "ADEN/PVR", "ADEN/LUR", "Unclassified",
     ]
     DEN_TO_ADENS = {
         "Sr.DEN/C": ["Sr.ADEN KWV BG", "Sr.ADEN N SUR"],
@@ -1464,13 +1475,16 @@ def generate_engineering(target_den: Optional[str] = "Sr.DEN/C",
             df["Action by"].str.upper().str.replace(" ", "", regex=False)
             .str.replace("/", "", regex=False).eq(target_clean)
         ].copy()
-        ADEN_ORDER = DEN_TO_ADENS.get(target_den, ALL_ADEN_ORDER)
+        ADEN_ORDER = DEN_TO_ADENS.get(target_den, ALL_ADEN_ORDER[:-1])
     else:
-        ADEN_ORDER = ALL_ADEN_ORDER
+        ADEN_ORDER = ALL_ADEN_ORDER[:-1]
 
-    df = df[df["ADEN"].notna()].copy()
+    df["ADEN"] = df["ADEN"].fillna("Unclassified")
+    _record_unclassified(f"engg:{target_den}", df, "ADEN")
     present = df["ADEN"].unique().tolist()
     ADEN_ORDER = [a for a in ADEN_ORDER if a in present]
+    if "Unclassified" in present and "Unclassified" not in ADEN_ORDER:
+        ADEN_ORDER.append("Unclassified")
 
     total, resolved, pending, no_response = status_counts(df)
     MONTHS = month_pairs()
@@ -1745,7 +1759,8 @@ def generate_elect_trd(excel: str = EXCEL_FILE) -> str:
         return np.nan
 
     df["ELECT_TRD"] = df["Location"].apply(classify_trd)
-    df = df[df["ELECT_TRD"].notna()].copy()
+    df["ELECT_TRD"] = df["ELECT_TRD"].fillna("Unclassified")
+    _record_unclassified("elect_trd", df, "ELECT_TRD")
 
     total, resolved, pending, no_response = status_counts(df)
     sub = subhead_table(df)
@@ -1755,6 +1770,8 @@ def generate_elect_trd(excel: str = EXCEL_FILE) -> str:
         "SSE/TRD/KWV", "SSE/TRD/KEU", "SSE/TRD/BTW", "SSE/TRD/DRSV",
         "SSE/TRD/LUR", "SSE/TRD/PVR", "SSE/TRD/SGLA", "SSE/TRD/SGRE",
     ]
+    if (df["ELECT_TRD"] == "Unclassified").any():
+        TRD_ORDER = list(TRD_ORDER) + ["Unclassified"]
     elect_trd = (
         df.groupby(["ELECT_TRD", "Month"]).size().unstack(fill_value=0)
         .reindex(TRD_ORDER, fill_value=0)
@@ -1831,7 +1848,7 @@ def generate_elect_trd(excel: str = EXCEL_FILE) -> str:
              9.8, "bold", "white", "center")
     add_text(ax, x3 + w3 / 2, y3 + h3 - 0.43, "ELECT/TRD JURISDICTION WISE SUMMARY",
              7.8, "bold", NAVY, "center")
-    TRD_SHORT = {j: j.split("/")[-1] for j in TRD_ORDER}
+    TRD_SHORT = {j: ("Uncl." if j == "Unclassified" else j.split("/")[-1]) for j in TRD_ORDER}
     headers = ["Month"] + [TRD_SHORT[j] for j in TRD_ORDER] + ["TOTAL"]
     widths = [0.58] + [0.42] * len(TRD_ORDER) + [0.50]
     scale = (w3 - 0.12) / sum(widths)
@@ -2194,11 +2211,14 @@ def generate_operating(excel: str = EXCEL_FILE) -> str:
         return np.nan
 
     df["OPERATING_TI"] = df.apply(classify_operating, axis=1)
-    df = df[df["OPERATING_TI"].notna()].copy()
+    df["OPERATING_TI"] = df["OPERATING_TI"].fillna("Unclassified")
+    _record_unclassified("operating", df, "OPERATING_TI")
     total, resolved, pending, no_response = status_counts(df)
     sub = subhead_table(df)
 
     TI_ORDER = ["TI/SUR/N", "TI/SUR/S", "TI/KLBG", "TI/WD", "TI/KWV", "TI/BGVN", "TI/LUR", "TI/PVR"]
+    if (df["OPERATING_TI"] == "Unclassified").any():
+        TI_ORDER = list(TI_ORDER) + ["Unclassified"]
     operating_ti = (
         df.groupby(["OPERATING_TI", "Month"]).size().unstack(fill_value=0)
         .reindex(TI_ORDER, fill_value=0)
@@ -2278,6 +2298,7 @@ def generate_operating(excel: str = EXCEL_FILE) -> str:
     TI_SHORT = {
         "TI/SUR/N": "SUR/N", "TI/SUR/S": "SUR/S", "TI/KLBG": "KLBG", "TI/WD": "WD",
         "TI/KWV": "KWV", "TI/BGVN": "BGVN", "TI/LUR": "LUR", "TI/PVR": "PVR",
+        "Unclassified": "Uncl.",
     }
     headers = ["Month"] + [TI_SHORT.get(j, j) for j in TI_ORDER] + ["TOTAL"]
     widths = [0.62] + [0.65] * len(TI_ORDER) + [0.65]
@@ -2861,7 +2882,8 @@ def generate_snt(excel: str = EXCEL_FILE) -> str:
     # also try raw Location
     mask = df["ADSTE"].isna()
     df.loc[mask, "ADSTE"] = df.loc[mask, "Location"].map(adste_map)
-    df = df[df["ADSTE"].notna()].copy()
+    df["ADSTE"] = df["ADSTE"].fillna("Unclassified")
+    _record_unclassified("snt", df, "ADSTE")
 
     total, resolved, pending, no_response = status_counts(df)
     sub = subhead_table(df)
@@ -2872,6 +2894,8 @@ def generate_snt(excel: str = EXCEL_FILE) -> str:
         "ADSTE/KWV-I (KWV-BRB)",
         "ADSTE/KWV-II (LC-34(DKY)-LUR)",
     ]
+    if (df["ADSTE"] == "Unclassified").any():
+        ADSTE_ORDER = list(ADSTE_ORDER) + ["Unclassified"]
     adste = (
         df.groupby(["ADSTE", "Month"]).size().unstack(fill_value=0)
         .reindex(ADSTE_ORDER, fill_value=0)
