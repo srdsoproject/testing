@@ -2859,7 +2859,7 @@ def generate_snt(excel: str = EXCEL_FILE) -> str:
         "JEUR-SUR", "SUR-JEUR", "WSD", "KWV-BRB", "MA", "WDS"
     }
     KWV_II = {
-        "SEI", "BTW", "PJR", "UMD", "YSI", "MRX", "OSA", "HGL", "LUR", "KMRD", "KWV-KWV",
+        "SEI", "BTW", "PJR", "UMD", "YSI", "MRX", "OSA", "HGL", "LUR", "KMRD", "KWV-LUR",
         "LC-10", "LC-34", "LC-6", "LC-22", "LC-31", "LC-42", "LC-61", "LC-70", "LC-91", "LC-55", "LC-74", "KWV-HGL", "LC-2", "LC-4", "LC-5",
         "KWV-LUR", "KWV-SEI", "LC-3", "DRSV", "DKY", "LC-34(DKY)-LUR",
     }
