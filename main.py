@@ -932,7 +932,7 @@ def normalize_str(text):
     return re.sub(r'\s+', ' ', text.lower()).strip()
 
 
-def classify_feedback(feedback, user_remark=""):
+def classify_feedback(feedback, user_remark="", strict=False):
     if isinstance(feedback, str) and feedback.strip() == "`":
         return ""
 
@@ -989,7 +989,7 @@ def classify_feedback(feedback, user_remark=""):
         return "Resolved"
     if a == "Pending" or b == "Pending":
         return "Pending"
-    return "Pending"
+    return None if strict else "Pending"   # strict=True -> report "no keyword matched"
 
 
 def get_status(feedback, remark):
@@ -2521,6 +2521,35 @@ with tabs[3]:
         return buf.getvalue()
     
     
+    def get_unclassified_df(df: pd.DataFrame, dept_key: str) -> pd.DataFrame:
+        """Rows that HAVE feedback text but matched no resolved/pending keyword
+        (and no !/# marker), i.e. rows classify_feedback() could only default."""
+        work = head_filter_for_dept(df, dept_key)
+        if work.empty:
+            return work
+        work = work.copy()
+        fb = work["Feedback"].fillna("").astype(str).str.strip()
+        rm = work["User Feedback/Remark"].fillna("").astype(str).str.strip()
+        unmatched = pd.Series(
+            [classify_feedback(f, r, strict=True) is None for f, r in zip(fb, rm)],
+            index=work.index,
+        )
+        out = work[(fb != "") & unmatched]
+        return out[_original_columns(out)] if len(out) else out.head(0)
+
+
+    def build_unclassified_excel(df: pd.DataFrame, dept_key: str) -> bytes:
+        out = get_unclassified_df(df, dept_key)
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+            if out.empty:
+                pd.DataFrame({"Message": ["No unclassified records for this department / date range"]}
+                             ).to_excel(writer, sheet_name="Unclassified_Records", index=False)
+            else:
+                out.to_excel(writer, sheet_name="Unclassified_Records", index=False)
+        return buf.getvalue()
+
+
     def find_latest_image(out_dir: Path, hint: str, after_ts: float) -> Optional[Path]:
         """Find newest PNG in output folder matching hint, created after after_ts."""
         if not out_dir.exists():
@@ -2792,6 +2821,12 @@ with tabs[3]:
             except Exception as exc:
                 item["general_error"] = (item["general_error"] or "") + f" | Pending Excel: {exc}"
     
+            try:
+                item["unclassified_df"] = get_unclassified_df(filtered_df, key)
+                item["unclassified_xlsx"] = build_unclassified_excel(filtered_df, key)
+            except Exception as exc:
+                item["general_error"] = (item["general_error"] or "") + f" | Unclassified Excel: {exc}"
+
             results.append(item)
     
         progress.progress(1.0, text="Done")
@@ -2939,5 +2974,21 @@ with tabs[3]:
                     key=f"dl_pend_{item['key']}",
                 )
     
+        if item.get("unclassified_xlsx"):
+            st.markdown("#### 🏷️ Unclassified records (feedback not recognised)")
+            udf = item.get("unclassified_df")
+            if udf is not None and len(udf):
+                st.caption(f"{len(udf)} record(s) have feedback that matched no keyword rule.")
+                st.dataframe(udf, use_container_width=True, hide_index=True)
+            else:
+                st.info("No unclassified records for this selection.")
+            st.download_button(
+                "⬇ Download Unclassified records Excel",
+                data=item["unclassified_xlsx"],
+                file_name=f"{item['key']}_Unclassified_Records.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key=f"dl_uncl_{item['key']}",
+            )
+
     st.markdown("---")
     st.caption("Source: SARAL · Solapur Division, Central Railway · Generated via Streamlit UI")
