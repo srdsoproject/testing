@@ -1299,7 +1299,7 @@ def generate_engineering(target_den: Optional[str] = "Sr.DEN/C",
         "AAG", "BALE", "MA", "MKPT", "MO", "MVE", "PK", "SUR", "WDS", "WKA",
         "BALE-SUR", "SUR-MO", "SUR-LTRR", "SUR-KEM", "JEUR-SUR", "SUR-DD", "DD-SUR",
         "SUR-MRJ", "SUR-KWV", "KWV-SUR", "SUR-PVR", "SUR-KLBG", "SUR-WADI",
-        "AAG-MKPT", "BGVN-SUR", "SUR-BGVN",
+        "AAG-MKPT", "BGVN-SUR", "SUR-BGVN", "BGVN-SUR"
     }
     SR_ADEN_KWV_BG = {
         "BGVN", "BLNI", "BRB", "DHS", "JEUR", "JNTR", "KEM", "KWV", "MLM", "PPJ", "PRWD", "WSB", "KEU",
