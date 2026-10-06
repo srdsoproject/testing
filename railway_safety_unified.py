@@ -2122,7 +2122,7 @@ def generate_operating(excel: str = EXCEL_FILE) -> str:
     SUR_DD_TI = {
         "SUR": "TI/SUR/N", "BALE": "TI/SUR/N", "PAKNI": "TI/SUR/N", "PK": "TI/SUR/N",
         "MVE": "TI/SUR/N", "MOHOL": "TI/SUR/N", "MO": "TI/SUR/N",
-        "MKPT": "TI/SUR/N", "AAG": "TI/SUR/N", "WKA": "TI/SUR/N",
+        "MKPT": "TI/SUR/N", "AAG": "TI/SUR/N", "WKA": "TI/SUR/N", "MA": "TI/KWV",
         "MADHA": "TI/KWV", "WDS": "TI/KWV", "KWV": "TI/KWV", "DHS": "TI/KWV",
         "KEM": "TI/KWV", "BLNI": "TI/KWV", "JEUR": "TI/KWV",
         "PPJ": "TI/BGVN", "WSB": "TI/BGVN", "KEU": "TI/BGVN", "JNTR": "TI/BGVN",
