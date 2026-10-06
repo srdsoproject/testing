@@ -2846,7 +2846,7 @@ def generate_snt(excel: str = EXCEL_FILE) -> str:
     KLBG = {
         "WADI", "SDB", "MR", "HQR", "KLBG", "BBD", "SVG", "HHD", "GUR", "KUI",
         "DUD", "BOT", "AKOR", "TLT", "HG", "TJSP",
-        "WADI-SUR", "SUR-WADI", "WADI-KLBG", "SUR-SDB", "SUR-HG", "SUR-NGS",
+        "WADI-SUR", "SUR-WADI", "WADI-KLBG", "SUR-SDB", "SUR-HG", "SUR-NGS", "SUR-KLBG", 
     }
     SUR = {
         "TKWD", "SUR", "BALE", "PK", "MVE", "MO", "MKPT", "AAG", "WKA", "MLB",
@@ -2854,13 +2854,13 @@ def generate_snt(excel: str = EXCEL_FILE) -> str:
         "SUR-KWV", "KWV-MLB", "MLB-MRJ", "TKWD-MKPT",
     }
     KWV_I = {
-        "KWV", "DHS", "KEM", "BLNI", "JEUR", "PPJ", "WSB", "KEU", "JNTR", "BGVN",
-        "MLM", "BRB", "WDS", "MLM-BRB", "DD-KWV", "BGVN-JNTR", "SUR-KEM",
-        "JEUR-SUR", "SUR-JEUR", "WSD", "KWV-BRB",
+        "KWV", "DHS", "KEM", "BLNI", "JEUR", "PPJ", "WSB", "KEU", "JNTR", "BGVN", "SUR-BGVN",
+        "MLM", "BRB", "WDS", "MLM-BRB", "DD-KWV", "BGVN-JNTR", "SUR-KEM", "KWV-SUR",
+        "JEUR-SUR", "SUR-JEUR", "WSD", "KWV-BRB", "MA", "WDS"
     }
     KWV_II = {
         "SEI", "BTW", "PJR", "UMD", "YSI", "MRX", "OSA", "HGL", "LUR", "KMRD",
-        "LC-10", "LC-34", "LC-6", "LC-22", "LC-31", "LC-42", "LC-61", "LC-70", "LC-91",
+        "LC-10", "LC-34", "LC-6", "LC-22", "LC-31", "LC-42", "LC-61", "LC-70", "LC-91", "LC-55", "LC-74", "KWV-HGL",
         "KWV-LUR", "KWV-SEI", "LC-3", "DRSV", "DKY", "LC-34(DKY)-LUR",
     }
 
