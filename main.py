@@ -2047,8 +2047,8 @@ with tabs[2]:
             # ---- Feedback = Inspections sheet column M (13th column) ----
             # ---- Feedback = Inspections sheet column J (10th column) ----
             insp_df = insp_df.copy()
-            if insp_df.shape[1] > 9:
-                insp_df["Feedback"] = insp_df.iloc[:, 9]
+            if insp_df.shape[1] > 10:
+                insp_df["Feedback"] = insp_df.iloc[:, 11]
             else:
                 insp_df["Feedback"] = ""
             insp_df["Feedback"] = insp_df["Feedback"].fillna("").astype(str).str.strip()
