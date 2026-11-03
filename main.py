@@ -661,7 +661,7 @@ def build_whatsapp_message(name, phone, designation_hq, insp_date_str, sections,
         lines.append(f"*{i}. {str(sec_type).strip().upper()}*")
         lines.append(str(sec_location).strip())
         lines.append("*Deficiencies:*")
-        for j, (defect_text, action_by) in enumerate(deficiencies, start=1):
+        for j, (defect_text, action_by, feedback) in enumerate(deficiencies, start=1):
             lines.append(f"{j}. {defect_text}")
             lines.append(f"   Action By: {action_by if str(action_by).strip() else 'Not Assigned'}")
 
