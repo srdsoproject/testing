@@ -2110,7 +2110,11 @@ with tabs[2]:
                         sections = []
                         for (sec_type, sec_location), sec_rows in sub.groupby(["Type", "Location"], sort=False):
                             deficiencies = [
-                                (str(row["Deficiency"]).strip(), str(row["ActionBy"]).strip())
+                                (
+                                    str(row["Deficiency"]).strip(),
+                                    str(row["ActionBy"]).strip(),
+                                    str(row.get("Feedback", "")).strip(),   # column M
+                                )
                                 for _, row in sec_rows.iterrows()
                                 if str(row["Deficiency"]).strip()
                             ]
@@ -2156,7 +2160,6 @@ with tabs[2]:
                                     use_container_width=True,
                                     key=f"insp_dl_{g_name}_{g_phone}_{g_date}",
                                 )
-
 with tabs[3]:
 
 
