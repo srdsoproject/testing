@@ -665,7 +665,7 @@ def build_whatsapp_message(name, phone, designation_hq, insp_date_str, sections,
         for j, (defect_text, action_by, remarks) in enumerate(deficiencies, start=1):
             lines.append(f"{j}. {defect_text}")
             if remarks:
-                lines.append(f"   Feedback: {remarks}")
+                lines.append(f"{remarks}")
 
     lines.append("Photos: 0")
     lines.append(f"*Division:* Solapur • {phone or 'N/A'}")
