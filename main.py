@@ -639,11 +639,21 @@ def load_inspections_data():
         if mask.any():
             df.loc[mask, "Date_parsed"] = pd.to_datetime(df.loc[mask, "Date"], errors="coerce", dayfirst=True)
 
+        # ---- Skip rules ----
+        # 1) Missing / unparseable date of inspection
+        df = df[df["Date_parsed"].notna()]
+
+        # 2) Head is "Others" AND Action By is not assigned
+        unassigned = df["ActionBy"].str.strip().str.lower().isin(
+            ["", "not assigned", "n/a", "na", "-"]
+        )
+        is_others = df["Head"].str.strip().str.lower().isin(["others", "other"])
+        df = df[~(is_others & unassigned)].reset_index(drop=True)
+
         return df
     except Exception as e:
         st.error(f"❌ Error loading Inspections sheet: {str(e)}")
         return pd.DataFrame(columns=cols + ["Date_parsed"])
-
 
 def build_whatsapp_message(name, phone, designation_hq, insp_date_str, sections, submitted_dt=None):
     """Build a WhatsApp-formatted Safety Inspection Report matching the S.A.R.A.L template.
