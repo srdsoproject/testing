@@ -81,6 +81,7 @@ INSPECTIONS_COL_MAP = {
     "InspectionBy": 10,      # Column K - Inspection By / Designation & HQ
     "ActionBy": 11,           # Column L - Action By
     "Remarks": 12,
+    "Head": 8,  
 }
 
 # Characters used for the CAPTCHA text. Visually-confusable characters
