@@ -651,7 +651,7 @@ def build_whatsapp_message(name, phone, designation_hq, insp_date_str, sections,
               deficiencies is a list of (deficiency_text, action_by) tuples.
     """
     lines = [
-        "*SAFETY INSPECTION REPORT*",
+        "*Sir, FEEDBACK OF YOUR SAFETY INSPECTION REPORT*",
         "_Solapur Division • Central Railway_",
         f"*Inspecting Official(s):* {name or 'N/A'}",
         f"*Designation & HQ:* {designation_hq or 'N/A'}",
@@ -677,6 +677,7 @@ def build_whatsapp_message(name, phone, designation_hq, insp_date_str, sections,
     lines.append(f"*Total Inspections:* {len(sections)}")
     lines.append("_Auto-generated via Safety Inspection App_")
     lines.append("Safety Department • Solapur Division")
+    lines.append("THANK YOU")
 
     return "\n".join(lines)
 
