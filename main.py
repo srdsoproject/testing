@@ -2025,150 +2025,150 @@ with tabs[1]:
 # INSPECTIONS TAB — WhatsApp report generator
 # =========================================================================
 with tabs[2]:
-       st.markdown("### 📨 Safety Inspection Report")
-    st.caption(
-        "Safety Inspections by inspecting officials:"
-    )
-
-    refresh_col, _sp = st.columns([1, 5])
-    with refresh_col:
-        if st.button("🔄 Refresh", key="insp_refresh_btn", use_container_width=True):
-            load_inspections_data.clear()
-            st.rerun()
-
-    insp_df = load_inspections_data()
-
-    if insp_df.empty:
-        st.warning(
-            "No data available from the Inspections sheet. Please check the sheet ID/name, "
-            "and that it is shared with the service account."
+        st.markdown("### 📨 Safety Inspection Report")
+        st.caption(
+            "Safety Inspections by inspecting officials:"
         )
-    else:
-        # ---- Feedback = Inspections sheet column M (13th column) ----
-        insp_df = insp_df.copy()
-        if "Feedback" not in insp_df.columns:
-            if insp_df.shape[1] > 12:
-                insp_df["Feedback"] = insp_df.iloc[:, 12]
-            else:
-                insp_df["Feedback"] = ""
-        insp_df["Feedback"] = insp_df["Feedback"].fillna("").astype(str).str.strip()
-
-        valid_dates = insp_df["Date_parsed"].dropna()
-        if valid_dates.empty:
-            st.warning("No valid inspection dates could be parsed from column G of the Inspections sheet.")
+    
+        refresh_col, _sp = st.columns([1, 5])
+        with refresh_col:
+            if st.button("🔄 Refresh", key="insp_refresh_btn", use_container_width=True):
+                load_inspections_data.clear()
+                st.rerun()
+    
+        insp_df = load_inspections_data()
+    
+        if insp_df.empty:
+            st.warning(
+                "No data available from the Inspections sheet. Please check the sheet ID/name, "
+                "and that it is shared with the service account."
+            )
         else:
-            min_d = valid_dates.min().date()
-            max_d = valid_dates.max().date()
-
-            fc1, fc2 = st.columns(2)
-            insp_from_date = fc1.date_input(
-                "📅 From Date", value=max_d, min_value=min_d, max_value=max_d, key="insp_from_date"
-            )
-            insp_to_date = fc2.date_input(
-                "📅 To Date", value=max_d, min_value=min_d, max_value=max_d, key="insp_to_date"
-            )
-
-            if insp_from_date > insp_to_date:
-                st.warning("From Date cannot be after To Date. Swapping them.")
-                insp_from_date, insp_to_date = insp_to_date, insp_from_date
-
-            ranged = insp_df[
-                (insp_df["Date_parsed"] >= pd.Timestamp(insp_from_date)) &
-                (insp_df["Date_parsed"] <= pd.Timestamp(insp_to_date))
-            ].copy()
-
-            if ranged.empty:
-                st.info("No inspections found in the selected date range.")
-            else:
-                official_names = sorted(n for n in ranged["Name"].dropna().unique() if str(n).strip())
-                locations = sorted(l for l in ranged["Location"].dropna().unique() if str(l).strip())
-                designations = sorted(d for d in ranged["InspectionBy"].dropna().unique() if str(d).strip())
-
-                ff1, ff2, ff3 = st.columns(3)
-                selected_officials = ff1.multiselect(
-                    "👤 Inspecting Official", official_names, key="insp_name_filter"
-                )
-                selected_locations = ff2.multiselect(
-                    "📍 Location", locations, key="insp_location_filter"
-                )
-                selected_designations = ff3.multiselect(
-                    "🎖️ Designation & HQ", designations, key="insp_designation_filter"
-                )
-
-                if selected_officials:
-                    ranged = ranged[ranged["Name"].isin(selected_officials)]
-                if selected_locations:
-                    ranged = ranged[ranged["Location"].isin(selected_locations)]
-                if selected_designations:
-                    ranged = ranged[ranged["InspectionBy"].isin(selected_designations)]
-
-                ranged["Date_str"] = ranged["Date_parsed"].dt.strftime("%Y-%m-%d")
-                grouped = ranged.groupby(["Name", "Phone", "Date_str"], sort=True)
-
-                if len(grouped) == 0:
-                    st.info("No matching inspections to build a report for.")
+            # ---- Feedback = Inspections sheet column M (13th column) ----
+            insp_df = insp_df.copy()
+            if "Feedback" not in insp_df.columns:
+                if insp_df.shape[1] > 12:
+                    insp_df["Feedback"] = insp_df.iloc[:, 12]
                 else:
-                    st.markdown(f"**{len(grouped)} report(s) found for the selected filters.**")
-
-                    for (g_name, g_phone, g_date), sub in grouped:
-                        designation_series = sub["InspectionBy"].dropna()
-                        designation_series = designation_series[designation_series.str.strip() != ""]
-                        designation_hq = designation_series.iloc[0] if not designation_series.empty else ""
-
-                        # Sub-group into individual numbered inspections (Type + Location)
-                        sections = []
-                        for (sec_type, sec_location), sec_rows in sub.groupby(["Type", "Location"], sort=False):
-                            deficiencies = [
-                                (
-                                    str(row["Deficiency"]).strip(),
-                                    str(row["ActionBy"]).strip(),
-                                    str(row["Feedback"]).strip(),   # Inspections sheet column M
+                    insp_df["Feedback"] = ""
+            insp_df["Feedback"] = insp_df["Feedback"].fillna("").astype(str).str.strip()
+    
+            valid_dates = insp_df["Date_parsed"].dropna()
+            if valid_dates.empty:
+                st.warning("No valid inspection dates could be parsed from column G of the Inspections sheet.")
+            else:
+                min_d = valid_dates.min().date()
+                max_d = valid_dates.max().date()
+    
+                fc1, fc2 = st.columns(2)
+                insp_from_date = fc1.date_input(
+                    "📅 From Date", value=max_d, min_value=min_d, max_value=max_d, key="insp_from_date"
+                )
+                insp_to_date = fc2.date_input(
+                    "📅 To Date", value=max_d, min_value=min_d, max_value=max_d, key="insp_to_date"
+                )
+    
+                if insp_from_date > insp_to_date:
+                    st.warning("From Date cannot be after To Date. Swapping them.")
+                    insp_from_date, insp_to_date = insp_to_date, insp_from_date
+    
+                ranged = insp_df[
+                    (insp_df["Date_parsed"] >= pd.Timestamp(insp_from_date)) &
+                    (insp_df["Date_parsed"] <= pd.Timestamp(insp_to_date))
+                ].copy()
+    
+                if ranged.empty:
+                    st.info("No inspections found in the selected date range.")
+                else:
+                    official_names = sorted(n for n in ranged["Name"].dropna().unique() if str(n).strip())
+                    locations = sorted(l for l in ranged["Location"].dropna().unique() if str(l).strip())
+                    designations = sorted(d for d in ranged["InspectionBy"].dropna().unique() if str(d).strip())
+    
+                    ff1, ff2, ff3 = st.columns(3)
+                    selected_officials = ff1.multiselect(
+                        "👤 Inspecting Official", official_names, key="insp_name_filter"
+                    )
+                    selected_locations = ff2.multiselect(
+                        "📍 Location", locations, key="insp_location_filter"
+                    )
+                    selected_designations = ff3.multiselect(
+                        "🎖️ Designation & HQ", designations, key="insp_designation_filter"
+                    )
+    
+                    if selected_officials:
+                        ranged = ranged[ranged["Name"].isin(selected_officials)]
+                    if selected_locations:
+                        ranged = ranged[ranged["Location"].isin(selected_locations)]
+                    if selected_designations:
+                        ranged = ranged[ranged["InspectionBy"].isin(selected_designations)]
+    
+                    ranged["Date_str"] = ranged["Date_parsed"].dt.strftime("%Y-%m-%d")
+                    grouped = ranged.groupby(["Name", "Phone", "Date_str"], sort=True)
+    
+                    if len(grouped) == 0:
+                        st.info("No matching inspections to build a report for.")
+                    else:
+                        st.markdown(f"**{len(grouped)} report(s) found for the selected filters.**")
+    
+                        for (g_name, g_phone, g_date), sub in grouped:
+                            designation_series = sub["InspectionBy"].dropna()
+                            designation_series = designation_series[designation_series.str.strip() != ""]
+                            designation_hq = designation_series.iloc[0] if not designation_series.empty else ""
+    
+                            # Sub-group into individual numbered inspections (Type + Location)
+                            sections = []
+                            for (sec_type, sec_location), sec_rows in sub.groupby(["Type", "Location"], sort=False):
+                                deficiencies = [
+                                    (
+                                        str(row["Deficiency"]).strip(),
+                                        str(row["ActionBy"]).strip(),
+                                        str(row["Feedback"]).strip(),   # Inspections sheet column M
+                                    )
+                                    for _, row in sec_rows.iterrows()
+                                    if str(row["Deficiency"]).strip()
+                                ]
+                                if deficiencies:
+                                    sections.append((sec_type, sec_location, deficiencies))
+    
+                            if not sections:
+                                continue
+    
+                            message = build_whatsapp_message(g_name, g_phone, designation_hq, g_date, sections)
+                            n_deficiencies = sum(len(d) for _, _, d in sections)
+    
+                            with st.expander(
+                                f"📋 {g_name or 'Unknown'} • {g_date} • {len(sections)} inspection(s), "
+                                f"{n_deficiencies} deficiencies"
+                            ):
+                                st.text_area(
+                                    "Message Preview (tap inside, select all, copy)",
+                                    value=message,
+                                    height=420,
+                                    key=f"insp_msg_{g_name}_{g_phone}_{g_date}",
                                 )
-                                for _, row in sec_rows.iterrows()
-                                if str(row["Deficiency"]).strip()
-                            ]
-                            if deficiencies:
-                                sections.append((sec_type, sec_location, deficiencies))
-
-                        if not sections:
-                            continue
-
-                        message = build_whatsapp_message(g_name, g_phone, designation_hq, g_date, sections)
-                        n_deficiencies = sum(len(d) for _, _, d in sections)
-
-                        with st.expander(
-                            f"📋 {g_name or 'Unknown'} • {g_date} • {len(sections)} inspection(s), "
-                            f"{n_deficiencies} deficiencies"
-                        ):
-                            st.text_area(
-                                "Message Preview (tap inside, select all, copy)",
-                                value=message,
-                                height=420,
-                                key=f"insp_msg_{g_name}_{g_phone}_{g_date}",
-                            )
-
-                            b1, b2 = st.columns(2)
-                            with b1:
-                                # No phone number in the link — this opens WhatsApp's own
-                                # share screen and lets the user pick the contact/group manually.
-                                wa_url = f"https://wa.me/?text={quote(message)}"
-                                st.markdown(
-                                    f'<a href="{wa_url}" target="_blank" rel="noopener noreferrer">'
-                                    f'<button style="width:100%;min-height:44px;background-color:#25D366;'
-                                    f'color:white;border:none;border-radius:10px;font-weight:600;">'
-                                    f'📤 Share via WhatsApp</button></a>',
-                                    unsafe_allow_html=True,
-                                )
-                            with b2:
-                                safe_name = re.sub(r"[^A-Za-z0-9_-]+", "_", str(g_name) or "unknown")
-                                st.download_button(
-                                    "📥 Download as .txt",
-                                    data=message.encode("utf-8"),
-                                    file_name=f"inspection_report_{safe_name}_{g_date}.txt",
-                                    mime="text/plain",
-                                    use_container_width=True,
-                                    key=f"insp_dl_{g_name}_{g_phone}_{g_date}",
-                                )
+    
+                                b1, b2 = st.columns(2)
+                                with b1:
+                                    # No phone number in the link — this opens WhatsApp's own
+                                    # share screen and lets the user pick the contact/group manually.
+                                    wa_url = f"https://wa.me/?text={quote(message)}"
+                                    st.markdown(
+                                        f'<a href="{wa_url}" target="_blank" rel="noopener noreferrer">'
+                                        f'<button style="width:100%;min-height:44px;background-color:#25D366;'
+                                        f'color:white;border:none;border-radius:10px;font-weight:600;">'
+                                        f'📤 Share via WhatsApp</button></a>',
+                                        unsafe_allow_html=True,
+                                    )
+                                with b2:
+                                    safe_name = re.sub(r"[^A-Za-z0-9_-]+", "_", str(g_name) or "unknown")
+                                    st.download_button(
+                                        "📥 Download as .txt",
+                                        data=message.encode("utf-8"),
+                                        file_name=f"inspection_report_{safe_name}_{g_date}.txt",
+                                        mime="text/plain",
+                                        use_container_width=True,
+                                        key=f"insp_dl_{g_name}_{g_phone}_{g_date}",
+                                    )
 with tabs[3]:    
     # ---------------------------------------------------------------------------
     # Import unified dashboard module (same folder or on PYTHONPATH)
