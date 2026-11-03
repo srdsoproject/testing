@@ -2025,7 +2025,7 @@ with tabs[1]:
 # INSPECTIONS TAB — WhatsApp report generator
 # =========================================================================
 with tabs[2]:
-    st.markdown("### 📨 Safety Inspection Report")
+       st.markdown("### 📨 Safety Inspection Report")
     st.caption(
         "Safety Inspections by inspecting officials:"
     )
@@ -2044,6 +2044,15 @@ with tabs[2]:
             "and that it is shared with the service account."
         )
     else:
+        # ---- Feedback = Inspections sheet column M (13th column) ----
+        insp_df = insp_df.copy()
+        if "Feedback" not in insp_df.columns:
+            if insp_df.shape[1] > 12:
+                insp_df["Feedback"] = insp_df.iloc[:, 12]
+            else:
+                insp_df["Feedback"] = ""
+        insp_df["Feedback"] = insp_df["Feedback"].fillna("").astype(str).str.strip()
+
         valid_dates = insp_df["Date_parsed"].dropna()
         if valid_dates.empty:
             st.warning("No valid inspection dates could be parsed from column G of the Inspections sheet.")
@@ -2113,7 +2122,7 @@ with tabs[2]:
                                 (
                                     str(row["Deficiency"]).strip(),
                                     str(row["ActionBy"]).strip(),
-                                    str(row.get("Feedback", "")).strip(),   # column M
+                                    str(row["Feedback"]).strip(),   # Inspections sheet column M
                                 )
                                 for _, row in sec_rows.iterrows()
                                 if str(row["Deficiency"]).strip()
@@ -2160,11 +2169,7 @@ with tabs[2]:
                                     use_container_width=True,
                                     key=f"insp_dl_{g_name}_{g_phone}_{g_date}",
                                 )
-with tabs[3]:
-
-
-
-    
+with tabs[3]:    
     # ---------------------------------------------------------------------------
     # Import unified dashboard module (same folder or on PYTHONPATH)
     # ---------------------------------------------------------------------------
