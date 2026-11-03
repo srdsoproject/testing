@@ -80,6 +80,7 @@ INSPECTIONS_COL_MAP = {
     "Deficiency": 9,        # Column J - Deficiency noted
     "InspectionBy": 10,      # Column K - Inspection By / Designation & HQ
     "ActionBy": 11,           # Column L - Action By
+    "Feedback": 12,
 }
 
 # Characters used for the CAPTCHA text. Visually-confusable characters
@@ -661,8 +662,10 @@ def build_whatsapp_message(name, phone, designation_hq, insp_date_str, sections,
         lines.append(f"*{i}. {str(sec_type).strip().upper()}*")
         lines.append(str(sec_location).strip())
         lines.append("*Deficiencies:*")
-        for j, (defect_text, action_by) in enumerate(deficiencies, start=1):
+        for j, (defect_text, action_by, remarks) in enumerate(deficiencies, start=1):
             lines.append(f"{j}. {defect_text}")
+            if remarks:
+                lines.append(f"   Remarks: {remarks}")
             lines.append(f"   Action By: {action_by if str(action_by).strip() else 'Not Assigned'}")
 
     lines.append("Photos: 0")
@@ -2110,10 +2113,10 @@ with tabs[2]:
                         sections = []
                         for (sec_type, sec_location), sec_rows in sub.groupby(["Type", "Location"], sort=False):
                             deficiencies = [
-                                (str(row["Deficiency"]).strip(), str(row["ActionBy"]).strip())
-                                for _, row in sec_rows.iterrows()
-                                if str(row["Deficiency"]).strip()
-                            ]
+    (str(row["Deficiency"]).strip(), str(row["ActionBy"]).strip(), str(row["Remarks"]).strip())
+    for _, row in sec_rows.iterrows()
+    if str(row["Deficiency"]).strip()
+]
                             if deficiencies:
                                 sections.append((sec_type, sec_location, deficiencies))
 
