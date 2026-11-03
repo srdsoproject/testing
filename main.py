@@ -80,7 +80,7 @@ INSPECTIONS_COL_MAP = {
     "Deficiency": 9,        # Column J - Deficiency noted
     "InspectionBy": 10,      # Column K - Inspection By / Designation & HQ
     "ActionBy": 11,           # Column L - Action By
-    "Feedback": 12,
+    "Remarks": 12,
 }
 
 # Characters used for the CAPTCHA text. Visually-confusable characters
