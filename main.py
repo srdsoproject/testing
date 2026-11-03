@@ -81,7 +81,6 @@ INSPECTIONS_COL_MAP = {
     "InspectionBy": 10,      # Column K - Inspection By / Designation & HQ
     "ActionBy": 11,           # Column L - Action By
     "Remarks": 12,
-    "Head": 8,  
 }
 
 # Characters used for the CAPTCHA text. Visually-confusable characters
@@ -613,37 +612,59 @@ def connect_to_inspections_sheet():
 
 @st.cache_data(ttl=30)
 def load_inspections_data():
-    """Load the 'Inspections' sheet using fixed column letters (see INSPECTIONS_COL_MAP)
-    rather than header names, since the sheet header text may not match exactly."""
+    """Load the 'Inspections' sheet using fixed column letters (see INSPECTIONS_COL_MAP).
+    'Head' is not in this sheet, so it is looked up from the main database sheet."""
     cols = list(INSPECTIONS_COL_MAP.keys())
     try:
         ws = connect_to_inspections_sheet()
         values = ws.get_all_values()
         if not values or len(values) < 2:
-            return pd.DataFrame(columns=cols + ["Date_parsed"])
+            return pd.DataFrame(columns=cols + ["Head", "Date_parsed"])
 
         max_idx = max(INSPECTIONS_COL_MAP.values())
         records = []
-        for row in values[1:]:  # skip header row
+        for row in values[1:]:
             if len(row) <= max_idx:
                 row = row + [""] * (max_idx + 1 - len(row))
             records.append({name: row[idx].strip() for name, idx in INSPECTIONS_COL_MAP.items()})
 
         df = pd.DataFrame(records)
-        # Drop fully blank rows
         df = df[df[cols].apply(lambda r: any(str(v).strip() for v in r), axis=1)].reset_index(drop=True)
 
-        # Parse dates - try the default parser first, then fall back to day-first
+        # Parse dates
         df["Date_parsed"] = pd.to_datetime(df["Date"], errors="coerce")
         mask = df["Date_parsed"].isna() & (df["Date"].astype(str).str.strip() != "")
         if mask.any():
             df.loc[mask, "Date_parsed"] = pd.to_datetime(df.loc[mask, "Date"], errors="coerce", dayfirst=True)
 
-        # ---- Skip rules ----
-        # 1) Missing / unparseable date of inspection
-        df = df[df["Date_parsed"].notna()]
+        # ---- Skip rule 1: missing / unparseable date of inspection ----
+        df = df[df["Date_parsed"].notna()].reset_index(drop=True)
 
-        # 2) Head is "Others" AND Action By is not assigned
+        # ---- Look up Head from the database sheet ----
+        def _norm(s):
+            return re.sub(r"\s+", " ", str(s).lower()).strip()
+
+        full_lookup, text_lookup = {}, {}
+        db = load_data()
+        if db is not None and not db.empty:
+            for _, r in db.iterrows():
+                head = str(r.get("Head", "")).strip()
+                text = _norm(r.get("Deficiencies Noted", ""))
+                if not head or not text:
+                    continue
+                d = r.get("Date of Inspection")
+                dkey = d.strftime("%Y-%m-%d") if pd.notna(d) else ""
+                full_lookup.setdefault((text, dkey, _norm(r.get("Location", ""))), head)
+                text_lookup.setdefault(text, head)
+
+        def _find_head(row):
+            text = _norm(row["Deficiency"])
+            key = (text, row["Date_parsed"].strftime("%Y-%m-%d"), _norm(row["Location"]))
+            return full_lookup.get(key) or text_lookup.get(text, "")
+
+        df["Head"] = df.apply(_find_head, axis=1)
+
+        # ---- Skip rule 2: Head is "Others" AND Action By not assigned ----
         unassigned = df["ActionBy"].str.strip().str.lower().isin(
             ["", "not assigned", "n/a", "na", "-"]
         )
@@ -653,7 +674,7 @@ def load_inspections_data():
         return df
     except Exception as e:
         st.error(f"❌ Error loading Inspections sheet: {str(e)}")
-        return pd.DataFrame(columns=cols + ["Date_parsed"])
+        return pd.DataFrame(columns=cols + ["Head", "Date_parsed"])
 
 def build_whatsapp_message(name, phone, designation_hq, insp_date_str, sections, submitted_dt=None):
     """Build a WhatsApp-formatted Safety Inspection Report matching the S.A.R.A.L template.
