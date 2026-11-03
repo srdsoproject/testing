@@ -2045,12 +2045,12 @@ with tabs[2]:
             )
         else:
             # ---- Feedback = Inspections sheet column M (13th column) ----
+            # ---- Feedback = Inspections sheet column J (10th column) ----
             insp_df = insp_df.copy()
-            if "Feedback" not in insp_df.columns:
-                if insp_df.shape[1] > 12:
-                    insp_df["Feedback"] = insp_df.iloc[:, 12]
-                else:
-                    insp_df["Feedback"] = ""
+            if insp_df.shape[1] > 9:
+                insp_df["Feedback"] = insp_df.iloc[:, 9]
+            else:
+                insp_df["Feedback"] = ""
             insp_df["Feedback"] = insp_df["Feedback"].fillna("").astype(str).str.strip()
     
             valid_dates = insp_df["Date_parsed"].dropna()
