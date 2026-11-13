@@ -2215,7 +2215,7 @@ with tabs[3]:
         "commercial": ("Commercial", "commercial", "commercial"),
         "mechanical": ("Mechanical", "mechanical", "mechanical"),
         "snt": ("S&T / Signal & Telecom", "snt", "snt"),
-        "gsu": ("GSU"),
+        "gsu": ("GSU","gsu", "gsu"),
     }
     
     # Expected output filenames from detailed generators (may vary slightly)
