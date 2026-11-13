@@ -2193,10 +2193,7 @@ with tabs[2]:
                                 )
 
 with tabs[3]:
-
-
-
-    
+   
     # ---------------------------------------------------------------------------
     # Import unified dashboard module (same folder or on PYTHONPATH)
     # ---------------------------------------------------------------------------
@@ -2218,6 +2215,7 @@ with tabs[3]:
         "commercial": ("Commercial", "commercial", "commercial"),
         "mechanical": ("Mechanical", "mechanical", "mechanical"),
         "snt": ("S&T / Signal & Telecom", "snt", "snt"),
+        "gsu": ("GSU"),
     }
     
     # Expected output filenames from detailed generators (may vary slightly)
