@@ -208,20 +208,40 @@ def _schema_text(tables):
 # ----------------------------------------------------------------------------
 # Claude calls
 # ----------------------------------------------------------------------------
+def _secret(name):
+    """Read a secret. Also finds it if it was accidentally pasted inside a [section] of secrets.toml
+    (a very common mistake: anything below a [section] header belongs to that section)."""
+    try:
+        v = st.secrets.get(name)
+        if v:
+            return v
+        for k in st.secrets:
+            sec = st.secrets[k]
+            items = sec if isinstance(sec, (list, tuple)) else [sec]
+            for it in items:
+                if hasattr(it, "get") and not isinstance(it, str):
+                    v = it.get(name)
+                    if v:
+                        return v
+    except Exception:
+        pass
+    return None
+
+
 def _provider():
-    """'gemini' or 'claude'. Set LLM_PROVIDER in secrets, else whichever key exists (Gemini first)."""
-    p = str(st.secrets.get("LLM_PROVIDER", "")).strip().lower()
+    """'gemini' or 'claude'. Set LLM_PROVIDER in secrets, else Claude only if its key exists, else Gemini."""
+    p = str(_secret("LLM_PROVIDER") or "").strip().lower()
     if p in ("gemini", "claude"):
         return p
-    if st.secrets.get("GEMINI_API_KEY") or st.secrets.get("GOOGLE_API_KEY"):
-        return "gemini"
-    return "claude"
+    if _secret("ANTHROPIC_API_KEY") and not (_secret("GEMINI_API_KEY") or _secret("GOOGLE_API_KEY")):
+        return "claude"
+    return "gemini"
 
 
 def _llm(system, messages, max_tokens, json_mode=False):
     """One text-in / text-out call to the configured AI. messages = [{"role": "user"|"assistant", "content": str}]"""
     if _provider() == "gemini":
-        key = st.secrets.get("GEMINI_API_KEY") or st.secrets.get("GOOGLE_API_KEY")
+        key = _secret("GEMINI_API_KEY") or _secret("GOOGLE_API_KEY")
         if not key:
             raise RuntimeError("GEMINI_API_KEY is missing in Secrets")
         from google import genai
@@ -235,17 +255,17 @@ def _llm(system, messages, max_tokens, json_mode=False):
         if json_mode:
             cfg["response_mime_type"] = "application/json"
         resp = client.models.generate_content(
-            model=st.secrets.get("GEMINI_MODEL", DEFAULT_GEMINI_MODEL),
+            model=_secret("GEMINI_MODEL") or DEFAULT_GEMINI_MODEL,
             contents=contents,
             config=types.GenerateContentConfig(**cfg))
         return (resp.text or "").strip()
 
-    key = st.secrets.get("ANTHROPIC_API_KEY", None)
+    key = _secret("ANTHROPIC_API_KEY")
     if not key:
         raise RuntimeError("ANTHROPIC_API_KEY is missing in Secrets")
     import anthropic
     resp = anthropic.Anthropic(api_key=key).messages.create(
-        model=st.secrets.get("SARAL_CHAT_MODEL", DEFAULT_MODEL),
+        model=_secret("SARAL_CHAT_MODEL") or DEFAULT_MODEL,
         max_tokens=max_tokens, system=system, messages=messages)
     return "".join(b.text for b in resp.content if getattr(b, "text", None)).strip()
 
