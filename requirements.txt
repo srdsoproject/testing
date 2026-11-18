@@ -12,4 +12,5 @@ openpyxl
 reportlab==4.2.2
 Pillow
 anthropic
+google-genai
 openpyxl
