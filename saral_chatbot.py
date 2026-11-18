@@ -11,7 +11,7 @@ HOW IT WORKS (safe by design)
 
 SETUP
     Gemini (default):  pip install google-genai openpyxl
-        secrets ->  GEMINI_API_KEY = "AIza..."        (optional: GEMINI_MODEL = "gemini-2.5-flash")
+        secrets ->  GEMINI_API_KEY = "AIza..."        (optional: GEMINI_MODEL = "gemini-3.8-flash")
     Claude instead:    pip install anthropic openpyxl
         secrets ->  ANTHROPIC_API_KEY = "sk-ant-..."  and  LLM_PROVIDER = "claude"
     If both keys exist, set LLM_PROVIDER = "gemini" or "claude" to choose.
@@ -27,7 +27,7 @@ import pandas as pd
 import streamlit as st
 
 DEFAULT_MODEL = "claude-sonnet-5-5"           # used only if provider is Claude
-DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"     # free-tier model; override with GEMINI_MODEL in secrets
+DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"     # Google says 2.5-flash is closed to new users; override with GEMINI_MODEL in secrets
 MAX_ROWS_SHOWN = 500
 MAX_ROWS_TO_AI = 40
 MAX_CATEGORY_VALUES = 60
