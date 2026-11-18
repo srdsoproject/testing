@@ -1480,7 +1480,7 @@ with tabs[4]:
             render_saral_chatbot({"Deficiencies": _chat_df})
     except ModuleNotFoundError as _e:
         st.error(f"Chatbot module missing: {_e}. Keep saral_chatbot.py in the same folder as this file "
-                 f"and install the 'anthropic' and 'openpyxl' packages.")
+                 f"and install the 'google-genai' and 'openpyxl' packages.")
     except Exception as _e:
         st.error(f"Ask SARAL could not start: {type(_e).__name__}: {_e}")
 
