@@ -1465,6 +1465,25 @@ if st.session_state.df is None:
 # MAIN TABS
 # =========================================================================
 tabs = st.tabs(["📝 View Records", "📊 Analytics", "📨 Inspections", " 💡Smart Analysis", "🤖 Ask SARAL"])
+
+# ---- Ask SARAL (AI chatbot) ----
+# Kept ABOVE the other tabs on purpose: the other tabs call st.stop() in some
+# situations, and any code placed after them would never run.
+with tabs[4]:
+    try:
+        from saral_chatbot import render_saral_chatbot, add_status
+        _chat_src = st.session_state.df
+        if _chat_src is None or _chat_src.empty:
+            st.info("No data available yet for the chatbot.")
+        else:
+            _chat_df = add_status(_chat_src, classify_feedback)
+            render_saral_chatbot({"Deficiencies": _chat_df})
+    except ModuleNotFoundError as _e:
+        st.error(f"Chatbot module missing: {_e}. Keep saral_chatbot.py in the same folder as this file "
+                 f"and install the 'anthropic' and 'openpyxl' packages.")
+    except Exception as _e:
+        st.error(f"Ask SARAL could not start: {type(_e).__name__}: {_e}")
+
 with tabs[0]:
     df = st.session_state.df
     if df is None or df.empty:
@@ -2973,7 +2992,3 @@ with tabs[3]:
     
     st.markdown("---")
     st.caption("Source: SARAL · Solapur Division, Central Railway · Generated via Streamlit UI")
-with tabs[4]:
-    from saral_chatbot import render_saral_chatbot, add_status
-    chat_df = add_status(st.session_state.df, classify_feedback)
-    render_saral_chatbot({"Deficiencies": chat_df})
