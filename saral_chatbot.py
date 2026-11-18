@@ -15,6 +15,7 @@ SETUP
     (optional)                  SARAL_CHAT_MODEL  = "claude-sonnet-5-5"
 """
 
+import difflib
 import io
 import json
 import re
@@ -110,12 +111,36 @@ Rules:
 - Use ONLY the table and column names listed above. Never invent columns.
 - If the question is too unclear, set "clarification" to ONE short question and leave other fields empty.
 - Earlier conversation is given so follow-ups like "now only for Solapur" refine the previous plan.
+
+Understanding careless typing (VERY IMPORTANT):
+- Users are not computer-savvy. Expect spelling mistakes, missing spaces, short forms, mixed Hindi/English,
+  no punctuation, ALL CAPS or all small letters. Work out what they MEAN and answer; never complain about spelling.
+  Examples: "defficiencies", "defeciency", "deficencies", "defs" = deficiencies; "dept", "deptt", "dpt" = department
+  (department = the "Head" column); "pndng", "pendng" = pending; "resolvd", "solved", "done", "closed" = Resolved;
+  "wk", "wek" = week; "hw many", "kitne" = how many; "kon sa", "konsa", "which" = which.
+- Department short forms: engg, engr, eng, enginering, track, den -> ENGINEERING; snt, s&t, s and t, signal, telecom,
+  tele -> SIGNAL & TELECOM; optg, opt, ops, operating, operation -> OPTG; mech, mechnical -> MECHANICAL;
+  comm, comml, commercial -> COMMERCIAL; trd -> ELECT/TRD; elect g, elec g, general elect -> ELECT/G; tro -> ELECT/TRO;
+  pers, personal -> PERSONNEL; sec, rpf -> SECURITY; med -> MEDICAL.
+- Officer short forms (go in "Action By" unless "inspection by" is clear): dom, sr dom, srdom -> Sr.DOM;
+  sr den s, den s -> Sr.DEN/S; den c -> Sr.DEN/C; sr dste, dste -> Sr.DSTE; drm -> DRM/SUR; adrm -> ADRM; dso -> Sr.DSO.
+  Always pick the closest value that really exists in the sample values.
+- Time words: "today", "yesterday", "last N days", "last week"/"past week"/"this week" = the last 7 days ending today,
+  "this month" = 1st of this month to today, "last month" = the previous full calendar month.
+  Put the exact date range you used into the "title" (e.g. "Department-wise deficiencies, 11 Nov to 18 Nov 2026").
+- Questions like "which department has most/least ..." mean: filter by the dates, group_by ["Head"], count rows
+  (aggregation column "*" , func "count", as "Deficiencies"), sort descending (ascending true for "least"), limit null.
+- If the user just says hi / help / what can you do, set "clarification" to a short friendly message listing 3 example
+  questions they can ask.
+- When unsure between two meanings, pick the most likely one and answer; do not ask unless truly impossible.
 """
 
 SUMMARY_SYSTEM = """You are the helpful assistant inside the S.A.R.A.L railway safety app.
 Write a SHORT answer (3-6 lines) in very simple words for a person who is not good with computers.
 Reply in the same language style as the question (English, Hindi or Hinglish).
 State the total number of records first, then 2-4 key points (biggest/smallest, pending vs resolved vs no response if visible).
+If the question asks "which / who / most / least / highest", begin with the direct answer (name and number) in one line.
+Mention the date range used if the result title shows it. Never mention spelling mistakes.
 Use only the numbers given. Do not invent anything. No tables, no markdown headings."""
 
 
@@ -232,16 +257,24 @@ def _col(df, name):
     for c in df.columns:
         if c.lower().strip() == str(name).lower().strip():
             return c
+    close = difflib.get_close_matches(str(name), list(df.columns), n=1, cutoff=0.7)
+    if close:
+        return close[0]
     raise KeyError(f'Column "{name}" not found')
 
 
 def _text_mask(series, value, exact_first=True):
+    """Exact match first, then 'contains', then spelling-tolerant (fuzzy) match."""
     ns = series.astype(str).map(_norm)
     nv = _norm(value)
     exact = ns == nv
     if exact_first and exact.any():
         return exact
-    return ns.str.contains(re.escape(nv), na=False) if nv else exact
+    contains = ns.str.contains(re.escape(nv), na=False) if nv else exact
+    if contains.any() or not exact_first or not nv:
+        return contains
+    close = difflib.get_close_matches(nv, ns.unique().tolist(), n=3, cutoff=0.75)
+    return ns.isin(close) if close else contains
 
 
 def _apply_filter(df, f):
@@ -345,13 +378,29 @@ def _answer(question, tables, history, hint):
         title = plan.get("title") or "Result"
         history.append({"q": question, "plan": plan})
         if result.empty:
-            return {"q": question, "text": "No records found. Try a different date range or name."}
+            note = ""
+            src = tables.get(plan.get("table")) if plan.get("table") in tables else next(iter(tables.values()))
+            dcols = [c for c in src.columns if pd.api.types.is_datetime64_any_dtype(src[c])]
+            if dcols and src[dcols[0]].notna().any():
+                note = f" The latest record in the data is dated {src[dcols[0]].max():%d-%m-%Y}."
+            return {"q": question,
+                    "text": f"No records found for: {title}.{note} Try a longer date range or another name."}
         return {"q": question, "text": _ask_summary(question, title, len(result), result),
                 "table": result, "title": title}
     except Exception as e:
+        msg = str(e)
+        if "ANTHROPIC_API_KEY" in msg:
+            return {"q": question,
+                    "text": "🔧 The chatbot is not switched on yet. The app administrator must add the "
+                            "ANTHROPIC_API_KEY in the app's Secrets settings. Please inform your administrator."}
+        if isinstance(e, ModuleNotFoundError):
+            return {"q": question,
+                    "text": "🔧 The chatbot needs a software package that is not installed yet. "
+                            "Please inform your administrator.", "error": msg}
         return {"q": question,
-                "text": "Sorry, I could not answer that. Please try asking in a different way.",
-                "error": f"{type(e).__name__}: {e}"}
+                "text": "Sorry, I could not answer that this time. Please try again in a few words, "
+                        "for example: Engg pending deficiencies last 7 days.",
+                "error": f"{type(e).__name__}: {msg}"}
 
 
 def _show_turn(t, idx):
