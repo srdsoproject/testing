@@ -10,9 +10,11 @@ HOW IT WORKS (safe by design)
   4. The user gets the table, a short summary in simple words, and an Excel download.
 
 SETUP
-    pip install anthropic openpyxl
-    .streamlit/secrets.toml ->  ANTHROPIC_API_KEY = "sk-ant-..."
-    (optional)                  SARAL_CHAT_MODEL  = "claude-sonnet-5-5"
+    Gemini (default):  pip install google-genai openpyxl
+        secrets ->  GEMINI_API_KEY = "AIza..."        (optional: GEMINI_MODEL = "gemini-2.5-flash")
+    Claude instead:    pip install anthropic openpyxl
+        secrets ->  ANTHROPIC_API_KEY = "sk-ant-..."  and  LLM_PROVIDER = "claude"
+    If both keys exist, set LLM_PROVIDER = "gemini" or "claude" to choose.
 """
 
 import difflib
@@ -24,7 +26,8 @@ import datetime as dt
 import pandas as pd
 import streamlit as st
 
-DEFAULT_MODEL = "claude-sonnet-5-5"
+DEFAULT_MODEL = "claude-sonnet-5-5"           # used only if provider is Claude
+DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"     # free-tier model; override with GEMINI_MODEL in secrets
 MAX_ROWS_SHOWN = 500
 MAX_ROWS_TO_AI = 40
 MAX_CATEGORY_VALUES = 60
@@ -205,16 +208,46 @@ def _schema_text(tables):
 # ----------------------------------------------------------------------------
 # Claude calls
 # ----------------------------------------------------------------------------
-def _client():
-    import anthropic
+def _provider():
+    """'gemini' or 'claude'. Set LLM_PROVIDER in secrets, else whichever key exists (Gemini first)."""
+    p = str(st.secrets.get("LLM_PROVIDER", "")).strip().lower()
+    if p in ("gemini", "claude"):
+        return p
+    if st.secrets.get("GEMINI_API_KEY") or st.secrets.get("GOOGLE_API_KEY"):
+        return "gemini"
+    return "claude"
+
+
+def _llm(system, messages, max_tokens, json_mode=False):
+    """One text-in / text-out call to the configured AI. messages = [{"role": "user"|"assistant", "content": str}]"""
+    if _provider() == "gemini":
+        key = st.secrets.get("GEMINI_API_KEY") or st.secrets.get("GOOGLE_API_KEY")
+        if not key:
+            raise RuntimeError("GEMINI_API_KEY is missing in Secrets")
+        from google import genai
+        from google.genai import types
+        client = genai.Client(api_key=key)
+        contents = [{"role": "user" if m["role"] == "user" else "model",
+                     "parts": [{"text": m["content"]}]} for m in messages]
+        cfg = dict(system_instruction=system,
+                   max_output_tokens=max(max_tokens * 4, 4096),   # room for the model's own thinking
+                   temperature=0.1)
+        if json_mode:
+            cfg["response_mime_type"] = "application/json"
+        resp = client.models.generate_content(
+            model=st.secrets.get("GEMINI_MODEL", DEFAULT_GEMINI_MODEL),
+            contents=contents,
+            config=types.GenerateContentConfig(**cfg))
+        return (resp.text or "").strip()
+
     key = st.secrets.get("ANTHROPIC_API_KEY", None)
     if not key:
-        raise RuntimeError("ANTHROPIC_API_KEY is missing in .streamlit/secrets.toml")
-    return anthropic.Anthropic(api_key=key)
-
-
-def _model():
-    return st.secrets.get("SARAL_CHAT_MODEL", DEFAULT_MODEL)
+        raise RuntimeError("ANTHROPIC_API_KEY is missing in Secrets")
+    import anthropic
+    resp = anthropic.Anthropic(api_key=key).messages.create(
+        model=st.secrets.get("SARAL_CHAT_MODEL", DEFAULT_MODEL),
+        max_tokens=max_tokens, system=system, messages=messages)
+    return "".join(b.text for b in resp.content if getattr(b, "text", None)).strip()
 
 
 def _ask_plan(question, tables, history, hint):
@@ -225,8 +258,7 @@ def _ask_plan(question, tables, history, hint):
         msgs.append({"role": "user", "content": h["q"]})
         msgs.append({"role": "assistant", "content": json.dumps(h["plan"])})
     msgs.append({"role": "user", "content": question})
-    resp = _client().messages.create(model=_model(), max_tokens=1200, system=system, messages=msgs)
-    text = "".join(b.text for b in resp.content if getattr(b, "text", None))
+    text = _llm(system, msgs, 1200, json_mode=True)
     m = re.search(r"\{.*\}", text, re.S)
     if not m:
         raise ValueError("Could not understand the question. Please rephrase.")
@@ -239,9 +271,7 @@ def _ask_summary(question, title, total, result):
         sample = sample[:12000]
     content = (f"Question: {question}\nResult title: {title}\n"
                f"Total rows in result: {total}\nFirst rows (CSV):\n{sample}")
-    resp = _client().messages.create(model=_model(), max_tokens=500, system=SUMMARY_SYSTEM,
-                                     messages=[{"role": "user", "content": content}])
-    return "".join(b.text for b in resp.content if getattr(b, "text", None)).strip()
+    return _llm(SUMMARY_SYSTEM, [{"role": "user", "content": content}], 500)
 
 
 # ----------------------------------------------------------------------------
@@ -389,10 +419,11 @@ def _answer(question, tables, history, hint):
                 "table": result, "title": title}
     except Exception as e:
         msg = str(e)
-        if "ANTHROPIC_API_KEY" in msg:
+        if "API_KEY" in msg and isinstance(e, RuntimeError):
             return {"q": question,
                     "text": "🔧 The chatbot is not switched on yet. The app administrator must add the "
-                            "ANTHROPIC_API_KEY in the app's Secrets settings. Please inform your administrator."}
+                            "AI key (GEMINI_API_KEY) in the app's Secrets settings. Please inform your administrator.",
+                    "error": msg}
         if isinstance(e, ModuleNotFoundError):
             return {"q": question,
                     "text": "🔧 The chatbot needs a software package that is not installed yet. "
