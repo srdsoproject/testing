@@ -14,3 +14,4 @@ Pillow
 anthropic
 google-genai
 openpyxl
+python-docx
