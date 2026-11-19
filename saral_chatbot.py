@@ -47,7 +47,7 @@ Column meanings:
   COMMERCIAL, C&W, PERSONNEL, SECURITY, FINANCE, MEDICAL, STORE, GSU.
 - "Sub Head": category inside a department.
 - "Deficiencies Noted": the text of the deficiency.
-- "Inspection By": the officer who inspected (e.g. Sr.DOM, DRM/SUR, ADRM).
+- "Inspection By": the officer who inspected (e.g. Sr.DOM, DRM/SUR, ADRM, Sr.DSO).
 - "Action By": the officer RESPONSIBLE for fixing it (e.g. Sr.DOM, Sr.DEN/S, Sr.DSTE). Cells may contain multiple
   comma- or slash-separated officers (e.g. "Sr.DEN/S, Sr.DSTE").
 - "Feedback": compliance reply given by the department. "User Feedback/Remark": extra remark.
@@ -57,8 +57,8 @@ Column meanings:
 Interpretation rules:
 - Department words map to "Head": Engg/Engineering/Track -> ENGINEERING, S&T/Signal/Telecom -> SIGNAL & TELECOM,
   Operating/Optg -> OPTG, Mech -> MECHANICAL, Elect TRD -> ELECT/TRD, Elect G -> ELECT/G, Elect TRO -> ELECT/TRO.
-- Officer designations (Sr DOM, Sr DEN/S, DRM, Sr DSTE, ADEN...) in a question about deficiencies, pending work,
-  or compliance mean "Action By", unless the user says "inspected by" / "inspection done by" (then use "Inspection By").
+- Officer designations (Sr DOM, Sr DEN/S, DRM, Sr DSTE, Sr DSO, ADEN...) in a question about deficiencies, pending work,
+  or compliance mean "Action By", unless the user says "inspected by" / "inspection by" / "inspections by" (then use "Inspection By").
   Use op "contains" for "Action By" and "Inspection By" because cells can list multiple officers.
 - "resolved / complied / closed / attended" -> Status = Resolved (op eq).
 - IMPORTANT: in SARAL "pending / open / not done / outstanding" means NOT YET RESOLVED, i.e. Status in
@@ -107,7 +107,8 @@ JSON format:
 Rules:
 - op is one of: eq, ne, in, contains, gt, gte, lt, lte, between, isnull, notnull.
 - Dates are ISO strings YYYY-MM-DD. "between" takes [from, to] inclusive.
-  Resolve "last 5 days", "this month", "August to October" into exact dates using today's date.
+  Resolve "last 5 days", "this month", "August to October", "april to october 2025" into exact dates using today's date.
+  If a year is attached to the end of a month range (e.g. "april to october 2025"), apply that year to both months.
   If no year is given for a month range, use the most recent such period that is not in the future.
 - Use values exactly as they appear in the sample values when possible (e.g. "Sr DOM" -> "Sr.DOM").
 - Use op "contains" for "Action By" and "Inspection By" so multi-officer entries match accurately.
@@ -211,14 +212,16 @@ def _add_status_core(df, classify_fn, feedback_col="Feedback", remark_col="User 
 
 
 def _parse_dates_safely(series):
-    """Parse ISO YYYY-MM-DD and DD-MM-YYYY dates without dropping valid ISO rows as NaT."""
-    s = series.astype(str).str.strip()
-    iso_mask = s.str.match(r"^\d{4}-\d{1,2}-\d{1,2}")
+    if _is_dt(series):
+        return series.dt.tz_localize(None) if getattr(series.dt, "tz", None) is not None else series
+    s = series.astype(str).str.strip().replace({"": pd.NA, "nan": pd.NA, "None": pd.NA, "NaT": pd.NA})
+    iso_mask = s.notna() & s.str.match(r"^\d{4}[-/]\d{1,2}[-/]\d{1,2}")
     out = pd.Series(pd.NaT, index=series.index, dtype="datetime64[ns]")
     if iso_mask.any():
-        out[iso_mask] = pd.to_datetime(s[iso_mask], errors="coerce", format="mixed")
-    if (~iso_mask).any():
-        out[~iso_mask] = pd.to_datetime(s[~iso_mask], errors="coerce", dayfirst=True, format="mixed")
+        out[iso_mask] = pd.to_datetime(s[iso_mask], errors="coerce", dayfirst=False)
+    other_mask = s.notna() & (~iso_mask)
+    if other_mask.any():
+        out[other_mask] = pd.to_datetime(s[other_mask], errors="coerce", dayfirst=True)
     return out
 
 
@@ -235,9 +238,11 @@ def _prepare(dfs, hidden_columns):
                 if getattr(d[c].dt, "tz", None) is not None:
                     d[c] = d[c].dt.tz_localize(None)
             elif d[c].dtype == object and re.search(r"date|time", c, re.I):
-                conv = _parse_dates_safely(d[c])
-                if conv.notna().mean() > 0.5:
-                    d[c] = conv
+                non_empty = d[c].astype(str).str.strip().replace({"": pd.NA, "nan": pd.NA, "None": pd.NA}).notna().sum()
+                if non_empty > 0:
+                    conv = _parse_dates_safely(d[c])
+                    if conv.notna().sum() / non_empty > 0.5:
+                        d[c] = conv
         out[name] = d
     return out
 
@@ -272,7 +277,7 @@ def _schema_text(tables):
 
 
 # ----------------------------------------------------------------------------
-# AI calls (Gemini by default, Groq / Claude fallback)
+# AI calls (Gemini by default, Groq / Claude fallback with auto-404 recovery)
 # ----------------------------------------------------------------------------
 def _secret(name):
     try:
@@ -292,6 +297,37 @@ def _secret(name):
     return None
 
 
+def _is_model_not_found(msg):
+    m = str(msg).lower()
+    return "404" in m or "not_found" in m or "does not exist" in m or "not found" in m
+
+
+def _discover_groq_model(key):
+    import requests
+    r = requests.get(
+        "https://api.groq.com/openai/v1/models",
+        headers={"Authorization": f"Bearer {key}"},
+        timeout=15,
+    )
+    if r.status_code != 200:
+        return None
+    ids = [
+        m["id"] for m in r.json().get("data", [])
+        if not any(bad in m.get("id", "").lower() for bad in ("whisper", "guard", "tts", "embed"))
+    ]
+    preferred = [
+        "llama-3.3-70b-versatile",
+        "meta-llama/llama-4-scout-17b-16e-instruct",
+        "qwen/qwen3-32b",
+        "openai/gpt-oss-120b",
+        "llama-3.1-8b-instant",
+    ]
+    for p in preferred:
+        if p in ids:
+            return p
+    return ids[0] if ids else None
+
+
 def _gem_generate(client, types, cfg, model, contents, config):
     if _STATE.get("gem_think", True):
         try:
@@ -301,7 +337,7 @@ def _gem_generate(client, types, cfg, model, contents, config):
             )
         except Exception as e:
             m = str(e)
-            if _is_limit_error(m) or any(x in m for x in ("404", "NOT_FOUND", "401", "403", "PERMISSION", "API key")):
+            if _is_limit_error(m) or _is_model_not_found(m) or any(x in m for x in ("401", "403", "PERMISSION", "API key")):
                 raise
             _STATE["gem_think"] = False
     return client.models.generate_content(model=model, contents=contents, config=config)
@@ -329,32 +365,57 @@ def _llm_single(provider, system, messages, max_tokens, json_mode=False):
         )
         if json_mode:
             cfg["response_mime_type"] = "application/json"
-        resp = _gem_generate(
-            client, types, cfg,
-            model=_secret("GEMINI_MODEL") or DEFAULT_GEMINI_MODEL,
-            contents=contents,
-            config=types.GenerateContentConfig(**cfg),
-        )
-        return (resp.text or "").strip()
+
+        candidates = []
+        for cand in (_STATE.get("gem_model"), _secret("GEMINI_MODEL"), DEFAULT_GEMINI_MODEL, "gemini-2.0-flash"):
+            if cand and cand not in candidates:
+                candidates.append(cand)
+
+        last_err = None
+        for model in candidates:
+            try:
+                resp = _gem_generate(
+                    client, types, cfg, model=model, contents=contents,
+                    config=types.GenerateContentConfig(**cfg),
+                )
+                _STATE["gem_model"] = model
+                return (resp.text or "").strip()
+            except Exception as e:
+                last_err = e
+                if _is_model_not_found(e):
+                    continue
+                raise
+        raise last_err
 
     if provider == "groq":
         key = _secret("GROQ_API_KEY")
         if not key:
             raise RuntimeError("GROQ_API_KEY is missing in Secrets")
         import requests
-        r = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {key}"},
-            json={
-                "model": _secret("GROQ_MODEL") or DEFAULT_GROQ_MODEL,
-                "temperature": 0.0,
-                "max_tokens": max(max_tokens, 1500),
-                "messages": [{"role": "system", "content": system}] + messages,
-            },
-            timeout=30,
-        )
+
+        def _call_groq(model_name):
+            return requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {key}"},
+                json={
+                    "model": model_name,
+                    "temperature": 0.0,
+                    "max_tokens": max(max_tokens, 1500),
+                    "messages": [{"role": "system", "content": system}] + messages,
+                },
+                timeout=30,
+            )
+
+        model = _STATE.get("groq_model") or _secret("GROQ_MODEL") or DEFAULT_GROQ_MODEL
+        r = _call_groq(model)
+        if r.status_code == 404:
+            alt = _discover_groq_model(key)
+            if alt and alt != model:
+                model = alt
+                r = _call_groq(model)
         if r.status_code != 200:
-            raise RuntimeError(f"Groq {r.status_code}: {r.text[:300]}")
+            raise RuntimeError(f"Groq {r.status_code}: {r.text[:250]}")
+        _STATE["groq_model"] = model
         return (r.json()["choices"][0]["message"]["content"] or "").strip()
 
     key = _secret("ANTHROPIC_API_KEY")
@@ -384,8 +445,8 @@ def _providers():
 def _llm(system, messages, max_tokens, json_mode=False):
     order = _providers()
     if not order:
-        raise RuntimeError("GEMINI_API_KEY is missing in Secrets")
-    last, tried, limited = None, 0, 0
+        raise RuntimeError("No API key found in Secrets (add GEMINI_API_KEY or GROQ_API_KEY)")
+    errors, tried, limited = [], 0, 0
     for p in order:
         if time.time() < _STATE.get("off_" + p, 0):
             continue
@@ -395,13 +456,13 @@ def _llm(system, messages, max_tokens, json_mode=False):
             _STATE["used"] = p
             return out
         except Exception as e:
-            last = e
+            errors.append(f"{p}: {e}")
             if _is_limit_error(e):
                 limited += 1
                 _STATE["off_" + p] = time.time() + 900
     if tried == 0 or limited == tried:
         raise RuntimeError("429 RESOURCE_EXHAUSTED: all AI free limits are used up")
-    raise last
+    raise RuntimeError(" | ".join(errors))
 
 
 def _looks_like_followup(question):
@@ -472,7 +533,6 @@ def _col(df, name):
 
 
 def _token_boundary_mask(series, value):
-    """Match an officer/code token cleanly inside cells like 'Sr.DEN/S, Sr.DSTE' without matching 'LC-4' to 'LC-40'."""
     nv = _norm(value)
     if not nv:
         return pd.Series(False, index=series.index)
@@ -481,13 +541,11 @@ def _token_boundary_mask(series, value):
         parts = [_norm(p) for p in re.split(r"[,;&]+", str(cell)) if _norm(p)]
         if nv in parts:
             return True
-        # Allow prefix/suffix boundary match on non-digit boundaries (e.g. 'dens' inside 'srdens', 'sur' inside 'surdd')
         for p in parts:
             idx = p.find(nv)
             if idx != -1:
                 before = p[idx - 1] if idx > 0 else ""
                 after = p[idx + len(nv)] if idx + len(nv) < len(p) else ""
-                # Prevent LC-4 matching LC-40 or DOM matching ADOM
                 if nv[-1].isdigit() and after.isdigit():
                     continue
                 if nv == "dom" and before == "a":
@@ -499,11 +557,6 @@ def _token_boundary_mask(series, value):
 
 
 def _text_mask(series, value, mode="exact"):
-    """
-    mode='exact': strict normalized equality (never falls back to wrong stations/codes when 0 rows match).
-    mode='token': boundary-aware token match (ideal for Action By / Inspection By).
-    mode='contains': substring match (for free-text columns like Deficiencies Noted / Feedback).
-    """
     ns = series.astype(str).map(_norm)
     nv = _norm(value)
     if not nv:
@@ -765,12 +818,34 @@ def _rule_dates(ql):
     if found:
         m1, y1_str = _MONTHS[found[0][0]], found[0][1]
         m2, y2_str = _MONTHS[found[-1][0]], found[-1][1]
-        y1 = int(y1_str) if y1_str else (today.year if m1 <= today.month else today.year - 1)
-        y2 = int(y2_str) if y2_str else (y1 if m2 >= m1 else y1 + 1)
+
+        # If year is attached to end month (e.g. "april to october 2025"), inherit it for the start month too
+        if y1_str and y2_str:
+            y1, y2 = int(y1_str), int(y2_str)
+        elif y2_str:
+            y2 = int(y2_str)
+            y1 = y2 if m1 <= m2 else y2 - 1
+        elif y1_str:
+            y1 = int(y1_str)
+            y2 = y1 if m2 >= m1 else y1 + 1
+        else:
+            y2 = today.year if m2 <= today.month else today.year - 1
+            y1 = y2 if m1 <= m2 else y2 - 1
+
         start, end = dt.date(y1, m1, 1), min(_month_end(y2, m2), today)
         if start <= end:
             return start, end
     return None
+
+
+def _detect_officer_col(ql, df):
+    if "Inspection By" not in df.columns:
+        return "Action By"
+    if re.search(r"\b(?:insp(?:ected|ections?)(?:\s+done)?\s+by|noted\s+by|pointed\s+out\s+by)\b", ql):
+        return "Inspection By"
+    if re.search(r"\binspections?\b", ql) and not re.search(r"\b(?:action\s+by|deficienc|pending|resolved|compliance)\b", ql):
+        return "Inspection By"
+    return "Action By"
 
 
 def _find_officer(ql, df, col):
@@ -847,7 +922,7 @@ def _rule_plan(question, tables, prev=None):
             filters.append({"column": "Head", "op": "in", "value": found})
             parts.append(" / ".join(found))
 
-    ocol = "Inspection By" if re.search(r"insp(?:ected|ection)\s+by", ql) and "Inspection By" in df.columns else "Action By"
+    ocol = _detect_officer_col(ql, df)
     if ocol in df.columns:
         offs = _find_officer(ql, df, ocol)
         if offs:
@@ -856,7 +931,7 @@ def _rule_plan(question, tables, prev=None):
                 if len(offs) > 1
                 else {"column": ocol, "op": "contains", "value": offs[0]}
             )
-            parts.append(" / ".join(offs))
+            parts.append(f"{'Inspected by ' if ocol == 'Inspection By' else ''}{' / '.join(offs)}")
 
     if "Location" in df.columns:
         locs = {_norm(x): x for x in df["Location"].dropna().astype(str).unique() if _norm(x)}
@@ -1056,7 +1131,6 @@ def _kpis(df, plan=None):
     no_resp = int(vc.get("No Response", 0))
     out = {"Total": total, "Resolved": res, "Pending": pend, "No Response": no_resp}
 
-    # Only show Compliance % when Status wasn't restricted exclusively to non-resolved items
     status_filtered_open = False
     for f in (plan or {}).get("filters") or []:
         if f.get("column") == "Status":
@@ -1344,7 +1418,7 @@ def _answer(question, tables, history, hint):
                 elif isinstance(e, RuntimeError) and "API_KEY" in msg:
                     note = "⚡ AI key not configured; using Basic mode (built-in rules)."
                 else:
-                    note = f"⚡ AI fallback to Basic mode ({type(e).__name__}: {msg[:80]})."
+                    note = f"⚡ AI fallback to Basic mode ({msg[:140]})."
                 plan = None
         else:
             note = "⚡ AI unavailable or rate-limited; using Basic mode (built-in rules)."
