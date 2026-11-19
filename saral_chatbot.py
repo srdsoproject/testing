@@ -12,7 +12,7 @@ import datetime as dt
 import pandas as pd
 import streamlit as st
 
-CHATBOT_VERSION = "v4"
+CHATBOT_VERSION = "v4.1"
 DEFAULT_MODEL = "claude-sonnet-4-5"
 DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
 DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile"
@@ -639,8 +639,10 @@ def _text_mask(series, value, mode="exact"):
     if mode == "exact":
         return ns == nv
     if mode == "token":
-        exact = ns == nv
-        return exact if exact.any() else _token_boundary_mask(series, value)
+        # Always use token-boundary matching. The old "exact if any exact exists"
+        # shortcut dropped compound values such as "Sr.DSO & Safety Team"
+        # whenever a pure "Sr.DSO" row was also present.
+        return _token_boundary_mask(series, value)
     return ns.str.contains(re.escape(nv), na=False)
 
 
