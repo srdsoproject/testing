@@ -36,18 +36,23 @@ _is_num = pd.api.types.is_numeric_dtype
 # ----------------------------------------------------------------------------
 SARAL_HINT = """
 This is the S.A.R.A.L (Safety Abnormality Report & Action List) database of Solapur Division, Central Railway.
-Each row is ONE deficiency noted during an inspection.
+IMPORTANT DATA MODEL:
+- Each row in the table is ONE DEFICIENCY noted during an inspection (one inspection often has 10-25 rows).
+- A single INSPECTION is identified by the combination of Date of Inspection, Inspection By, Type of Inspection, and Location.
 
 Column meanings:
 - "Date of Inspection": date the inspection was done (default date for any date range in a question).
 - "Type of Inspection": FOOTPLATE INSPECTION, STATION INSPECTION, LC GATE INSPECTION, COACHING DEPOT, ON TRAIN,
   SURPRISE/AMBUSH INSPECTION, WORKSITE INSPECTION, OTHER (UNUSUAL).
 - "Location": station code (SUR, KWV, WADI...), level crossing gate (LC-40) or footplate section (SUR-DD).
-- "Head": the DEPARTMENT. Values: ELECT/TRD, ELECT/G, ELECT/TRO, SIGNAL & TELECOM, OPTG, MECHANICAL, ENGINEERING,
+- "Head": the ACTION DEPARTMENT responsible for fixing the item. Valid values are ONLY:
+  ELECT/TRD, ELECT/G, ELECT/TRO, SIGNAL & TELECOM, OPTG, MECHANICAL, ENGINEERING,
   COMMERCIAL, C&W, PERSONNEL, SECURITY, FINANCE, MEDICAL, STORE, GSU.
+  NOTE: "SAFETY" or "Safety Team" is NEVER a value of "Head"!
 - "Sub Head": category inside a department.
 - "Deficiencies Noted": the text of the deficiency.
-- "Inspection By": the officer who inspected (e.g. Sr.DOM, DRM/SUR, ADRM, Sr.DSO).
+- "Inspection By": the officer/team who conducted the inspection (e.g. "Sr.DSO", "Sr.DSO & Safety Team",
+  "Sr.DSO/Safety Team", "Sr.DOM", "DRM/SUR", "ADRM").
 - "Action By": the officer RESPONSIBLE for fixing it (e.g. Sr.DOM, Sr.DEN/S, Sr.DSTE). Cells may contain multiple
   comma- or slash-separated officers (e.g. "Sr.DEN/S, Sr.DSTE").
 - "Feedback": compliance reply given by the department. "User Feedback/Remark": extra remark.
@@ -57,20 +62,23 @@ Column meanings:
 Interpretation rules:
 - Department words map to "Head": Engg/Engineering/Track -> ENGINEERING, S&T/Signal/Telecom -> SIGNAL & TELECOM,
   Operating/Optg -> OPTG, Mech -> MECHANICAL, Elect TRD -> ELECT/TRD, Elect G -> ELECT/G, Elect TRO -> ELECT/TRO.
+- "Safety team" / "along with safety team" / "safety branch" refers to the inspecting team in "Inspection By",
+  NEVER "Head". If the user says "Sr.DSO, safety team" or "Sr.DSO with safety team", filter "Inspection By" with
+  op "contains" and value "Sr.DSO" (so it matches "Sr.DSO", "Sr.DSO & Safety Team", "Sr.DSO/Safety Team", etc.).
+  Only if the user asks for "safety team" WITHOUT any officer designation, use Inspection By contains "Safety".
 - Officer designations (Sr DOM, Sr DEN/S, DRM, Sr DSTE, Sr DSO, ADEN...) in a question about deficiencies, pending work,
-  or compliance mean "Action By", unless the user says "inspected by" / "inspection by" / "inspections by" (then use "Inspection By").
-  Use op "contains" for "Action By" and "Inspection By" because cells can list multiple officers.
+  or compliance mean "Action By", unless the user says "inspected by" / "inspection by" / "inspections by" /
+  "inspection report of" (then use "Inspection By").
+  Use op "contains" for "Action By" and "Inspection By".
 - "resolved / complied / closed / attended" -> Status = Resolved (op eq).
 - IMPORTANT: in SARAL "pending / open / not done / outstanding" means NOT YET RESOLVED, i.e. Status in
   ["Pending", "No Response"] (use op "in" with BOTH values), because a deficiency with no feedback yet is still pending.
   Only if the user says "pending with feedback / feedback given but pending" use Status eq Pending.
 - ONLY when the user says "no reply / not responded / no feedback / no response" use Status = No Response (op eq).
-- Date ranges refer to "Date of Inspection". Only if the user says "complied/resolved ON or DURING <dates>"
-  use "Timestamp of Compliance" instead.
+- Date ranges refer to "Date of Inspection" (do NOT add duplicate Month filters if Date of Inspection is filtered).
+  Only if the user says "complied/resolved ON or DURING <dates>" use "Timestamp of Compliance" instead.
 - "Deficiencies Noted" and "Feedback" are long text: for "related to <word>" questions use op "contains".
-- For "all deficiencies" style questions return the full rows with these columns:
-  Date of Inspection, Type of Inspection, Location, Head, Sub Head, Deficiencies Noted, Inspection By, Action By,
-  Feedback, Status.
+- For "all deficiencies" or "inspection report of <officer>" style questions leave group_by empty so full rows return.
 - "Analysis" of a department: group_by ["Sub Head", "Status"] with count, after filtering Head and dates.
 """
 
@@ -78,7 +86,7 @@ EXAMPLES = [
     "Sr DOM all deficiencies resolved from August to October",
     "Give me analysis of Engg department of last 5 days",
     "Which department has the most pending deficiencies?",
-    "Sr DSTE pending deficiencies of this month",
+    "Inspection report of Sr.DSO",
 ]
 
 PLAN_SYSTEM = """You convert a railway safety inspection question into a JSON query plan.
@@ -105,16 +113,19 @@ JSON format:
 }}
 
 Rules:
+- Users make heavy spelling mistakes, punctuation mistakes (".", ",", "/", "-", "&"), uppercase/lowercase variations,
+  and broken grammar (e.g. "inpection report od Sr,dso"). Understand their true intent effortlessly.
 - op is one of: eq, ne, in, contains, gt, gte, lt, lte, between, isnull, notnull.
 - Dates are ISO strings YYYY-MM-DD. "between" takes [from, to] inclusive.
   Resolve "last 5 days", "this month", "August to October", "april to october 2025" into exact dates using today's date.
   If a year is attached to the end of a month range (e.g. "april to october 2025"), apply that year to both months.
   If no year is given for a month range, use the most recent such period that is not in the future.
-- Use values exactly as they appear in the sample values when possible (e.g. "Sr DOM" -> "Sr.DOM").
-- Use op "contains" for "Action By" and "Inspection By" so multi-officer entries match accurately.
+- Do NOT add a separate Month column filter when Date of Inspection already covers the date range.
+- Use values exactly as they appear in the sample values when possible (e.g. "Sr,dso" -> "Sr.DSO").
+- Use op "contains" for "Action By" and "Inspection By".
 - Use op "eq" or "in" for exact codes like "Location" (e.g. "SUR", "LC-40") and "Head".
 - For "analysis"/"summary"/"department wise" questions use group_by + aggregations.
-- For "show/list/give me all" questions leave group_by and aggregations empty so full rows come back.
+- For "show/list/give me all/inspection report of" questions leave group_by and aggregations empty so full rows come back.
 - Use ONLY the table and column names listed above. Never invent columns.
 - Only inherit filters from earlier conversation if the current message is clearly a follow-up refinement
   (e.g. "now only for Solapur", "what about pending ones?", "same for last month"). If the user asks a new
@@ -125,7 +136,8 @@ Rules:
 SUMMARY_SYSTEM = """You are the helpful assistant inside the S.A.R.A.L railway safety app.
 Write a SHORT answer (3-6 lines) in very simple words for a person who is not good with computers.
 Reply in the same language style as the question (English, Hindi or Hinglish).
-State the total number of records first, then 2-4 key points (biggest/smallest, pending vs resolved vs no response if visible).
+State both the number of inspections (if provided) and total deficiency records first, then 2-4 key points
+(biggest/smallest, pending vs resolved vs no response if visible).
 If the question asks "which / who / most / least / highest", begin with the direct answer (name and number) in one line.
 Mention the date range used if the result title shows it. Never mention spelling mistakes.
 Use only the numbers given. Do not invent anything. No tables, no markdown headings.
@@ -264,11 +276,15 @@ def _schema_text(tables):
                 vals = s.dropna().astype(str).str.strip()
                 vals = vals[vals != ""].unique()
                 if c in ("Action By", "Inspection By"):
-                    tokens = sorted({
-                        tok.strip() for v in vals
-                        for tok in re.split(r"[,;&]+", v) if tok.strip()
-                    })
-                    lines.append(f'  - "{c}" (text, individual values): {tokens[:MAX_CATEGORY_VALUES]}')
+                    raw_unique = sorted(vals.tolist())
+                    if len(raw_unique) <= MAX_CATEGORY_VALUES:
+                        lines.append(f'  - "{c}" (text) values: {raw_unique}')
+                    else:
+                        tokens = sorted({
+                            tok.strip() for v in vals
+                            for tok in re.split(r"[,;&]+", v) if tok.strip()
+                        })
+                        lines.append(f'  - "{c}" (text, individual values): {tokens[:MAX_CATEGORY_VALUES]}')
                 elif len(vals) <= MAX_CATEGORY_VALUES:
                     lines.append(f'  - "{c}" (text) values: {list(vals)}')
                 else:
@@ -367,7 +383,13 @@ def _llm_single(provider, system, messages, max_tokens, json_mode=False):
             cfg["response_mime_type"] = "application/json"
 
         candidates = []
-        for cand in (_STATE.get("gem_model"), _secret("GEMINI_MODEL"), DEFAULT_GEMINI_MODEL, "gemini-2.0-flash"):
+        for cand in (
+            _STATE.get("gem_model"),
+            _secret("GEMINI_MODEL"),
+            DEFAULT_GEMINI_MODEL,
+            "gemini-2.5-flash-lite",
+            "gemini-2.0-flash",
+        ):
             if cand and cand not in candidates:
                 candidates.append(cand)
 
@@ -382,7 +404,7 @@ def _llm_single(provider, system, messages, max_tokens, json_mode=False):
                 return (resp.text or "").strip()
             except Exception as e:
                 last_err = e
-                if _is_model_not_found(e):
+                if _is_model_not_found(e) or _is_limit_error(e):
                     continue
                 raise
         raise last_err
@@ -502,19 +524,20 @@ def _split_followups(text):
     return body, fu[:3]
 
 
-def _ask_summary(question, title, total, result):
+def _ask_summary(question, title, total, insp_count, result):
     sample = result.head(MAX_ROWS_TO_AI).to_csv(index=False)
     if len(sample) > 12000:
         sample = sample[:12000]
+    insp_line = f"Unique inspections in result: {insp_count}\n" if insp_count is not None else ""
     content = (
         f"Question: {question}\nResult title: {title}\n"
-        f"Total rows in result: {total}\nFirst rows (CSV):\n{sample}"
+        f"{insp_line}Total deficiency rows in result: {total}\nFirst rows (CSV):\n{sample}"
     )
     return _split_followups(_llm(SUMMARY_SYSTEM, [{"role": "user", "content": content}], 500))
 
 
 # ----------------------------------------------------------------------------
-# Safe plan executor
+# Safe plan executor & S.A.R.A.L. plan sanitizer
 # ----------------------------------------------------------------------------
 def _norm(x):
     return re.sub(r"[^a-z0-9]", "", str(x).lower())
@@ -532,25 +555,85 @@ def _col(df, name):
     raise KeyError(f'Column "{name}" not found')
 
 
+def _strip_safety_team_phrase(val):
+    """Turn 'Sr.DSO, safety team' or 'Sr.DSO & Safety' into 'Sr.DSO' while keeping pure 'Safety Team' as 'Safety'."""
+    s = str(val).strip()
+    cleaned = re.sub(
+        r"(?:[,;&+/]|\b(?:and|with|along\s+with)\b)?\s*\bsafety\s*(?:team|branch|dept|department)?\b",
+        "", s, flags=re.I
+    ).strip(" ,;&+/()")
+    return cleaned if cleaned else "Safety"
+
+
+def _sanitize_plan(plan, df):
+    """Fix common S.A.R.A.L. domain misinterpretations before running filters."""
+    plan = json.loads(json.dumps(plan))
+    raw_filters = plan.get("filters") or []
+    if isinstance(raw_filters, dict):
+        raw_filters = [{"column": k, "op": "eq", "value": v} for k, v in raw_filters.items()]
+
+    has_date_range = any(
+        str(f.get("column", "")).strip().lower() == "date of inspection"
+        and str(f.get("op", "")).lower() in ("between", "gte", "gt", "lte", "lt", "eq")
+        for f in raw_filters if isinstance(f, dict)
+    )
+    has_insp_by = any(
+        str(f.get("column", "")).strip().lower() == "inspection by"
+        for f in raw_filters if isinstance(f, dict)
+    )
+
+    cleaned = []
+    for f in raw_filters:
+        if not isinstance(f, dict) or "column" not in f:
+            continue
+        col_raw = str(f["column"]).strip()
+        val = f.get("value")
+
+        # 1. "SAFETY" / "Safety Team" is NEVER a Head department in S.A.R.A.L.; it belongs to Inspection By
+        if col_raw.lower() == "head" and isinstance(val, str) and _norm(val) in ("safety", "safetyteam", "safetybranch"):
+            if not has_insp_by and "Inspection By" in df.columns:
+                cleaned.append({"column": "Inspection By", "op": "contains", "value": "Safety"})
+                has_insp_by = True
+            continue
+
+        # 2. Drop redundant Month filter when Date of Inspection already filters the date window
+        if has_date_range and col_raw.lower() in ("month", "inspection month"):
+            continue
+
+        # 3. Clean "Sr.DSO, safety team" -> "Sr.DSO" on Inspection By / Action By
+        if col_raw.lower() in ("inspection by", "action by") and isinstance(val, str):
+            val = _strip_safety_team_phrase(val)
+            f = dict(f, value=val)
+            if str(f.get("op", "")).lower() in ("eq", "in"):
+                f["op"] = "contains"
+
+        cleaned.append(_fix_status_filter(f))
+
+    plan["filters"] = cleaned
+    return plan
+
+
 def _token_boundary_mask(series, value):
     nv = _norm(value)
     if not nv:
         return pd.Series(False, index=series.index)
 
     def _matches(cell):
-        parts = [_norm(p) for p in re.split(r"[,;&]+", str(cell)) if _norm(p)]
+        parts = [_norm(p) for p in re.split(r"[,;&+/]+", str(cell)) if _norm(p)]
         if nv in parts:
             return True
-        for p in parts:
-            idx = p.find(nv)
-            if idx != -1:
-                before = p[idx - 1] if idx > 0 else ""
-                after = p[idx + len(nv)] if idx + len(nv) < len(p) else ""
-                if nv[-1].isdigit() and after.isdigit():
-                    continue
-                if nv == "dom" and before == "a":
-                    continue
-                return True
+        full = _norm(cell)
+        idx = full.find(nv)
+        if idx != -1:
+            before = full[idx - 1] if idx > 0 else ""
+            after = full[idx + len(nv)] if idx + len(nv) < len(full) else ""
+            if nv[-1].isdigit() and after.isdigit():
+                return False
+            if nv == "dom" and before == "a":
+                return False
+            if nv == "dso" and before == "a":
+                return False
+            return True
         return False
 
     return series.map(_matches)
@@ -627,12 +710,10 @@ def _filter_df(plan, tables):
     if name not in tables:
         name = next(iter(tables))
     df = tables[name]
-    filters = plan.get("filters") or []
-    if isinstance(filters, dict):
-        filters = [{"column": k, "op": "eq", "value": v} for k, v in filters.items()]
-    for f in filters:
-        df = _apply_filter(df, _fix_status_filter(f))
-    return df
+    sanitized = _sanitize_plan(plan, df)
+    for f in sanitized.get("filters") or []:
+        df = _apply_filter(df, f)
+    return df, sanitized
 
 
 def _aggregate_df(df, plan):
@@ -705,7 +786,46 @@ def _aggregate_df(df, plan):
 
 
 # ----------------------------------------------------------------------------
-# Basic mode (built-in rules fallback)
+# Inspection-level summary (matches S.A.R.A.L. "View Records" inspection count)
+# ----------------------------------------------------------------------------
+def _inspection_summary(df):
+    """Group deficiency rows into unique inspections (Date + Inspection By + Type + Location)."""
+    if df.empty:
+        return pd.DataFrame()
+    key_cols = [c for c in ("Date of Inspection", "Inspection By", "Type of Inspection", "Location") if c in df.columns]
+    if not key_cols:
+        return pd.DataFrame()
+
+    work = df.copy()
+    norm_keys = []
+    for c in key_cols:
+        nk = f"_k_{c}"
+        if _is_dt(work[c]):
+            work[nk] = work[c].dt.normalize()
+        else:
+            work[nk] = work[c].fillna("").astype(str).str.strip().str.upper()
+        norm_keys.append(nk)
+
+    rows = []
+    for _, grp in work.groupby(norm_keys, dropna=False, sort=False):
+        first = grp.iloc[0]
+        rec = {c: first[c] for c in key_cols}
+        rec["Deficiencies"] = len(grp)
+        if "Status" in grp.columns:
+            vc = grp["Status"].value_counts()
+            rec["Resolved"] = int(vc.get("Resolved", 0))
+            rec["Pending"] = int(vc.get("Pending", 0))
+            rec["No Response"] = int(vc.get("No Response", 0))
+        rows.append(rec)
+
+    out = pd.DataFrame(rows)
+    if "Date of Inspection" in out.columns and _is_dt(out["Date of Inspection"]):
+        out = out.sort_values("Date of Inspection", ascending=False)
+    return out.reset_index(drop=True)
+
+
+# ----------------------------------------------------------------------------
+# Basic mode (spelling- & punctuation-tolerant built-in rules fallback)
 # ----------------------------------------------------------------------------
 _STATE = {}
 _PLAN_CACHE = {}
@@ -736,14 +856,33 @@ _DEPT_WORDS = {
     "C&W": ["c&w", "cnw", "c and w", "carriage", "wagon"],
 }
 
+_TYPO_MAP = {
+    "inpection": "inspection", "inpections": "inspections",
+    "inspecion": "inspection", "inspecions": "inspections",
+    "inspecton": "inspection", "inspectons": "inspections",
+    "inspectn": "inspection", "inspn": "inspection", "insp": "inspection",
+    "defficiency": "deficiency", "defficiencies": "deficiencies",
+    "deficency": "deficiency", "deficencies": "deficiencies",
+    "deficincy": "deficiency", "defs": "deficiencies",
+    "reprt": "report", "rport": "report",
+    "anlysis": "analysis", "analisys": "analysis", "summry": "summary",
+}
+
 _BASIC_HELP = (
     "I can answer questions like:\n\n"
     "- Sr DOM all deficiencies resolved from August to October\n"
     "- Which department has most pending deficiencies this month\n"
-    "- Engg analysis of last 7 days\n\n"
+    "- Engg analysis of last 7 days\n"
+    "- Inspection report of Sr.DSO\n\n"
     "Please type your question with a department or officer, a status (pending / resolved) "
     "and a period (last 7 days, this month, August to October)."
 )
+
+
+def _normalize_query_text(question):
+    q = re.sub(r"[^a-z0-9&/ ]+", " ", question.lower())
+    words = [_TYPO_MAP.get(w, w) for w in q.split()]
+    return " " + " ".join(words) + " "
 
 
 def _prepare_cached(dfs, hidden):
@@ -811,7 +950,6 @@ def _rule_dates(ql):
     if re.search(r"\bweek\b|\bwk\b|\bwek\b", ql):
         return today - dt.timedelta(days=6), today
 
-    # Avoid treating English modal "may" ("that may be pending") as month May
     ql_date = re.sub(r"\bmay\s+(?:be|have|not|also)\b", " ", ql)
     month_rx = r"\b(" + "|".join(sorted(_MONTHS, key=len, reverse=True)) + r")(?:\s+(20\d{2}))?\b"
     found = re.findall(month_rx, ql_date)
@@ -819,7 +957,6 @@ def _rule_dates(ql):
         m1, y1_str = _MONTHS[found[0][0]], found[0][1]
         m2, y2_str = _MONTHS[found[-1][0]], found[-1][1]
 
-        # If year is attached to end month (e.g. "april to october 2025"), inherit it for the start month too
         if y1_str and y2_str:
             y1, y2 = int(y1_str), int(y2_str)
         elif y2_str:
@@ -841,7 +978,7 @@ def _rule_dates(ql):
 def _detect_officer_col(ql, df):
     if "Inspection By" not in df.columns:
         return "Action By"
-    if re.search(r"\b(?:insp(?:ected|ections?)(?:\s+done)?\s+by|noted\s+by|pointed\s+out\s+by)\b", ql):
+    if re.search(r"\b(?:insp(?:ected|ections?)(?:\s+done)?\s+by|noted\s+by|pointed\s+out\s+by|inspection\s+report)\b", ql):
         return "Inspection By"
     if re.search(r"\binspections?\b", ql) and not re.search(r"\b(?:action\s+by|deficienc|pending|resolved|compliance)\b", ql):
         return "Inspection By"
@@ -859,27 +996,40 @@ def _find_officer(ql, df, col):
     all_vals = {
         tok.strip()
         for v in df[col].dropna().astype(str).unique()
-        for tok in re.split(r"[,;&]+", v) if tok.strip()
+        for tok in re.split(r"[,;&+/]+", v) if tok.strip()
     }
     best_len, hits = 0, []
+    variant_map = {}
     for v in all_vals:
         n = _norm(v)
+        if len(n) < 3 or n in ("safety", "safetyteam", "team"):
+            continue
         variants = {n: v}
         if n.startswith("sr") and len(n) > 4:
             variants[n[2:]] = v
         for var, val in variants.items():
-            if len(var) >= 3 and var in cand:
+            variant_map[var] = val
+            if var in cand:
                 if len(var) > best_len:
                     best_len, hits = len(var), [val]
                 elif len(var) == best_len and val not in hits:
                     hits.append(val)
+
+    # Fuzzy fallback for minor officer spelling mistakes (e.g. "sr dos" -> "Sr.DSO")
+    if not hits and variant_map:
+        for c_tok in sorted(cand, key=len, reverse=True):
+            if len(c_tok) >= 5:
+                close = difflib.get_close_matches(c_tok, list(variant_map.keys()), n=1, cutoff=0.82)
+                if close:
+                    hits = [variant_map[close[0]]]
+                    break
     return hits
 
 
 def _rule_plan(question, tables, prev=None):
     df = next(iter(tables.values()))
     tname = next(iter(tables))
-    ql = " " + re.sub(r"\s+", " ", re.sub(r"[^a-z0-9&/ ]+", " ", question.lower())) + " "
+    ql = _normalize_query_text(question)
     if re.fullmatch(r"\s*(hi|hii|hello|hey|hlo|help|namaste)\s*", ql) or "what can you do" in ql:
         return {"clarification": "Hello! " + _BASIC_HELP}
 
@@ -913,10 +1063,21 @@ def _rule_plan(question, tables, prev=None):
     if "Head" in df.columns:
         heads = df["Head"].dropna().astype(str).unique()
         found = []
+        alias_to_target = {w: t for t, words in _DEPT_WORDS.items() for w in words}
         for target, words in _DEPT_WORDS.items():
             if any(re.search(r"(?<![a-z0-9])" + re.escape(w) + r"(?![a-z0-9])", ql) for w in words):
                 real = [h for h in heads if _norm(target) == _norm(h)]
                 found.append(real[0] if real else target)
+        # Fuzzy department fallback for spelling errors (e.g. "enginering", "mechnical")
+        if not found:
+            for tok in ql.split():
+                if len(tok) >= 5:
+                    close = difflib.get_close_matches(tok, list(alias_to_target.keys()), n=1, cutoff=0.82)
+                    if close:
+                        target = alias_to_target[close[0]]
+                        real = [h for h in heads if _norm(target) == _norm(h)]
+                        found.append(real[0] if real else target)
+                        break
         if found:
             dept_filtered = True
             filters.append({"column": "Head", "op": "in", "value": found})
@@ -932,6 +1093,9 @@ def _rule_plan(question, tables, prev=None):
                 else {"column": ocol, "op": "contains", "value": offs[0]}
             )
             parts.append(f"{'Inspected by ' if ocol == 'Inspection By' else ''}{' / '.join(offs)}")
+        elif re.search(r"\bsafety\s*(?:team|branch)\b", ql) and "Inspection By" in df.columns:
+            filters.append({"column": "Inspection By", "op": "contains", "value": "Safety"})
+            parts.append("Inspected by Safety Team")
 
     if "Location" in df.columns:
         locs = {_norm(x): x for x in df["Location"].dropna().astype(str).unique() if _norm(x)}
@@ -978,7 +1142,10 @@ def _rule_plan(question, tables, prev=None):
 
     rank = re.search(r"\b(which|most|more|max|maximum|least|less|minimum|lowest|highest|top|konsa|kaun)\b", ql)
     asc = bool(re.search(r"\b(least|less|minimum|lowest|fewest)\b", ql))
-    wise = re.search(r"\bwise\b|\banalysis\b|\banalyse\b|\banalyze\b|\bsummary\b|\breport\b", ql)
+    # Do NOT treat "inspection report" as a group_by summary when a specific officer/filter is already given
+    is_insp_report = bool(re.search(r"\binspection\s+report\b", ql)) and bool(filters)
+    wise = None if is_insp_report else re.search(r"\bwise\b|\banalysis\b|\banalyse\b|\banalyze\b|\bsummary\b|\breport\b", ql)
+
     dims = [
         ("Sub Head", r"sub ?head|category|categories"),
         ("Type of Inspection", r"type of inspection|inspection type"),
@@ -1077,14 +1244,16 @@ def _nm(x):
     return x.strftime("%d-%m-%Y") if isinstance(x, pd.Timestamp) else str(x)
 
 
-def _local_summary(title, result, plan, raw_filtered):
+def _local_summary(title, result, plan, raw_filtered, insp_count=None):
     num = [c for c in result.columns if _is_num(result[c])]
-    k = _kpis(raw_filtered, plan)
+    k = _kpis(raw_filtered, plan, insp_count=insp_count)
+    insp_prefix = f"**{insp_count} inspections** ({len(raw_filtered)} deficiencies)" if insp_count is not None else f"**{len(raw_filtered)} records**"
+
     if plan.get("group_by") and num:
         asc = bool(plan.get("ascending"))
         val = num[-1]
         g = [c for c in result.columns if c not in num]
-        lines = [f"**{int(result[val].sum())} records** found: {title}."]
+        lines = [f"{insp_prefix} found: {title}."]
         if g:
             s = result.groupby(g[0])[val].sum().sort_values(ascending=asc)
             label = {"Head": "department", "Action By": "officer", "Location": "location"}.get(g[0], g[0])
@@ -1099,7 +1268,7 @@ def _local_summary(title, result, plan, raw_filtered):
             )
         return "\n\n".join(lines)
 
-    lines = [f"**{len(result)} records** found: {title}."]
+    lines = [f"{insp_prefix} found: {title}."]
     if "Resolved" in k:
         comp_txt = f" Compliance **{k['Compliance %']}%**." if "Compliance %" in k else ""
         lines.append(
@@ -1121,15 +1290,22 @@ def _local_followups(plan):
 # ----------------------------------------------------------------------------
 # Insights: KPIs, auto charts, quick findings
 # ----------------------------------------------------------------------------
-def _kpis(df, plan=None):
+def _kpis(df, plan=None, insp_count=None):
     total = len(df)
+    out = {}
+    if insp_count is not None:
+        out["Inspections"] = insp_count
     if "Status" not in df.columns:
-        return {"Total records": total}
+        out["Deficiencies" if insp_count is not None else "Total records"] = total
+        return out
     vc = df["Status"].value_counts()
     res = int(vc.get("Resolved", 0))
     pend = int(vc.get("Pending", 0))
     no_resp = int(vc.get("No Response", 0))
-    out = {"Total": total, "Resolved": res, "Pending": pend, "No Response": no_resp}
+    out["Deficiencies" if insp_count is not None else "Total"] = total
+    out["Resolved"] = res
+    out["Pending"] = pend
+    out["No Response"] = no_resp
 
     status_filtered_open = False
     for f in (plan or {}).get("filters") or []:
@@ -1291,19 +1467,31 @@ def _mpl_png(spec):
 # ----------------------------------------------------------------------------
 # Downloads: Excel and Word
 # ----------------------------------------------------------------------------
-def _to_excel(df):
+def _to_excel(df, insp_df=None):
     buf = io.BytesIO()
     out = df.copy()
     for c in out.columns:
         if _is_dt(out[c]):
             out[c] = out[c].dt.strftime("%d-%m-%Y").fillna("")
     with pd.ExcelWriter(buf, engine="openpyxl") as xw:
-        out.to_excel(xw, index=False, sheet_name="Result")
-        ws = xw.sheets["Result"]
+        out.to_excel(xw, index=False, sheet_name="Deficiencies")
+        ws = xw.sheets["Deficiencies"]
         for i, c in enumerate(out.columns, 1):
             longest = max([len(str(c))] + [len(str(v)) for v in out[c].head(200)])
             ws.column_dimensions[ws.cell(1, i).column_letter].width = min(50, longest + 2)
         ws.freeze_panes = "A2"
+
+        if insp_df is not None and not insp_df.empty and len(insp_df) < len(out):
+            iout = insp_df.copy()
+            for c in iout.columns:
+                if _is_dt(iout[c]):
+                    iout[c] = iout[c].dt.strftime("%d-%m-%Y").fillna("")
+            iout.to_excel(xw, index=False, sheet_name="Inspections")
+            ws2 = xw.sheets["Inspections"]
+            for i, c in enumerate(iout.columns, 1):
+                longest = max([len(str(c))] + [len(str(v)) for v in iout[c].head(200)])
+                ws2.column_dimensions[ws2.cell(1, i).column_letter].width = min(40, longest + 2)
+            ws2.freeze_panes = "A2"
     return buf.getvalue()
 
 
@@ -1428,38 +1616,41 @@ def _answer(question, tables, history, hint):
         if plan.get("clarification"):
             return {"q": question, "text": plan["clarification"], "note": note}
 
-        raw_filtered = _filter_df(plan, tables)
-        result = _aggregate_df(raw_filtered, plan)
-        title = plan.get("title") or "Result"
-        history.append({"q": question, "plan": plan})
+        raw_filtered, clean_plan = _filter_df(plan, tables)
+        result = _aggregate_df(raw_filtered, clean_plan)
+        title = clean_plan.get("title") or "Result"
+        history.append({"q": question, "plan": clean_plan})
 
         if result.empty:
             date_note = ""
-            src = tables.get(plan.get("table")) if plan.get("table") in tables else next(iter(tables.values()))
+            src = tables.get(clean_plan.get("table")) if clean_plan.get("table") in tables else next(iter(tables.values()))
             dcols = [c for c in src.columns if _is_dt(src[c])]
             if dcols and src[dcols[0]].notna().any():
                 date_note = f" The latest record in the data is dated {src[dcols[0]].max():%d-%m-%Y}."
             return {
                 "q": question,
                 "text": f"No records found for: {title}.{date_note} Try a longer date range or another name.",
-                "explain": _explain_plan(plan),
+                "explain": _explain_plan(clean_plan),
                 "note": note,
             }
+
+        insp_df = _inspection_summary(raw_filtered)
+        insp_count = len(insp_df) if not insp_df.empty else None
 
         body, followups = None, []
         if mode == "ai" and _ai_available() and str(_secret("SARAL_AI_SUMMARY") or "").strip().lower() in ("1", "true", "yes"):
             try:
-                body, followups = _ask_summary(question, title, len(result), result)
+                body, followups = _ask_summary(question, title, len(raw_filtered), insp_count, result)
             except Exception:
                 body, followups = None, []
         if not body:
-            body = _local_summary(title, result, plan, raw_filtered)
+            body = _local_summary(title, result, clean_plan, raw_filtered, insp_count=insp_count)
         if not followups:
-            followups = _local_followups(plan)
+            followups = _local_followups(clean_plan)
 
-        grouped = bool(plan.get("group_by"))
+        grouped = bool(clean_plan.get("group_by"))
         try:
-            specs = _charts_for(result, plan)
+            specs = _charts_for(result, clean_plan)
         except Exception:
             specs = []
 
@@ -1467,6 +1658,7 @@ def _answer(question, tables, history, hint):
             "q": question,
             "text": body,
             "table": result,
+            "insp_table": insp_df,
             "title": title,
             "followups": followups,
             "grouped": grouped,
@@ -1474,10 +1666,10 @@ def _answer(question, tables, history, hint):
             "note": note,
             "secs": round(time.time() - t0, 1),
             "ai_secs": ai_s,
-            "explain": _explain_plan(plan),
-            "kpis": _kpis(raw_filtered, plan),
+            "explain": _explain_plan(clean_plan),
+            "kpis": _kpis(raw_filtered, clean_plan, insp_count=insp_count),
             "insights": _insights(raw_filtered),
-            "xlsx": _to_excel(result),
+            "xlsx": _to_excel(result, insp_df=insp_df if not grouped else None),
             "docx": None,
         }
     except Exception as e:
@@ -1529,6 +1721,11 @@ def _show_turn(t, idx, newest):
                     st.caption("📊 Charts need the 'plotly' package (add it to requirements.txt).")
                 except Exception as e:
                     st.caption(f"📊 Chart could not be drawn: {e}")
+
+            insp_tbl = t.get("insp_table")
+            if insp_tbl is not None and not insp_tbl.empty and not t.get("grouped"):
+                with st.expander(f"📋 Inspection-wise summary ({len(insp_tbl)} inspections)", expanded=False):
+                    st.dataframe(insp_tbl, use_container_width=True, hide_index=True)
 
             if t.get("insights"):
                 with st.expander("💡 Quick insights", expanded=True):
