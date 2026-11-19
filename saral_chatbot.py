@@ -12,6 +12,7 @@ import datetime as dt
 import pandas as pd
 import streamlit as st
 
+CHATBOT_VERSION = "v4"
 DEFAULT_MODEL = "claude-sonnet-4-5"
 DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
 DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile"
@@ -38,7 +39,7 @@ SARAL_HINT = """
 This is the S.A.R.A.L (Safety Abnormality Report & Action List) database of Solapur Division, Central Railway.
 IMPORTANT DATA MODEL:
 - Each row in the table is ONE DEFICIENCY noted during an inspection (one inspection often has 10-25 rows).
-- A single INSPECTION is identified by the combination of Date of Inspection, Inspection By, Type of Inspection, and Location.
+- A single INSPECTION is identified by Date of Inspection + Inspection By + Type of Inspection (across multiple locations).
 
 Column meanings:
 - "Date of Inspection": date the inspection was done (default date for any date range in a question).
@@ -113,8 +114,8 @@ JSON format:
 }}
 
 Rules:
-- Users make heavy spelling mistakes, punctuation mistakes (".", ",", "/", "-", "&"), uppercase/lowercase variations,
-  and broken grammar (e.g. "inpection report od Sr,dso"). Understand their true intent effortlessly.
+- Users make heavy spelling mistakes, glued words ("frommthe"), punctuation mistakes (".", ",", "/", "-", "&"),
+  uppercase/lowercase variations, and broken grammar (e.g. "inpection report od Sr,dso"). Understand their true intent.
 - op is one of: eq, ne, in, contains, gt, gte, lt, lte, between, isnull, notnull.
 - Dates are ISO strings YYYY-MM-DD. "between" takes [from, to] inclusive.
   Resolve "last 5 days", "this month", "August to October", "april to october 2025" into exact dates using today's date.
@@ -140,9 +141,7 @@ State both the number of inspections (if provided) and total deficiency records 
 (biggest/smallest, pending vs resolved vs no response if visible).
 If the question asks "which / who / most / least / highest", begin with the direct answer (name and number) in one line.
 Mention the date range used if the result title shows it. Never mention spelling mistakes.
-Use only the numbers given. Do not invent anything. No tables, no markdown headings.
-Then, on a NEW LAST LINE, write exactly:
-FOLLOWUPS: <question 1> | <question 2> | <question 3>"""
+Use only the numbers given. Do not invent anything. No tables, no markdown headings."""
 
 
 # ----------------------------------------------------------------------------
@@ -282,7 +281,7 @@ def _schema_text(tables):
                     else:
                         tokens = sorted({
                             tok.strip() for v in vals
-                            for tok in re.split(r"[,;&]+", v) if tok.strip()
+                            for tok in re.split(r"[,;&+/]+", v) if tok.strip()
                         })
                         lines.append(f'  - "{c}" (text, individual values): {tokens[:MAX_CATEGORY_VALUES]}')
                 elif len(vals) <= MAX_CATEGORY_VALUES:
@@ -416,15 +415,18 @@ def _llm_single(provider, system, messages, max_tokens, json_mode=False):
         import requests
 
         def _call_groq(model_name):
+            payload = {
+                "model": model_name,
+                "temperature": 0.0,
+                "max_tokens": max(max_tokens, 1500),
+                "messages": [{"role": "system", "content": system}] + messages,
+            }
+            if json_mode:
+                payload["response_format"] = {"type": "json_object"}
             return requests.post(
                 "https://api.groq.com/openai/v1/chat/completions",
                 headers={"Authorization": f"Bearer {key}"},
-                json={
-                    "model": model_name,
-                    "temperature": 0.0,
-                    "max_tokens": max(max_tokens, 1500),
-                    "messages": [{"role": "system", "content": system}] + messages,
-                },
+                json=payload,
                 timeout=30,
             )
 
@@ -507,21 +509,13 @@ def _ask_plan(question, tables, history, hint):
         for h in history[-2:]:
             msgs.append({"role": "user", "content": h["q"]})
             msgs.append({"role": "assistant", "content": json.dumps(h["plan"], default=str)})
-    msgs.append({"role": "user", "content": question})
+    cleaned_q = _normalize_query_text(question).strip()
+    msgs.append({"role": "user", "content": f"{question}\n(Normalized: {cleaned_q})"})
     text = _llm(system, msgs, 1200, json_mode=True)
     m = re.search(r"\{.*\}", text, re.S)
     if not m:
         raise ValueError("Could not understand the question. Please rephrase.")
     return json.loads(m.group(0))
-
-
-def _split_followups(text):
-    m = re.search(r"FOLLOWUPS:\s*(.+)$", text, re.S | re.I)
-    if not m:
-        return text.strip(), []
-    body = text[:m.start()].strip()
-    fu = [x.strip(" -•*\n") for x in m.group(1).split("|") if x.strip(" -•*\n")]
-    return body, fu[:3]
 
 
 def _ask_summary(question, title, total, insp_count, result):
@@ -533,7 +527,7 @@ def _ask_summary(question, title, total, insp_count, result):
         f"Question: {question}\nResult title: {title}\n"
         f"{insp_line}Total deficiency rows in result: {total}\nFirst rows (CSV):\n{sample}"
     )
-    return _split_followups(_llm(SUMMARY_SYSTEM, [{"role": "user", "content": content}], 500))
+    return _llm(SUMMARY_SYSTEM, [{"role": "user", "content": content}], 400).strip()
 
 
 # ----------------------------------------------------------------------------
@@ -559,7 +553,7 @@ def _strip_safety_team_phrase(val):
     """Turn 'Sr.DSO, safety team' or 'Sr.DSO & Safety' into 'Sr.DSO' while keeping pure 'Safety Team' as 'Safety'."""
     s = str(val).strip()
     cleaned = re.sub(
-        r"(?:[,;&+/]|\b(?:and|with|along\s+with)\b)?\s*\bsafety\s*(?:team|branch|dept|department)?\b",
+        r"(?:[,;&+/]|\b(?:and|with|along\s+with)\b)?\s*\b(?:safety|saftey)\s*(?:team|tem|teem|branch|dept|department)?\b",
         "", s, flags=re.I
     ).strip(" ,;&+/()")
     return cleaned if cleaned else "Safety"
@@ -590,7 +584,7 @@ def _sanitize_plan(plan, df):
         val = f.get("value")
 
         # 1. "SAFETY" / "Safety Team" is NEVER a Head department in S.A.R.A.L.; it belongs to Inspection By
-        if col_raw.lower() == "head" and isinstance(val, str) and _norm(val) in ("safety", "safetyteam", "safetybranch"):
+        if col_raw.lower() == "head" and isinstance(val, str) and _norm(val) in ("safety", "safetyteam", "safetytem", "safetybranch"):
             if not has_insp_by and "Inspection By" in df.columns:
                 cleaned.append({"column": "Inspection By", "op": "contains", "value": "Safety"})
                 has_insp_by = True
@@ -629,9 +623,7 @@ def _token_boundary_mask(series, value):
             after = full[idx + len(nv)] if idx + len(nv) < len(full) else ""
             if nv[-1].isdigit() and after.isdigit():
                 return False
-            if nv == "dom" and before == "a":
-                return False
-            if nv == "dso" and before == "a":
+            if nv in ("dom", "dso") and before == "a":
                 return False
             return True
         return False
@@ -789,10 +781,10 @@ def _aggregate_df(df, plan):
 # Inspection-level summary (matches S.A.R.A.L. "View Records" inspection count)
 # ----------------------------------------------------------------------------
 def _inspection_summary(df):
-    """Group deficiency rows into unique inspections (Date + Inspection By + Type + Location)."""
+    """Group deficiency rows into unique inspections (Date + Inspection By + Type of Inspection)."""
     if df.empty:
         return pd.DataFrame()
-    key_cols = [c for c in ("Date of Inspection", "Inspection By", "Type of Inspection", "Location") if c in df.columns]
+    key_cols = [c for c in ("Date of Inspection", "Inspection By", "Type of Inspection") if c in df.columns]
     if not key_cols:
         return pd.DataFrame()
 
@@ -810,6 +802,9 @@ def _inspection_summary(df):
     for _, grp in work.groupby(norm_keys, dropna=False, sort=False):
         first = grp.iloc[0]
         rec = {c: first[c] for c in key_cols}
+        if "Location" in grp.columns:
+            locs = sorted({str(x).strip() for x in grp["Location"].dropna() if str(x).strip()})
+            rec["Locations"] = ", ".join(locs[:8]) + ("…" if len(locs) > 8 else "")
         rec["Deficiencies"] = len(grp)
         if "Status" in grp.columns:
             vc = grp["Status"].value_counts()
@@ -825,7 +820,7 @@ def _inspection_summary(df):
 
 
 # ----------------------------------------------------------------------------
-# Basic mode (spelling- & punctuation-tolerant built-in rules fallback)
+# Basic mode (spelling-, glued-word- & punctuation-tolerant rules fallback)
 # ----------------------------------------------------------------------------
 _STATE = {}
 _PLAN_CACHE = {}
@@ -858,6 +853,7 @@ _DEPT_WORDS = {
 
 _TYPO_MAP = {
     "inpection": "inspection", "inpections": "inspections",
+    "isnpections": "inspections", "isnpection": "inspection",
     "inspecion": "inspection", "inspecions": "inspections",
     "inspecton": "inspection", "inspectons": "inspections",
     "inspectn": "inspection", "inspn": "inspection", "insp": "inspection",
@@ -866,6 +862,9 @@ _TYPO_MAP = {
     "deficincy": "deficiency", "defs": "deficiencies",
     "reprt": "report", "rport": "report",
     "anlysis": "analysis", "analisys": "analysis", "summry": "summary",
+    "saftey": "safety", "safey": "safety",
+    "tem": "team", "teem": "team",
+    "od": "of", "fo": "of",
 }
 
 _BASIC_HELP = (
@@ -881,13 +880,16 @@ _BASIC_HELP = (
 
 def _normalize_query_text(question):
     q = re.sub(r"[^a-z0-9&/ ]+", " ", question.lower())
+    # Split glued prepositions like "frommthe", "fromthe", "inthe", "ofthe"
+    q = re.sub(r"\b(from+)(the)\b", r"from \2", q)
+    q = re.sub(r"\b(in|of|to|on|at)(the)\b", r"\1 \2", q)
     words = [_TYPO_MAP.get(w, w) for w in q.split()]
     return " " + " ".join(words) + " "
 
 
 def _prepare_cached(dfs, hidden):
     try:
-        key = tuple(
+        key = (CHATBOT_VERSION,) + tuple(
             (n, d.shape, tuple(d.columns), int(pd.util.hash_pandas_object(d.astype(str), index=False).sum()))
             for n, d in dfs.items()
         ) + (tuple(hidden or []),)
@@ -911,6 +913,7 @@ def _is_limit_error(msg):
 def _ask_plan_cached(question, tables, history, hint):
     last = json.dumps(history[-1]["plan"], sort_keys=True, default=str) if (history and _looks_like_followup(question)) else ""
     key = (
+        CHATBOT_VERSION,
         re.sub(r"\s+", " ", question.strip().lower()),
         dt.date.today().isoformat(),
         last,
@@ -1015,7 +1018,6 @@ def _find_officer(ql, df, col):
                 elif len(var) == best_len and val not in hits:
                     hits.append(val)
 
-    # Fuzzy fallback for minor officer spelling mistakes (e.g. "sr dos" -> "Sr.DSO")
     if not hits and variant_map:
         for c_tok in sorted(cand, key=len, reverse=True):
             if len(c_tok) >= 5:
@@ -1068,7 +1070,6 @@ def _rule_plan(question, tables, prev=None):
             if any(re.search(r"(?<![a-z0-9])" + re.escape(w) + r"(?![a-z0-9])", ql) for w in words):
                 real = [h for h in heads if _norm(target) == _norm(h)]
                 found.append(real[0] if real else target)
-        # Fuzzy department fallback for spelling errors (e.g. "enginering", "mechnical")
         if not found:
             for tok in ql.split():
                 if len(tok) >= 5:
@@ -1142,7 +1143,6 @@ def _rule_plan(question, tables, prev=None):
 
     rank = re.search(r"\b(which|most|more|max|maximum|least|less|minimum|lowest|highest|top|konsa|kaun)\b", ql)
     asc = bool(re.search(r"\b(least|less|minimum|lowest|fewest)\b", ql))
-    # Do NOT treat "inspection report" as a group_by summary when a specific officer/filter is already given
     is_insp_report = bool(re.search(r"\binspection\s+report\b", ql)) and bool(filters)
     wise = None if is_insp_report else re.search(r"\bwise\b|\banalysis\b|\banalyse\b|\banalyze\b|\bsummary\b|\breport\b", ql)
 
@@ -1247,7 +1247,11 @@ def _nm(x):
 def _local_summary(title, result, plan, raw_filtered, insp_count=None):
     num = [c for c in result.columns if _is_num(result[c])]
     k = _kpis(raw_filtered, plan, insp_count=insp_count)
-    insp_prefix = f"**{insp_count} inspections** ({len(raw_filtered)} deficiencies)" if insp_count is not None else f"**{len(raw_filtered)} records**"
+    insp_prefix = (
+        f"**{insp_count} inspections** ({len(raw_filtered)} deficiencies)"
+        if insp_count is not None
+        else f"**{len(raw_filtered)} records**"
+    )
 
     if plan.get("group_by") and num:
         asc = bool(plan.get("ascending"))
@@ -1276,15 +1280,6 @@ def _local_summary(title, result, plan, raw_filtered, insp_count=None):
             f"(feedback pending {k['Pending']}, no feedback {k['No Response']}).{comp_txt}"
         )
     return "\n\n".join(lines)
-
-
-def _local_followups(plan):
-    has_status = any(f.get("column") == "Status" for f in plan.get("filters") or [])
-    return [
-        "Only resolved ones" if has_status else "Only pending ones",
-        "Department wise analysis of this",
-        "Same for last 30 days",
-    ]
 
 
 # ----------------------------------------------------------------------------
@@ -1637,16 +1632,14 @@ def _answer(question, tables, history, hint):
         insp_df = _inspection_summary(raw_filtered)
         insp_count = len(insp_df) if not insp_df.empty else None
 
-        body, followups = None, []
+        body = None
         if mode == "ai" and _ai_available() and str(_secret("SARAL_AI_SUMMARY") or "").strip().lower() in ("1", "true", "yes"):
             try:
-                body, followups = _ask_summary(question, title, len(raw_filtered), insp_count, result)
+                body = _ask_summary(question, title, len(raw_filtered), insp_count, result)
             except Exception:
-                body, followups = None, []
+                body = None
         if not body:
             body = _local_summary(title, result, clean_plan, raw_filtered, insp_count=insp_count)
-        if not followups:
-            followups = _local_followups(clean_plan)
 
         grouped = bool(clean_plan.get("group_by"))
         try:
@@ -1660,7 +1653,6 @@ def _answer(question, tables, history, hint):
             "table": result,
             "insp_table": insp_df,
             "title": title,
-            "followups": followups,
             "grouped": grouped,
             "specs": specs,
             "note": note,
@@ -1681,11 +1673,7 @@ def _answer(question, tables, history, hint):
         }
 
 
-def _queue_question(q):
-    st.session_state["saral_queued"] = q
-
-
-def _show_turn(t, idx, newest):
+def _show_turn(t, idx):
     st.markdown(f"**🧑 {t['q']}**")
     with st.container(border=True):
         st.markdown(t["text"])
@@ -1722,20 +1710,28 @@ def _show_turn(t, idx, newest):
                 except Exception as e:
                     st.caption(f"📊 Chart could not be drawn: {e}")
 
-            insp_tbl = t.get("insp_table")
-            if insp_tbl is not None and not insp_tbl.empty and not t.get("grouped"):
-                with st.expander(f"📋 Inspection-wise summary ({len(insp_tbl)} inspections)", expanded=False):
-                    st.dataframe(insp_tbl, use_container_width=True, hide_index=True)
-
             if t.get("insights"):
                 with st.expander("💡 Quick insights", expanded=True):
                     for s in t["insights"]:
                         st.markdown(f"- {s}")
 
-            st.caption(f"{t.get('title', 'Result')}  •  {len(tbl)} records")
-            st.dataframe(tbl.head(MAX_ROWS_SHOWN), use_container_width=True, hide_index=True)
-            if len(tbl) > MAX_ROWS_SHOWN:
-                st.caption(f"Showing first {MAX_ROWS_SHOWN} rows. Download the sheet to get all rows.")
+            insp_tbl = t.get("insp_table")
+            if insp_tbl is not None and not insp_tbl.empty and not t.get("grouped") and len(insp_tbl) < len(tbl):
+                tab_insp, tab_def = st.tabs([
+                    f"📋 Inspections ({len(insp_tbl)})",
+                    f"📝 All Deficiencies ({len(tbl)})",
+                ])
+                with tab_insp:
+                    st.dataframe(insp_tbl, use_container_width=True, hide_index=True)
+                with tab_def:
+                    st.dataframe(tbl.head(MAX_ROWS_SHOWN), use_container_width=True, hide_index=True)
+                    if len(tbl) > MAX_ROWS_SHOWN:
+                        st.caption(f"Showing first {MAX_ROWS_SHOWN} rows. Download the Excel sheet for all rows.")
+            else:
+                st.caption(f"{t.get('title', 'Result')}  •  {len(tbl)} records")
+                st.dataframe(tbl.head(MAX_ROWS_SHOWN), use_container_width=True, hide_index=True)
+                if len(tbl) > MAX_ROWS_SHOWN:
+                    st.caption(f"Showing first {MAX_ROWS_SHOWN} rows. Download the sheet to get all rows.")
 
             d1, d2 = st.columns(2)
             stamp = f"SARAL_{dt.date.today():%Y%m%d}_{idx}"
@@ -1758,14 +1754,6 @@ def _show_turn(t, idx, newest):
                         "📄 Prepare Word report", key=f"saral_pw_{idx}", on_click=_prep_docx,
                         args=(idx,), use_container_width=True
                     )
-
-        if newest and t.get("followups"):
-            st.markdown("**Ask next:**")
-            for j, f in enumerate(t["followups"]):
-                st.button(
-                    f, key=f"saral_fu_{idx}_{j}", on_click=_queue_question, args=(f,),
-                    use_container_width=True
-                )
 
 
 def _prep_docx(idx):
@@ -1809,7 +1797,7 @@ def render_saral_chatbot(dataframes: dict, title: str = "Ask SARAL",
     ss.setdefault("saral_turns", [])
     ss.setdefault("saral_hist", [])
 
-    question = ss.pop("saral_queued", None)
+    question = None
     with st.form("saral_chat_form", clear_on_submit=True):
         typed = st.text_input(
             "Your question",
@@ -1832,7 +1820,7 @@ def render_saral_chatbot(dataframes: dict, title: str = "Ask SARAL",
     n = len(ss["saral_turns"])
     for i in range(n - 1, -1, -1):
         if i >= n - 2:
-            _show_turn(ss["saral_turns"][i], i, newest=(i == n - 1))
+            _show_turn(ss["saral_turns"][i], i)
         else:
             _show_turn_compact(ss["saral_turns"][i], i)
 
