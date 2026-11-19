@@ -12,7 +12,7 @@ import datetime as dt
 import pandas as pd
 import streamlit as st
 
-CHATBOT_VERSION = "v4.1"
+CHATBOT_VERSION = "v4.2"
 DEFAULT_MODEL = "claude-sonnet-4-5"
 DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
 DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile"
@@ -53,8 +53,8 @@ Column meanings:
 - "Sub Head": category inside a department.
 - "Deficiencies Noted": the text of the deficiency.
 - "Inspection By": the officer/team who conducted the inspection (e.g. "Sr.DSO", "Sr.DSO & Safety Team",
-  "Sr.DSO/Safety Team", "Sr.DOM", "DRM/SUR", "ADRM").
-- "Action By": the officer RESPONSIBLE for fixing it (e.g. Sr.DOM, Sr.DEN/S, Sr.DSTE). Cells may contain multiple
+  "Sr.DSO/Safety Team", "Sr.DOM", "DRM/SUR", "ADRM", "AEE/OP/SUR", "AEE/OP", "ADEE/TRD/SUR").
+- "Action By": the officer RESPONSIBLE for fixing it (e.g. Sr.DOM, Sr.DEN/S, Sr.DSTE, AEE/OP/SUR). Cells may contain multiple
   comma- or slash-separated officers (e.g. "Sr.DEN/S, Sr.DSTE").
 - "Feedback": compliance reply given by the department. "User Feedback/Remark": extra remark.
 - "Timestamp of Compliance": when the compliance feedback was given.
@@ -67,10 +67,15 @@ Interpretation rules:
   NEVER "Head". If the user says "Sr.DSO, safety team" or "Sr.DSO with safety team", filter "Inspection By" with
   op "contains" and value "Sr.DSO" (so it matches "Sr.DSO", "Sr.DSO & Safety Team", "Sr.DSO/Safety Team", etc.).
   Only if the user asks for "safety team" WITHOUT any officer designation, use Inspection By contains "Safety".
-- Officer designations (Sr DOM, Sr DEN/S, DRM, Sr DSTE, Sr DSO, ADEN...) in a question about deficiencies, pending work,
+- Officer designations (Sr DOM, Sr DEN/S, DRM, Sr DSTE, Sr DSO, ADEN, AEE/OP, AEE/OP/SUR, ADEE/TRD/SUR...) in a question about deficiencies, pending work,
   or compliance mean "Action By", unless the user says "inspected by" / "inspection by" / "inspections by" /
-  "inspection report of" (then use "Inspection By").
+  "inspection report of" / "inspections of" (then use "Inspection By").
   Use op "contains" for "Action By" and "Inspection By".
+- CRITICAL: Designations that embed a station code (AEE/OP/SUR, AEE/OP/SUR(SUR), ADEE/TRD/SUR, SSE/P.Way/SUR, DRM/SUR)
+  are OFFICER names. Filter Inspection By / Action By with the designation (prefer the longest match such as "AEE/OP"
+  or "AEE/OP/SUR"). Do NOT create a Location filter from the embedded station code.
+  Only add a Location filter when the user clearly asks for a place ("at SUR", "SUR station", "location SUR",
+  "inspections at SUR", "in SUR"). Parentheses like "(SUR)" after an officer designation are part of the officer name, not a location request.
 - "resolved / complied / closed / attended" -> Status = Resolved (op eq).
 - IMPORTANT: in SARAL "pending / open / not done / outstanding" means NOT YET RESOLVED, i.e. Status in
   ["Pending", "No Response"] (use op "in" with BOTH values), because a deficiency with no feedback yet is still pending.
@@ -125,6 +130,10 @@ Rules:
 - Use values exactly as they appear in the sample values when possible (e.g. "Sr,dso" -> "Sr.DSO").
 - Use op "contains" for "Action By" and "Inspection By".
 - Use op "eq" or "in" for exact codes like "Location" (e.g. "SUR", "LC-40") and "Head".
+- NEVER turn a station code that is part of an officer designation into a Location filter.
+  Examples: "AEE/OP/SUR", "AEE/OP/SUR(SUR)", "ADEE/TRD/SUR", "DRM/SUR" → filter Inspection By / Action By
+  with contains "AEE/OP" or "AEE/OP/SUR" (or the full designation). Do not add Location=SUR.
+  Only filter Location when the user clearly asks for a place ("at SUR", "SUR station", "in SUR", "location SUR").
 - For "analysis"/"summary"/"department wise" questions use group_by + aggregations.
 - For "show/list/give me all/inspection report of" questions leave group_by and aggregations empty so full rows come back.
 - Use ONLY the table and column names listed above. Never invent columns.
@@ -603,6 +612,22 @@ def _sanitize_plan(plan, df):
 
         cleaned.append(_fix_status_filter(f))
 
+    # Drop Location filter when an officer designation already embeds the same station code
+    # e.g. question "AEE/OP/SUR inspections" should NOT also filter Location=SUR
+    officer_texts = []
+    for f in cleaned:
+        if str(f.get("column", "")).strip().lower() in ("inspection by", "action by"):
+            officer_texts.append(_norm(f.get("value", "")))
+    if officer_texts:
+        cleaned = [
+            f for f in cleaned
+            if not (
+                str(f.get("column", "")).strip().lower() == "location"
+                and any(_norm(f.get("value", "")) in ot or ot.endswith(_norm(f.get("value", "")))
+                        for ot in officer_texts)
+            )
+        ]
+
     plan["filters"] = cleaned
     return plan
 
@@ -991,21 +1016,45 @@ def _detect_officer_col(ql, df):
 
 
 def _find_officer(ql, df, col):
-    toks = [_norm(t) for t in ql.split() if _norm(t)]
+    # Keep original tokens (including slashes) so "AEE/OP/SUR" stays intact for matching.
+    raw_toks = [t for t in re.split(r"\s+", ql) if t.strip()]
+    toks = [_norm(t) for t in raw_toks if _norm(t)]
     cand = (
         set(toks)
         | {a + b for a, b in zip(toks, toks[1:])}
         | {a + b + c for a, b, c in zip(toks, toks[1:], toks[2:])}
         | {a + b + c + d for a, b, c, d in zip(toks, toks[1:], toks[2:], toks[3:])}
     )
-    all_vals = {
-        tok.strip()
-        for v in df[col].dropna().astype(str).unique()
-        for tok in re.split(r"[,;&+/]+", v) if tok.strip()
-    }
+    # Also add slash-joined variants from the original question (AEE/OP, AEE/OP/SUR, ...)
+    for m in re.finditer(r"[A-Za-z0-9]+(?:/[A-Za-z0-9.]+)+", ql):
+        cand.add(_norm(m.group(0)))
+        # also without trailing station-like token sometimes
+        parts = m.group(0).split("/")
+        if len(parts) >= 2:
+            cand.add(_norm("/".join(parts[:-1])))
+
+    # Collect BOTH full cell values and split tokens (full values preferred for long designations)
+    all_vals = set()
+    full_vals = set()
+    for v in df[col].dropna().astype(str).unique():
+        v = v.strip()
+        if not v:
+            continue
+        full_vals.add(v)
+        for tok in re.split(r"[,;&+]+", v):  # note: do NOT split on /
+            tok = tok.strip()
+            if tok:
+                all_vals.add(tok)
+                # also keep progressive prefixes of slash designations
+                if "/" in tok:
+                    bits = tok.split("/")
+                    for i in range(1, len(bits)):
+                        all_vals.add("/".join(bits[:i+1]))
+                        all_vals.add("/".join(bits[:i]))
+
     best_len, hits = 0, []
     variant_map = {}
-    for v in all_vals:
+    for v in list(all_vals) + list(full_vals):
         n = _norm(v)
         if len(n) < 3 or n in ("safety", "safetyteam", "team"):
             continue
@@ -1013,6 +1062,7 @@ def _find_officer(ql, df, col):
         if n.startswith("sr") and len(n) > 4:
             variants[n[2:]] = v
         for var, val in variants.items():
+            # Prefer longer / more specific designations
             variant_map[var] = val
             if var in cand:
                 if len(var) > best_len:
@@ -1022,7 +1072,7 @@ def _find_officer(ql, df, col):
 
     if not hits and variant_map:
         for c_tok in sorted(cand, key=len, reverse=True):
-            if len(c_tok) >= 5:
+            if len(c_tok) >= 4:
                 close = difflib.get_close_matches(c_tok, list(variant_map.keys()), n=1, cutoff=0.82)
                 if close:
                     hits = [variant_map[close[0]]]
@@ -1102,11 +1152,28 @@ def _rule_plan(question, tables, prev=None):
 
     if "Location" in df.columns:
         locs = {_norm(x): x for x in df["Location"].dropna().astype(str).unique() if _norm(x)}
+        # Only treat as location when clearly marked as place (at/in/station...).
+        # Bare station codes that appear inside officer designations (AEE/OP/SUR, DRM/SUR)
+        # must NOT become Location filters.
         words = (
             re.findall(r"(?:at|in|station|stn|location|gate)\s+([a-z0-9\-]+)", ql)
             + re.findall(r"([a-z0-9\-]+)\s+(?:station|stn)\b", ql)
         )
-        hit = next((w for w in words if _norm(w) in locs), None)
+        # Guard: skip if the same token is already part of an officer filter we just added
+        officer_norms = {
+            _norm(f.get("value", ""))
+            for f in filters
+            if str(f.get("column", "")).lower() in ("inspection by", "action by")
+        }
+        hit = None
+        for w in words:
+            nw = _norm(w)
+            if nw not in locs:
+                continue
+            if any(nw in on or on.endswith(nw) for on in officer_norms):
+                continue
+            hit = w
+            break
         if hit:
             filters.append({"column": "Location", "op": "eq", "value": locs[_norm(hit)]})
             parts.append(locs[_norm(hit)])
