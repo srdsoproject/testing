@@ -197,7 +197,19 @@ def add_status(df, classify_fn, feedback_col="Feedback", remark_col="User Feedba
             return "No Response"
         return classify_fn(r.get(feedback_col, ""), r.get(remark_col, ""))
 
+    key = None
+    try:                                    # same data as last time -> reuse the Status column (big time saver)
+        cols = [c for c in (feedback_col, remark_col) if c in df.columns]
+        key = (len(df), tuple(df.columns), int(pd.util.hash_pandas_object(df[cols].astype(str), index=False).sum()))
+    except Exception:
+        pass
+    if key is not None and key in _STATUS_CACHE:
+        d["Status"] = _STATUS_CACHE[key]
+        return d
     d["Status"] = d.apply(_row, axis=1)
+    if key is not None:
+        _STATUS_CACHE.clear()
+        _STATUS_CACHE[key] = d["Status"].tolist()
     return d
 
 
@@ -273,6 +285,21 @@ def _provider():
     return "gemini"
 
 
+def _gem_generate(client, types, cfg, model, contents, config):
+    """Gemini call. Asks for LOW 'thinking' (much faster); falls back to a plain call if the model/SDK rejects it."""
+    if _STATE.get("gem_think", True):
+        try:
+            c2 = dict(cfg, thinking_config=types.ThinkingConfig(thinking_level="low"))
+            return client.models.generate_content(model=model, contents=contents,
+                                                  config=types.GenerateContentConfig(**c2))
+        except Exception as e:
+            m = str(e)
+            if _is_limit_error(m) or any(x in m for x in ("404", "NOT_FOUND", "401", "403", "PERMISSION", "API key")):
+                raise
+            _STATE["gem_think"] = False
+    return client.models.generate_content(model=model, contents=contents, config=config)
+
+
 def _llm_single(provider, system, messages, max_tokens, json_mode=False):
     """One text-in / text-out call. messages = [{"role": "user"|"assistant", "content": str}]"""
     if provider == "gemini":
@@ -281,7 +308,10 @@ def _llm_single(provider, system, messages, max_tokens, json_mode=False):
             raise RuntimeError("GEMINI_API_KEY is missing in Secrets")
         from google import genai
         from google.genai import types
-        client = genai.Client(api_key=key)
+        try:
+            client = genai.Client(api_key=key, http_options=types.HttpOptions(timeout=30000))   # give up after 30 s
+        except Exception:
+            client = genai.Client(api_key=key)
         contents = [{"role": "user" if m["role"] == "user" else "model",
                      "parts": [{"text": m["content"]}]} for m in messages]
         cfg = dict(system_instruction=system,
@@ -289,7 +319,7 @@ def _llm_single(provider, system, messages, max_tokens, json_mode=False):
                    temperature=0.1)
         if json_mode:
             cfg["response_mime_type"] = "application/json"
-        resp = client.models.generate_content(
+        resp = _gem_generate(client, types, cfg,
             model=_secret("GEMINI_MODEL") or DEFAULT_GEMINI_MODEL,
             contents=contents,
             config=types.GenerateContentConfig(**cfg))
@@ -305,7 +335,7 @@ def _llm_single(provider, system, messages, max_tokens, json_mode=False):
                           json={"model": _secret("GROQ_MODEL") or DEFAULT_GROQ_MODEL, "temperature": 0.1,
                                 "max_tokens": max(max_tokens, 1500),
                                 "messages": [{"role": "system", "content": system}] + messages},
-                          timeout=60)
+                          timeout=30)
         if r.status_code != 200:
             raise RuntimeError(f"Groq {r.status_code}: {r.text[:300]}")
         return (r.json()["choices"][0]["message"]["content"] or "").strip()
@@ -529,6 +559,22 @@ _BASIC_HELP = ("I can answer questions like:\n\n"
                "- Engg analysis of last 7 days\n\n"
                "Please type your question with a department or officer, a status (pending / resolved) "
                "and a period (last 7 days, this month, August to October).")
+
+
+_STATUS_CACHE = {}
+_PREP_CACHE = {}
+
+
+def _prepare_cached(dfs, hidden):
+    """_prepare() copies the data and parses dates; do it only when the data really changed."""
+    try:
+        key = tuple((n, d.shape, tuple(d.columns), int(pd.util.hash_pandas_object(d, index=False).sum()))
+                    for n, d in dfs.items()) + (tuple(hidden or []),)
+    except Exception:
+        return _prepare(dfs, hidden)
+    if _PREP_CACHE.get("key") != key:
+        _PREP_CACHE["key"], _PREP_CACHE["val"] = key, _prepare(dfs, hidden)
+    return _PREP_CACHE["val"]
 
 
 def _ai_available():
@@ -1055,11 +1101,14 @@ def _to_docx(turn):
 # ----------------------------------------------------------------------------
 def _answer(question, tables, history, hint):
     try:
+        t0, ai_s = time.time(), None
         plan, mode, note = None, "ai", ""
         if _ai_available():
             try:
+                ta = time.time()
                 _STATE["used"] = None
                 plan = _ask_plan_cached(question, tables, history, hint)
+                ai_s = round(time.time() - ta, 1)
                 used, order = _STATE.get("used"), _providers()
                 if used and order and used != order[0]:
                     note = f"ℹ️ The main AI's free limit is used up, so this answer used {used.title()}."
@@ -1111,11 +1160,12 @@ def _answer(question, tables, history, hint):
             specs = []
         turn = {"q": question, "text": body, "table": result, "title": title, "followups": followups,
                 "grouped": grouped, "specs": specs, "note": note,
+                "secs": round(time.time() - t0, 1), "ai_secs": ai_s,
                 "kpis": None if grouped else _kpis(result),
                 "insights": [] if grouped else _insights(result)}
         turn["xlsx"] = _to_excel(result)
         try:
-            turn["docx"] = _to_docx(turn)
+            turn["docx"] = None                    # built only when the user asks for it (saves time)
         except Exception:
             turn["docx"] = None
         return turn
@@ -1150,6 +1200,9 @@ def _show_turn(t, idx, newest):
         st.markdown(t["text"])
         if t.get("note"):
             st.caption(t["note"])
+        if t.get("secs") is not None:
+            ai_txt = f" (AI part {t['ai_secs']} s)" if t.get("ai_secs") is not None else ""
+            st.caption(f"⏱ answered in {t['secs']} s{ai_txt}")
         if t.get("error"):
             st.caption(f"Details: {t['error']}")
         tbl = t.get("table")
@@ -1193,13 +1246,39 @@ def _show_turn(t, idx, newest):
                                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                                    key=f"saral_dx_{idx}", use_container_width=True)
             else:
-                d2.caption("📄 Word report needs 'python-docx' in requirements.txt")
+                if t.get("docx_failed"):
+                    d2.caption("📄 Word report needs 'python-docx' in requirements.txt")
+                else:
+                    d2.button("📄 Prepare Word report", key=f"saral_pw_{idx}", on_click=_prep_docx,
+                              args=(idx,), use_container_width=True)
 
         if newest and t.get("followups"):
             st.markdown("**Ask next:**")
             for j, f in enumerate(t["followups"]):
                 st.button(f, key=f"saral_fu_{idx}_{j}", on_click=_queue_question, args=(f,),
                           use_container_width=True)
+
+
+def _prep_docx(idx):
+    t = st.session_state["saral_turns"][idx]
+    try:
+        t["docx"] = _to_docx(t)
+    except Exception:
+        t["docx"] = None
+    if not t["docx"]:
+        t["docx_failed"] = True
+
+
+def _show_turn_compact(t, idx):
+    """Older answers: just the question and the answer text (keeps the page fast)."""
+    st.markdown(f"**🧑 {t['q']}**")
+    with st.container(border=True):
+        st.markdown(t["text"])
+        if t.get("xlsx"):
+            st.download_button("⬇️ Excel sheet", data=t["xlsx"],
+                               file_name=f"SARAL_{dt.date.today():%Y%m%d}_{idx}.xlsx",
+                               mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                               key=f"saral_xl_{idx}")
 
 
 def _clear_chat():
@@ -1214,7 +1293,7 @@ def render_saral_chatbot(dataframes: dict, title: str = "Ask SARAL",
     st.caption("Type your question in simple words (English / हिंदी / Hinglish). "
                "You get the answer, charts, an Excel sheet and a Word report.")
 
-    tables = _prepare(dataframes, hidden_columns)
+    tables = _prepare_cached(dataframes, hidden_columns)
     ss = st.session_state
     ss.setdefault("saral_turns", [])
     ss.setdefault("saral_hist", [])
@@ -1238,7 +1317,10 @@ def render_saral_chatbot(dataframes: dict, title: str = "Ask SARAL",
 
     n = len(ss["saral_turns"])
     for i in range(n - 1, -1, -1):                     # newest first
-        _show_turn(ss["saral_turns"][i], i, newest=(i == n - 1))
+        if i >= n - 2:
+            _show_turn(ss["saral_turns"][i], i, newest=(i == n - 1))
+        else:
+            _show_turn_compact(ss["saral_turns"][i], i)
 
     if n:
         st.button("🗑️ Clear chat", key="saral_clear", on_click=_clear_chat)
