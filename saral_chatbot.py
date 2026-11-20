@@ -1,5 +1,7 @@
 """
 saral_chatbot.py  -  "Ask SARAL": plain-language AI assistant for the S.A.R.A.L Streamlit app.
+v4.2 - designation matching fixed (AEE/OP/SUR, SSE/C&W/SUR, Sr.DEN/S ...), "last N inspections",
+       true inspection date taken from the deficiency text, analytical findings.
 """
 
 import difflib
@@ -12,7 +14,7 @@ import datetime as dt
 import pandas as pd
 import streamlit as st
 
-CHATBOT_VERSION = "v4.1"
+CHATBOT_VERSION = "v4.2"
 DEFAULT_MODEL = "claude-sonnet-4-5"
 DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
 DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile"
@@ -20,6 +22,12 @@ MAX_ROWS_SHOWN = 500
 MAX_ROWS_TO_AI = 40
 MAX_ROWS_IN_WORD = 100
 MAX_CATEGORY_VALUES = 150
+
+# Many rows carry "DATE OF INSPECTION : yyyy-mm-dd | ..." inside "Deficiencies Noted".
+# That is the REAL inspection date; the sheet's date column can be the entry/upload date.
+# True  = use the embedded date for "Date of Inspection" (old value kept as "Date Entered").
+# False = keep the sheet column exactly as it is.
+USE_EMBEDDED_INSPECTION_DATE = True
 
 INTERNAL_COLUMNS = ["_sheet_row", "_original_sheet_index", "_status_plain"]
 STATUS_COLORS = {"Resolved": "#2e9e5b", "Pending": "#e0623b", "No Response": "#8a94a6"}
@@ -32,6 +40,10 @@ ROW_COLS_DOC = [
 _is_dt = pd.api.types.is_datetime64_any_dtype
 _is_num = pd.api.types.is_numeric_dtype
 
+# Officer cells can hold several officers: "Sr.DSO & Safety Team", "ADSO/SUR , SAFETY TEAM (SUR)".
+# A "/" or an unspaced "&" is PART of a designation (AEE/OP/SUR, SSE/C&W/SUR, Sr.DEN/S) - never split on it.
+_OFFICER_SPLIT = re.compile(r"\s*[,;+]\s*|\s+&\s+|\s+/\s+")
+
 # ----------------------------------------------------------------------------
 # S.A.R.A.L specific knowledge
 # ----------------------------------------------------------------------------
@@ -43,6 +55,7 @@ IMPORTANT DATA MODEL:
 
 Column meanings:
 - "Date of Inspection": date the inspection was done (default date for any date range in a question).
+  ("Date Entered", if present, is only when the record was uploaded - ignore it unless asked.)
 - "Type of Inspection": FOOTPLATE INSPECTION, STATION INSPECTION, LC GATE INSPECTION, COACHING DEPOT, ON TRAIN,
   SURPRISE/AMBUSH INSPECTION, WORKSITE INSPECTION, OTHER (UNUSUAL).
 - "Location": station code (SUR, KWV, WADI...), level crossing gate (LC-40) or footplate section (SUR-DD).
@@ -52,8 +65,8 @@ Column meanings:
   NOTE: "SAFETY" or "Safety Team" is NEVER a value of "Head"!
 - "Sub Head": category inside a department.
 - "Deficiencies Noted": the text of the deficiency.
-- "Inspection By": the officer/team who conducted the inspection (e.g. "Sr.DSO", "Sr.DSO & Safety Team",
-  "Sr.DSO/Safety Team", "Sr.DOM", "DRM/SUR", "ADRM").
+- "Inspection By": the officer/team who conducted the inspection. Designations often contain "/" and a station
+  code, e.g. "AEE/OP/SUR", "SSE/C&W/SUR", "ADSO/SUR", "Sr.DSO", "Sr.DSO & Safety Team", "Sr.DOM", "DRM/SUR", "ADRM".
 - "Action By": the officer RESPONSIBLE for fixing it (e.g. Sr.DOM, Sr.DEN/S, Sr.DSTE). Cells may contain multiple
   comma- or slash-separated officers (e.g. "Sr.DEN/S, Sr.DSTE").
 - "Feedback": compliance reply given by the department. "User Feedback/Remark": extra remark.
@@ -61,6 +74,11 @@ Column meanings:
 - "Status": Resolved, Pending or No Response (No Response = no feedback given yet).
 
 Interpretation rules:
+- A designation written with slashes such as "AEE/OP/SUR", "EE/OP/SUR", "SSE/C&W/SUR" is an OFFICER
+  (column "Inspection By" or "Action By"). The "SUR" inside it is NOT a Location. Never turn it into a Location
+  filter. Keep the whole designation as one value (e.g. "AEE/OP/SUR"), op "contains".
+- "last inspection(s)" / "latest inspection(s)" means the most recent inspections, not a date range
+  (the app applies this itself - do not invent a date range for it).
 - Department words map to "Head": Engg/Engineering/Track -> ENGINEERING, S&T/Signal/Telecom -> SIGNAL & TELECOM,
   Operating/Optg -> OPTG, Mech -> MECHANICAL, Elect TRD -> ELECT/TRD, Elect G -> ELECT/G, Elect TRO -> ELECT/TRO.
 - "Safety team" / "along with safety team" / "safety branch" refers to the inspecting team in "Inspection By",
@@ -69,7 +87,7 @@ Interpretation rules:
   Only if the user asks for "safety team" WITHOUT any officer designation, use Inspection By contains "Safety".
 - Officer designations (Sr DOM, Sr DEN/S, DRM, Sr DSTE, Sr DSO, ADEN...) in a question about deficiencies, pending work,
   or compliance mean "Action By", unless the user says "inspected by" / "inspection by" / "inspections by" /
-  "inspection report of" (then use "Inspection By").
+  "inspection report of" / "<officer> inspections" (then use "Inspection By").
   Use op "contains" for "Action By" and "Inspection By".
 - "resolved / complied / closed / attended" -> Status = Resolved (op eq).
 - IMPORTANT: in SARAL "pending / open / not done / outstanding" means NOT YET RESOLVED, i.e. Status in
@@ -88,6 +106,7 @@ EXAMPLES = [
     "Give me analysis of Engg department of last 5 days",
     "Which department has the most pending deficiencies?",
     "Inspection report of Sr.DSO",
+    "Last 3 inspections of AEE/OP/SUR",
 ]
 
 PLAN_SYSTEM = """You convert a railway safety inspection question into a JSON query plan.
@@ -124,6 +143,8 @@ Rules:
 - Do NOT add a separate Month column filter when Date of Inspection already covers the date range.
 - Use values exactly as they appear in the sample values when possible (e.g. "Sr,dso" -> "Sr.DSO").
 - Use op "contains" for "Action By" and "Inspection By".
+- A designation with slashes (AEE/OP/SUR, SSE/C&W/SUR) is ONE officer value for "Inspection By"/"Action By";
+  its station code is NOT a Location filter.
 - Use op "eq" or "in" for exact codes like "Location" (e.g. "SUR", "LC-40") and "Head".
 - For "analysis"/"summary"/"department wise" questions use group_by + aggregations.
 - For "show/list/give me all/inspection report of" questions leave group_by and aggregations empty so full rows come back.
@@ -164,6 +185,16 @@ _DEPT_MAP = {
     "FINANCE": "FINANCE",
     "STORE": "STORE", "STORES": "STORE",
 }
+
+
+def _officer_tokens(value):
+    """Split a multi-officer cell into individual designations, keeping '/' and 'C&W' intact."""
+    out = []
+    for p in _OFFICER_SPLIT.split(str(value)):
+        p = re.sub(r"\s*\([^)]*\)\s*$", "", p).strip()
+        if p:
+            out.append(p)
+    return out
 
 
 def _clean_for_chat(d):
@@ -236,6 +267,25 @@ def _parse_dates_safely(series):
     return out
 
 
+def _apply_embedded_inspection_date(d):
+    """Use 'DATE OF INSPECTION : yyyy-mm-dd' from the deficiency text as the real inspection date."""
+    if not USE_EMBEDDED_INSPECTION_DATE:
+        return d
+    if "Deficiencies Noted" not in d.columns or "Date of Inspection" not in d.columns:
+        return d
+    if not _is_dt(d["Date of Inspection"]):
+        return d
+    emb = pd.to_datetime(
+        d["Deficiencies Noted"].astype(str)
+        .str.extract(r"DATE\s+OF\s+INSPECTION\s*:\s*(\d{4}-\d{2}-\d{2})", flags=re.I)[0],
+        errors="coerce",
+    )
+    if emb.notna().any():
+        d["Date Entered"] = d["Date of Inspection"]
+        d["Date of Inspection"] = emb.fillna(d["Date of Inspection"])
+    return d
+
+
 def _prepare(dfs, hidden_columns):
     drop = set(INTERNAL_COLUMNS) | set(hidden_columns or [])
     out = {}
@@ -248,12 +298,13 @@ def _prepare(dfs, hidden_columns):
             if _is_dt(d[c]):
                 if getattr(d[c].dt, "tz", None) is not None:
                     d[c] = d[c].dt.tz_localize(None)
-            elif d[c].dtype == object and re.search(r"date|time", c, re.I):
+            elif (not _is_num(d[c])) and re.search(r"date|time", c, re.I):
                 non_empty = d[c].astype(str).str.strip().replace({"": pd.NA, "nan": pd.NA, "None": pd.NA}).notna().sum()
                 if non_empty > 0:
                     conv = _parse_dates_safely(d[c])
                     if conv.notna().sum() / non_empty > 0.5:
                         d[c] = conv
+        d = _apply_embedded_inspection_date(d)
         out[name] = d
     return out
 
@@ -279,11 +330,8 @@ def _schema_text(tables):
                     if len(raw_unique) <= MAX_CATEGORY_VALUES:
                         lines.append(f'  - "{c}" (text) values: {raw_unique}')
                     else:
-                        tokens = sorted({
-                            tok.strip() for v in vals
-                            for tok in re.split(r"[,;&+/]+", v) if tok.strip()
-                        })
-                        lines.append(f'  - "{c}" (text, individual values): {tokens[:MAX_CATEGORY_VALUES]}')
+                        tokens = sorted({tok for v in vals for tok in _officer_tokens(v)})
+                        lines.append(f'  - "{c}" (text, individual designations): {tokens[:MAX_CATEGORY_VALUES]}')
                 elif len(vals) <= MAX_CATEGORY_VALUES:
                     lines.append(f'  - "{c}" (text) values: {list(vals)}')
                 else:
@@ -607,28 +655,26 @@ def _sanitize_plan(plan, df):
     return plan
 
 
+# Designations starting with these letters may be written without the leading "A"
+# (users type "EE/OP/SUR" for "AEE/OP/SUR").
+_LEAD_A_OK = {"ee", "en", "ste"}
+
+
+def _designation_regex(value):
+    """Regex for one designation: punctuation-insensitive, whole-token, never inside another word."""
+    chunks = re.findall(r"[a-z0-9]+", str(value).lower())
+    if not chunks:
+        return None
+    lead = r"(?<![a-z0-9])" + ("a?" if chunks[0] in _LEAD_A_OK else "")
+    body = r"[^a-z0-9]*".join(re.escape(c) for c in chunks)
+    return re.compile(lead + body + r"(?![a-z0-9])")
+
+
 def _token_boundary_mask(series, value):
-    nv = _norm(value)
-    if not nv:
+    rx = _designation_regex(value)
+    if rx is None:
         return pd.Series(False, index=series.index)
-
-    def _matches(cell):
-        parts = [_norm(p) for p in re.split(r"[,;&+/]+", str(cell)) if _norm(p)]
-        if nv in parts:
-            return True
-        full = _norm(cell)
-        idx = full.find(nv)
-        if idx != -1:
-            before = full[idx - 1] if idx > 0 else ""
-            after = full[idx + len(nv)] if idx + len(nv) < len(full) else ""
-            if nv[-1].isdigit() and after.isdigit():
-                return False
-            if nv in ("dom", "dso") and before == "a":
-                return False
-            return True
-        return False
-
-    return series.map(_matches)
+    return series.astype(str).str.lower().map(lambda s: bool(rx.search(s)))
 
 
 def _text_mask(series, value, mode="exact"):
@@ -639,9 +685,8 @@ def _text_mask(series, value, mode="exact"):
     if mode == "exact":
         return ns == nv
     if mode == "token":
-        # Always use token-boundary matching. The old "exact if any exact exists"
-        # shortcut dropped compound values such as "Sr.DSO & Safety Team"
-        # whenever a pure "Sr.DSO" row was also present.
+        # Whole-designation matching on the raw cell, so "Sr.DSO" finds "Sr.DSO & Safety Team",
+        # and "AEE/OP/SUR" is never broken into "AEE", "OP", "SUR".
         return _token_boundary_mask(series, value)
     return ns.str.contains(re.escape(nv), na=False)
 
@@ -699,6 +744,29 @@ def _fix_status_filter(f):
     return f
 
 
+def _keep_last_n_inspections(df, n):
+    """Keep only rows of the n most recent inspections (Date + Inspection By + Type)."""
+    kc = [c for c in ("Date of Inspection", "Inspection By", "Type of Inspection") if c in df.columns]
+    if df.empty or not kc:
+        return df
+    work = df.reset_index(drop=True)
+    parts = []
+    for c in kc:
+        if _is_dt(work[c]):
+            parts.append(work[c].dt.normalize().dt.strftime("%Y-%m-%d").fillna(""))
+        else:
+            parts.append(work[c].fillna("").astype(str).str.strip().str.upper())
+    key = parts[0]
+    for p in parts[1:]:
+        key = key + "|" + p
+    if "Date of Inspection" in kc and _is_dt(work["Date of Inspection"]):
+        latest = work.assign(_k=key).groupby("_k")["Date of Inspection"].max().sort_values(ascending=False)
+        keep = set(latest.head(n).index)
+    else:
+        keep = set(pd.unique(key)[:n])
+    return df[key.isin(keep).values]
+
+
 def _filter_df(plan, tables):
     name = plan.get("table")
     if name not in tables:
@@ -707,6 +775,12 @@ def _filter_df(plan, tables):
     sanitized = _sanitize_plan(plan, df)
     for f in sanitized.get("filters") or []:
         df = _apply_filter(df, f)
+    n_last = sanitized.get("last_n_inspections")
+    if n_last:
+        try:
+            df = _keep_last_n_inspections(df, int(n_last))
+        except Exception:
+            pass
     return df, sanitized
 
 
@@ -862,6 +936,8 @@ _TYPO_MAP = {
     "defficiency": "deficiency", "defficiencies": "deficiencies",
     "deficency": "deficiency", "deficencies": "deficiencies",
     "deficincy": "deficiency", "defs": "deficiencies",
+    "defficicies": "deficiencies", "defficiecies": "deficiencies", "defficiences": "deficiencies",
+    "deficiences": "deficiencies", "deficienies": "deficiencies", "defficicy": "deficiency",
     "reprt": "report", "rport": "report",
     "anlysis": "analysis", "analisys": "analysis", "summry": "summary",
     "saftey": "safety", "safey": "safety",
@@ -874,7 +950,8 @@ _BASIC_HELP = (
     "- Sr DOM all deficiencies resolved from August to October\n"
     "- Which department has most pending deficiencies this month\n"
     "- Engg analysis of last 7 days\n"
-    "- Inspection report of Sr.DSO\n\n"
+    "- Inspection report of Sr.DSO\n"
+    "- Last 3 inspections of AEE/OP/SUR\n\n"
     "Please type your question with a department or officer, a status (pending / resolved) "
     "and a period (last 7 days, this month, August to October)."
 )
@@ -891,7 +968,7 @@ def _normalize_query_text(question):
 
 def _prepare_cached(dfs, hidden):
     try:
-        key = (CHATBOT_VERSION,) + tuple(
+        key = (CHATBOT_VERSION, USE_EMBEDDED_INSPECTION_DATE) + tuple(
             (n, d.shape, tuple(d.columns), int(pd.util.hash_pandas_object(d.astype(str), index=False).sum()))
             for n, d in dfs.items()
         ) + (tuple(hidden or []),)
@@ -980,12 +1057,27 @@ def _rule_dates(ql):
     return None
 
 
+def _last_n_from_question(question):
+    """'last inspection' -> 1, 'last 3 inspections' -> 3, 'last inspections' -> 5, else None."""
+    ql = _normalize_query_text(question)
+    m = re.search(r"\b(?:last|latest|recent|newest)\s+(\d+)\s+inspections?\b", ql)
+    if m:
+        return max(1, int(m.group(1)))
+    m = re.search(r"\b(?:last|latest|recent|newest)\s+(inspections?)\b", ql)
+    if m:
+        return 1 if m.group(1) == "inspection" else 5
+    return None
+
+
 def _detect_officer_col(ql, df):
     if "Inspection By" not in df.columns:
         return "Action By"
     if re.search(r"\b(?:insp(?:ected|ections?)(?:\s+done)?\s+by|noted\s+by|pointed\s+out\s+by|inspection\s+report)\b", ql):
         return "Inspection By"
     if re.search(r"\binspections?\b", ql) and not re.search(r"\b(?:action\s+by|deficienc|pending|resolved|compliance)\b", ql):
+        return "Inspection By"
+    # "<officer> last inspections ... deficiencies list": an inspection-centric question
+    if re.search(r"\b(?:last|latest|recent)\s+(?:\d+\s+)?inspections?\b", ql):
         return "Inspection By"
     return "Action By"
 
@@ -999,9 +1091,9 @@ def _find_officer(ql, df, col):
         | {a + b + c + d for a, b, c, d in zip(toks, toks[1:], toks[2:], toks[3:])}
     )
     all_vals = {
-        tok.strip()
+        tok
         for v in df[col].dropna().astype(str).unique()
-        for tok in re.split(r"[,;&+/]+", v) if tok.strip()
+        for tok in _officer_tokens(v)
     }
     best_len, hits = 0, []
     variant_map = {}
@@ -1012,6 +1104,8 @@ def _find_officer(ql, df, col):
         variants = {n: v}
         if n.startswith("sr") and len(n) > 4:
             variants[n[2:]] = v
+        if n.startswith("a") and len(n) > 5:
+            variants[n[1:]] = v
         for var, val in variants.items():
             variant_map[var] = val
             if var in cand:
@@ -1028,6 +1122,47 @@ def _find_officer(ql, df, col):
                     hits = [variant_map[close[0]]]
                     break
     return hits
+
+
+def _enforce_officer(plan, question, df):
+    """
+    AI planners sometimes read the station code inside a designation as a Location
+    ("EE/OP/SUR" -> Location SUR). Find the designation deterministically from the
+    question and make sure it is filtered as an officer, dropping the wrong Location/Head filter.
+    """
+    try:
+        ql = _normalize_query_text(question)
+        main = _detect_officer_col(ql, df)
+        other = "Inspection By" if main == "Action By" else "Action By"
+        col, hits = main, []
+        if main in df.columns:
+            hits = _find_officer(ql, df, main)
+        if not hits and other in df.columns:
+            hits = _find_officer(ql, df, other)
+            col = other
+        if not hits:
+            return plan
+        hit = hits[0]
+        nv = _norm(hit)
+        plan = json.loads(json.dumps(plan))
+        kept = []
+        for f in plan.get("filters") or []:
+            if not isinstance(f, dict):
+                continue
+            c = str(f.get("column", "")).strip().lower()
+            fv = f.get("value")
+            fvs = fv if isinstance(fv, list) else [fv]
+            fns = [_norm(x) for x in fvs if isinstance(x, str) and _norm(x)]
+            if c in ("location", "head") and any(x in nv and x != nv for x in fns):
+                continue  # station code / word taken from inside the designation
+            if c in ("inspection by", "action by") and any(x in nv or nv in x for x in fns):
+                continue  # replaced by the exact designation below
+            kept.append(f)
+        kept.append({"column": col, "op": "contains", "value": hit})
+        plan["filters"] = kept
+        return plan
+    except Exception:
+        return plan
 
 
 def _rule_plan(question, tables, prev=None):
@@ -1237,6 +1372,9 @@ def _explain_plan(plan):
             out.append(f"{col} is {' or '.join(map(str, vals))}")
         elif op in ("isnull", "notnull"):
             out.append(f"{col} is {'blank' if op == 'isnull' else 'filled'}")
+    if plan.get("last_n_inspections"):
+        n = int(plan["last_n_inspections"])
+        out.append(f"only the latest {n} inspection{'s' if n > 1 else ''}")
     if plan.get("group_by"):
         out.append("counted by " + " and ".join(plan["group_by"]))
     return out
@@ -1285,7 +1423,7 @@ def _local_summary(title, result, plan, raw_filtered, insp_count=None):
 
 
 # ----------------------------------------------------------------------------
-# Insights: KPIs, auto charts, quick findings
+# Insights: KPIs, auto charts, quick findings, analysis
 # ----------------------------------------------------------------------------
 def _kpis(df, plan=None, insp_count=None):
     total = len(df)
@@ -1335,6 +1473,120 @@ def _insights(df):
             over30 = int(((today - op["Date of Inspection"]).dt.days > 30).sum())
             if over30:
                 out.append(f"**{over30}** open items are older than 30 days")
+    return out
+
+
+_TDC_RX = re.compile(r"T\.?\s*D\.?\s*C\.?\s*[:\-]?\s*(\d{1,2})[./\-](\d{1,2})[./\-](\d{2,4})", re.I)
+
+
+def _parse_tdc(text):
+    """Target date of compliance from feedback like 'TDC 30.11.2026' / 'T.D.C - 30.11.2026'."""
+    m = _TDC_RX.search(str(text))
+    if not m:
+        return pd.NaT
+    d, mo, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    if y < 100:
+        y += 2000
+    try:
+        return pd.Timestamp(y, mo, d)
+    except Exception:
+        return pd.NaT
+
+
+def _analysis(df, insp_df=None):
+    """Analytical findings (what is weak, what is overdue, what repeats) from the filtered records."""
+    out = []
+    if df.empty or "Status" not in df.columns:
+        return out
+    today = pd.Timestamp(dt.date.today())
+    total = len(df)
+    openm = df["Status"] != "Resolved"
+    n_open = int(openm.sum())
+    has_date = "Date of Inspection" in df.columns and _is_dt(df["Date of Inspection"])
+
+    pct = 100 * (total - n_open) / total
+    if n_open == 0:
+        out.append(f"**Verdict:** all {total} deficiencies are resolved - full compliance.")
+    else:
+        level = "good" if pct >= 90 else "moderate" if pct >= 75 else "weak"
+        out.append(f"**Verdict:** compliance is {level} - **{pct:.0f}%** resolved, **{n_open}** of {total} still open.")
+
+    # Department strength / backlog
+    if "Head" in df.columns and df["Head"].nunique() > 1:
+        g = df.groupby("Head")["Status"].agg(total="size", res=lambda s: int((s == "Resolved").sum()))
+        g["open"] = g["total"] - g["res"]
+        g["pct"] = 100 * g["res"] / g["total"]
+        big = g[g["total"] >= 3]
+        if not big.empty:
+            wn = big.sort_values(["pct", "total"], ascending=[True, False]).index[0]
+            w = big.loc[wn]
+            if w["pct"] < 100:
+                out.append(
+                    f"**Weakest department:** {wn} - only {int(w['res'])} of {int(w['total'])} resolved ({w['pct']:.0f}%)"
+                )
+        if n_open:
+            top = g["open"].idxmax()
+            if g.loc[top, "open"] > 0:
+                share = 100 * g.loc[top, "open"] / n_open
+                out.append(f"**Biggest backlog:** {top} holds {int(g.loc[top, 'open'])} open items ({share:.0f}% of all open)")
+
+    # Officer load
+    if "Action By" in df.columns and n_open:
+        o = df.loc[openm, "Action By"].map(_officer_tokens).explode().dropna().astype(str)
+        o = o[o.str.strip() != ""]
+        vc = o.value_counts()
+        if len(vc):
+            out.append(f"**Officer with most open items:** {vc.index[0]} ({int(vc.iloc[0])})")
+
+    # Ageing
+    if has_date and n_open:
+        ages = (today - df.loc[openm, "Date of Inspection"].dropna()).dt.days
+        if len(ages):
+            a = int((ages <= 7).sum())
+            b = int(((ages > 7) & (ages <= 30)).sum())
+            c = int((ages > 30).sum())
+            out.append(f"**Ageing of open items:** {a} up to 7 days, {b} between 8-30 days, {c} older than 30 days")
+
+    # Target date (TDC) overdue
+    if "Feedback" in df.columns and n_open:
+        tdc = pd.to_datetime(df.loc[openm, "Feedback"].map(_parse_tdc), errors="coerce")
+        with_tdc = int(tdc.notna().sum())
+        if with_tdc:
+            overdue = int((tdc < today).sum())
+            due7 = int(((tdc >= today) & (tdc <= today + pd.Timedelta(days=7))).sum())
+            out.append(
+                f"**Target dates (TDC):** {with_tdc} open items have one - **{overdue} already overdue**, "
+                f"{due7} fall due within 7 days"
+            )
+
+    # Speed of compliance
+    if has_date and "Timestamp of Compliance" in df.columns:
+        r = df[df["Status"] == "Resolved"]
+        ts = pd.to_datetime(r["Timestamp of Compliance"], errors="coerce")
+        if getattr(ts.dt, "tz", None) is not None:
+            ts = ts.dt.tz_localize(None)
+        days = (ts.dt.normalize() - r["Date of Inspection"].dt.normalize()).dt.days.dropna()
+        days = days[days >= 0]
+        if len(days) >= 3:
+            out.append(f"**Speed of compliance:** resolved items took {days.mean():.1f} days on average (median {days.median():.0f})")
+
+    # Recurring issues
+    if has_date and "Location" in df.columns and "Sub Head" in df.columns:
+        g = df.groupby(["Location", "Sub Head"]).agg(n=("Status", "size"), insp=("Date of Inspection", "nunique"))
+        rec = g[(g["insp"] >= 2) & (g["n"] >= 2)].sort_values(["insp", "n"], ascending=False)
+        if len(rec):
+            (loc, sub), r0 = rec.index[0], rec.iloc[0]
+            out.append(f"**Recurring issue:** {sub} at {loc} was raised in {int(r0['insp'])} different inspections ({int(r0['n'])} records)")
+
+    # Inspection depth
+    if insp_df is not None and not insp_df.empty and len(insp_df) > 1 and "Deficiencies" in insp_df.columns:
+        r0 = insp_df.sort_values("Deficiencies", ascending=False).iloc[0]
+        when = _nm(r0["Date of Inspection"]) if "Date of Inspection" in insp_df.columns else ""
+        who = f" by {r0['Inspection By']}" if "Inspection By" in insp_df.columns and r0["Inspection By"] else ""
+        out.append(
+            f"**Inspection depth:** {insp_df['Deficiencies'].mean():.1f} deficiencies per inspection on average; "
+            f"heaviest was {when}{who} with {int(r0['Deficiencies'])}"
+        )
     return out
 
 
@@ -1524,7 +1776,7 @@ def _to_docx(turn):
     doc.add_paragraph(f"Report: {turn.get('title', 'Result')}   |   Generated on {dt.datetime.now():%d-%m-%Y %H:%M}")
 
     doc.add_heading("Summary", level=1)
-    doc.add_paragraph(turn["text"])
+    doc.add_paragraph(turn["text"].replace("**", ""))
 
     kp = turn.get("kpis")
     if kp:
@@ -1532,6 +1784,11 @@ def _to_docx(turn):
         t.style = "Light Grid Accent 1"
         for i, (a, b) in enumerate(kp.items()):
             t.cell(0, i).text, t.cell(1, i).text = str(a), str(b)
+
+    if turn.get("analysis"):
+        doc.add_heading("Analysis", level=1)
+        for s in turn["analysis"]:
+            doc.add_paragraph(s.replace("**", ""), style="List Bullet")
 
     if turn.get("insights"):
         doc.add_heading("Key points", level=1)
@@ -1613,6 +1870,14 @@ def _answer(question, tables, history, hint):
         if plan.get("clarification"):
             return {"q": question, "text": plan["clarification"], "note": note}
 
+        src_df = tables.get(plan.get("table")) if plan.get("table") in tables else next(iter(tables.values()))
+        if mode == "ai":
+            # Deterministic safety net: designations like AEE/OP/SUR are officers, not Locations.
+            plan = _enforce_officer(plan, question, src_df)
+        n_last = _last_n_from_question(question)
+        if n_last:
+            plan["last_n_inspections"] = n_last
+
         raw_filtered, clean_plan = _filter_df(plan, tables)
         result = _aggregate_df(raw_filtered, clean_plan)
         title = clean_plan.get("title") or "Result"
@@ -1648,6 +1913,10 @@ def _answer(question, tables, history, hint):
             specs = _charts_for(result, clean_plan)
         except Exception:
             specs = []
+        try:
+            analysis = _analysis(raw_filtered, insp_df)
+        except Exception:
+            analysis = []
 
         return {
             "q": question,
@@ -1663,6 +1932,7 @@ def _answer(question, tables, history, hint):
             "explain": _explain_plan(clean_plan),
             "kpis": _kpis(raw_filtered, clean_plan, insp_count=insp_count),
             "insights": _insights(raw_filtered),
+            "analysis": analysis,
             "xlsx": _to_excel(result, insp_df=insp_df if not grouped else None),
             "docx": None,
         }
@@ -1696,6 +1966,11 @@ def _show_turn(t, idx):
                 for c, (k, v) in zip(st.columns(len(kp)), kp.items()):
                     c.metric(k, f"{v}%" if k == "Compliance %" else v)
 
+            if t.get("analysis"):
+                with st.expander("🧠 Analysis", expanded=True):
+                    for s in t["analysis"]:
+                        st.markdown(f"- {s}")
+
             specs = t.get("specs") or []
             if specs:
                 try:
@@ -1713,7 +1988,7 @@ def _show_turn(t, idx):
                     st.caption(f"📊 Chart could not be drawn: {e}")
 
             if t.get("insights"):
-                with st.expander("💡 Quick insights", expanded=True):
+                with st.expander("💡 Quick insights", expanded=False):
                     for s in t["insights"]:
                         st.markdown(f"- {s}")
 
@@ -1791,7 +2066,7 @@ def render_saral_chatbot(dataframes: dict, title: str = "Ask SARAL",
     st.subheader(f"🤖 {title}")
     st.caption(
         "Type your question in simple words (English / हिंदी / Hinglish). "
-        "You get the answer, charts, an Excel sheet and a Word report."
+        "You get the answer, analysis, charts, an Excel sheet and a Word report."
     )
 
     tables = _prepare_cached(dataframes, hidden_columns)
