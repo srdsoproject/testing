@@ -5,7 +5,9 @@ v4.2 - designation matching fixed (AEE/OP/SUR, SSE/C&W/SUR, Sr.DEN/S ...), "last
 """
 
 import difflib
+import gc
 import io
+import os
 import json
 import re
 import time
@@ -14,7 +16,7 @@ import datetime as dt
 import pandas as pd
 import streamlit as st
 
-CHATBOT_VERSION = "v4.2"
+CHATBOT_VERSION = "v4.3"
 DEFAULT_MODEL = "claude-sonnet-4-5"
 DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
 DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile"
@@ -99,6 +101,25 @@ Interpretation rules:
 - "Deficiencies Noted" and "Feedback" are long text: for "related to <word>" questions use op "contains".
 - For "all deficiencies" or "inspection report of <officer>" style questions leave group_by empty so full rows return.
 - "Analysis" of a department: group_by ["Sub Head", "Status"] with count, after filtering Head and dates.
+- "till date / to date / till now / so far / since the beginning / overall / all time / from the start of the data"
+  means NO date filter at all (the whole database). Never invent a date range for it.
+- A designation typed WITHOUT its station suffix (e.g. "SSE/P-WAY", "Sr.DEN", "ADEN") means ALL designations that
+  start with it (SSE/P-WAY/MO, SSE/P-WAY/KWV ...). Use op "contains" with exactly the part the user typed.
+- Spellings "p way", "pway", "p-way", "P.WAY" are the same thing.
+- "compliance" / "compliance %" / "weakest or best department/officer/station" -> set "metric": "compliance" and
+  group_by the asked dimension (default "Head"). Lowest first (ascending true) for weakest/worst/lowest.
+- "older than N days / pending more than N days" -> "min_age_days": N (open items only).
+- "overdue / beyond target date / TDC crossed" -> "overdue_tdc": true (open items whose TDC written in Feedback has passed).
+- "month wise / monthly trend" -> group_by ["Month"]; "year wise" -> group_by ["Year"]
+  (Month = YYYY-MM and Year are derived columns that always exist).
+- "repeat / recurring" deficiencies -> group_by ["Location","Sub Head"], count, sort descending.
+
+Examples (question -> key parts of the plan):
+1. "SSE/P-WAY inspections till date" -> filters [Inspection By contains "SSE/P-WAY"], NO date filter, no group_by.
+2. "which department has lowest compliance" -> metric "compliance", group_by ["Head"], ascending true.
+3. "Sr.DEN/S pending older than 30 days" -> filters [Action By contains "Sr.DEN/S", Status in ["Pending","No Response"]], min_age_days 30.
+4. "month wise deficiencies of Sr.DOM in 2026" -> filters [Action By contains "Sr.DOM", Date of Inspection between 2026-01-01 and 2026-12-31], group_by ["Month"].
+5. "top 5 stations with most pending" -> filters [Status in ["Pending","No Response"]], group_by ["Location"], count, sort descending, limit 5.
 """
 
 EXAMPLES = [
@@ -128,6 +149,9 @@ JSON format:
   "ascending": false,
   "limit": null,
   "chart": "auto",
+  "metric": null,
+  "min_age_days": null,
+  "overdue_tdc": false,
   "title": "<short title for the result>",
   "clarification": null
 }}
@@ -153,6 +177,9 @@ Rules:
   (e.g. "now only for Solapur", "what about pending ones?", "same for last month"). If the user asks a new
   standalone question, DO NOT carry over old filters.
 - When unsure between two meanings, pick the most likely one and answer; do not ask unless truly impossible.
+- "till date", "overall", "from the start of the data" = NO date filter. Do not add any Date of Inspection filter then.
+- metric is null or "compliance" (per-group Total / Resolved / Open / Compliance %).
+- Derived columns "Month" (YYYY-MM) and "Year" can be used in group_by.
 """
 
 SUMMARY_SYSTEM = """You are the helpful assistant inside the S.A.R.A.L railway safety app.
@@ -649,6 +676,10 @@ def _sanitize_plan(plan, df):
             if str(f.get("op", "")).lower() in ("eq", "in"):
                 f["op"] = "contains"
 
+        canon = next((c for c in _SNAP_COLS if c.lower() == col_raw.lower()), None)
+        if canon and str(f.get("op", "")).lower() in ("eq", "in", "ne"):
+            vv = f.get("value")
+            f = dict(f, value=[_snap_value(df, canon, x) for x in vv] if isinstance(vv, list) else _snap_value(df, canon, vv))
         cleaned.append(_fix_status_filter(f))
 
     plan["filters"] = cleaned
@@ -773,8 +804,23 @@ def _filter_df(plan, tables):
         name = next(iter(tables))
     df = tables[name]
     sanitized = _sanitize_plan(plan, df)
+    df = _add_derived(df, [str(f.get("column")) for f in sanitized.get("filters") or [] if isinstance(f, dict)])
     for f in sanitized.get("filters") or []:
-        df = _apply_filter(df, f)
+        try:
+            df = _apply_filter(df, f)
+        except KeyError:
+            sanitized.setdefault("_ignored", []).append(str(f.get("column")))
+    today = pd.Timestamp(dt.date.today())
+    min_age = sanitized.get("min_age_days")
+    if min_age and "Status" in df.columns and "Date of Inspection" in df.columns and _is_dt(df["Date of Inspection"]):
+        try:
+            age = (today - df["Date of Inspection"]).dt.days
+            df = df[(df["Status"] != "Resolved") & (age > int(min_age))]
+        except Exception:
+            pass
+    if sanitized.get("overdue_tdc") and "Feedback" in df.columns and "Status" in df.columns:
+        tdc = pd.to_datetime(df["Feedback"].map(_parse_tdc), errors="coerce")
+        df = df[(df["Status"] != "Resolved") & (tdc < today)]
     n_last = sanitized.get("last_n_inspections")
     if n_last:
         try:
@@ -785,6 +831,7 @@ def _filter_df(plan, tables):
 
 
 def _aggregate_df(df, plan):
+    df = _add_derived(df, plan.get("group_by") or [])
     group_by = []
     for g in plan.get("group_by") or []:
         try:
@@ -794,8 +841,23 @@ def _aggregate_df(df, plan):
         except KeyError:
             pass
 
+    for g in group_by:
+        if g in ("Action By", "Inspection By"):   # one row per individual officer, not per combined cell
+            df = df.assign(**{g: df[g].map(_officer_tokens)}).explode(g)
+            df[g] = df[g].fillna("").astype(str)
+            df = df[df[g].str.strip() != ""]
+    metric = str(plan.get("metric") or "").lower()
     aggs = plan.get("aggregations") or []
-    if group_by and aggs:
+    if group_by and metric == "compliance" and "Status" in df.columns:
+        result = df.groupby(group_by, dropna=False)["Status"].agg(
+            Total="size", Resolved=lambda x: int((x == "Resolved").sum())
+        ).reset_index()
+        result["Open"] = result["Total"] - result["Resolved"]
+        result["Compliance %"] = (100 * result["Resolved"] / result["Total"]).round(1)
+        result = result.sort_values(
+            ["Compliance %", "Total"], ascending=[bool(plan.get("ascending", True)), False]
+        )
+    elif group_by and aggs:
         spec = {}
         for a in aggs:
             func = a.get("func", "count")
@@ -831,7 +893,9 @@ def _aggregate_df(df, plan):
             )
         except KeyError:
             pass
-    elif group_by and len(result.columns) > len(group_by):
+    elif group_by and group_by[0] in ("Month", "Year"):
+        result = result.sort_values(group_by)
+    elif group_by and metric != "compliance" and len(result.columns) > len(group_by):
         val_col = result.columns[-1]
         if len(group_by) > 1:
             totals = result.groupby(group_by[0])[val_col].transform("sum")
@@ -943,6 +1007,8 @@ _TYPO_MAP = {
     "saftey": "safety", "safey": "safety",
     "tem": "team", "teem": "team",
     "od": "of", "fo": "of",
+    "sarting": "starting", "staring": "starting", "til": "till", "tiil": "till",
+    "complaince": "compliance", "complience": "compliance", "compliace": "compliance",
 }
 
 _BASIC_HELP = (
@@ -966,11 +1032,17 @@ def _normalize_query_text(question):
     return " " + " ".join(words) + " "
 
 
+def _fingerprint(d):
+    """Cheap change-detector (sampled rows + ends) - hashing the whole sheet on every rerun exhausts memory."""
+    n = len(d)
+    smp = pd.concat([d.iloc[::max(1, n // 300)], d.tail(5)]).astype(str)
+    return (n, tuple(map(str, d.columns)), int(pd.util.hash_pandas_object(smp, index=False).sum()))
+
+
 def _prepare_cached(dfs, hidden):
     try:
         key = (CHATBOT_VERSION, USE_EMBEDDED_INSPECTION_DATE) + tuple(
-            (n, d.shape, tuple(d.columns), int(pd.util.hash_pandas_object(d.astype(str), index=False).sum()))
-            for n, d in dfs.items()
+            (n, _fingerprint(d)) for n, d in dfs.items()
         ) + (tuple(hidden or []),)
     except Exception:
         return _prepare(dfs, hidden)
@@ -1082,53 +1154,105 @@ def _detect_officer_col(ql, df):
     return "Action By"
 
 
-def _find_officer(ql, df, col):
-    toks = [_norm(t) for t in ql.split() if _norm(t)]
-    cand = (
-        set(toks)
-        | {a + b for a, b in zip(toks, toks[1:])}
-        | {a + b + c for a, b, c in zip(toks, toks[1:], toks[2:])}
-        | {a + b + c + d for a, b, c, d in zip(toks, toks[1:], toks[2:], toks[3:])}
-    )
-    all_vals = {
-        tok
-        for v in df[col].dropna().astype(str).unique()
-        for tok in _officer_tokens(v)
-    }
-    best_len, hits = 0, []
-    variant_map = {}
-    for v in all_vals:
-        n = _norm(v)
-        if len(n) < 3 or n in ("safety", "safetyteam", "team"):
-            continue
-        variants = {n: v}
-        if n.startswith("sr") and len(n) > 4:
-            variants[n[2:]] = v
-        if n.startswith("a") and len(n) > 5:
-            variants[n[1:]] = v
-        for var, val in variants.items():
-            variant_map[var] = val
-            if var in cand:
-                if len(var) > best_len:
-                    best_len, hits = len(var), [val]
-                elif len(var) == best_len and val not in hits:
-                    hits.append(val)
+_OFFICER_STOP = {
+    "last", "list", "till", "date", "show", "give", "find", "with", "from", "this", "that", "month", "year",
+    "week", "days", "team", "wise", "report", "reports", "pending", "resolved", "inspection", "inspections",
+    "deficiency", "deficiencies", "analysis", "summary", "details", "latest", "recent", "total", "count",
+    "number", "station", "stations", "officer", "officers", "compliance", "overdue", "older", "than",
+    "department", "departments", "status", "which", "most", "least", "lowest", "highest",
+}
 
-    if not hits and variant_map:
-        for c_tok in sorted(cand, key=len, reverse=True):
-            if len(c_tok) >= 5:
-                close = difflib.get_close_matches(c_tok, list(variant_map.keys()), n=1, cutoff=0.82)
-                if close:
-                    hits = [variant_map[close[0]]]
-                    break
-    return hits
+
+def _all_designations(df, col):
+    if col not in df.columns:
+        return []
+    return sorted({tok for v in df[col].dropna().astype(str).unique() for tok in _officer_tokens(v)})
+
+
+def _name_variants(n):
+    out = {n}
+    if n.startswith("sr") and len(n) > 4:
+        out.add(n[2:])
+    if n.startswith("a") and len(n) > 5:
+        out.add(n[1:])
+    return out
+
+
+def _find_officer(ql, df, col):
+    """All designations in `col` that the question refers to.
+    Matches whole names AND prefixes: 'SSE/P-WAY' -> SSE/P-WAY/MO, SSE/P-WAY/KWV ..."""
+    toks = [_norm(t) for t in ql.split() if _norm(t)]
+    cands = []
+    for n in (1, 2, 3, 4):
+        for i in range(len(toks) - n + 1):
+            c = "".join(toks[i:i + n])
+            if len(c) >= 3 and c not in cands:
+                cands.append(c)
+    cands.sort(key=len, reverse=True)
+
+    meta = []
+    for v in _all_designations(df, col):
+        n = _norm(v)
+        if len(n) < 3 or n in ("safety", "safetyteam", "team", "notassigned"):
+            continue
+        meta.append((v, _name_variants(n)))
+    if not meta:
+        return []
+
+    # 1) whole-name or prefix match (may name several different officers)
+    used, found = [], []
+    for c in cands:
+        if c in _OFFICER_STOP or any(c in u for u in used):
+            continue
+        hits = [v for v, vs in meta if any(x == c or (len(c) >= 5 and x.startswith(c)) for x in vs)]
+        if hits:
+            used.append(c)
+            found += [h for h in hits if h not in found]
+    if found:
+        return found
+
+    # 2) typed part sits inside a designation ("pway" -> SSE/P-WAY/..)
+    for c in cands:
+        if len(c) < 4 or c in _OFFICER_STOP:
+            continue
+        hits = [v for v, vs in meta if any(c in x for x in vs)]
+        if 0 < len(hits) <= 12:
+            return hits
+
+    # 3) spelling mistakes
+    keys = {x: v for v, vs in meta for x in vs}
+    for c in cands:
+        if len(c) >= 5 and c not in _OFFICER_STOP:
+            close = difflib.get_close_matches(c, list(keys), n=1, cutoff=0.82)
+            if close:
+                return [keys[close[0]]]
+    return []
+
+
+def _officer_filter(df, col, hits):
+    """One filter for the matched designations; 'contains <typed part>' when they share a prefix."""
+    hits = list(dict.fromkeys(hits))
+    if len(hits) == 1:
+        return {"column": col, "op": "contains", "value": hits[0]}
+    low = [h.lower() for h in hits]
+    p = os.path.commonprefix(low)
+    if p and p[-1].isalnum() and any(len(x) > len(p) and x[len(p)].isalnum() for x in low):
+        p = re.sub(r"[a-z0-9]+$", "", p)
+    p = p.rstrip(" /-.,&")
+    if len(_norm(p)) >= 3:
+        value = hits[0][:len(p)].rstrip(" /-.,&")
+        rx = _designation_regex(value)
+        matched = {v for v in _all_designations(df, col) if rx and rx.search(v.lower())}
+        if matched == set(hits):
+            return {"column": col, "op": "contains", "value": value}
+    return {"column": col, "op": "in", "value": hits[:40]}
 
 
 def _enforce_officer(plan, question, df):
     """
-    AI planners sometimes read the station code inside a designation as a Location
-    ("EE/OP/SUR" -> Location SUR). Find the designation deterministically from the
-    question and make sure it is filtered as an officer, dropping the wrong Location/Head filter.
+    AI planners may (a) read the station code inside a designation as a Location, or
+    (b) pick ONE full designation when the user typed only the prefix (SSE/P-WAY).
+    Find the designation(s) deterministically and filter them as officers.
     """
     try:
         ql = _normalize_query_text(question)
@@ -1142,8 +1266,9 @@ def _enforce_officer(plan, question, df):
             col = other
         if not hits:
             return plan
-        hit = hits[0]
-        nv = _norm(hit)
+        flt = _officer_filter(df, col, hits)
+        nv_all = {_norm(h) for h in hits}
+        ws = {_norm(w) for w in ql.split()}
         plan = json.loads(json.dumps(plan))
         kept = []
         for f in plan.get("filters") or []:
@@ -1153,16 +1278,120 @@ def _enforce_officer(plan, question, df):
             fv = f.get("value")
             fvs = fv if isinstance(fv, list) else [fv]
             fns = [_norm(x) for x in fvs if isinstance(x, str) and _norm(x)]
-            if c in ("location", "head") and any(x in nv and x != nv for x in fns):
+            if c in ("location", "head") and any(
+                x in n and x != n and x not in ws for x in fns for n in nv_all
+            ):
                 continue  # station code / word taken from inside the designation
-            if c in ("inspection by", "action by") and any(x in nv or nv in x for x in fns):
-                continue  # replaced by the exact designation below
+            if c in ("inspection by", "action by") and any(
+                (x in n or n in x) for x in fns for n in nv_all
+            ):
+                continue  # replaced by the exact filter below
             kept.append(f)
-        kept.append({"column": col, "op": "contains", "value": hit})
+        kept.append(flt)
         plan["filters"] = kept
         return plan
     except Exception:
         return plan
+
+
+# ---- value snapping, till-date, compliance metric, derived columns ----------
+_SNAP_COLS = ("Head", "Location", "Type of Inspection", "Sub Head")
+
+
+def _snap_value(df, col, val):
+    """Map what the AI wrote to the real value in the data (case / spelling / alias tolerant)."""
+    if col not in df.columns or not isinstance(val, str):
+        return val
+    nm = {_norm(u): u for u in df[col].dropna().astype(str).unique() if _norm(u)}
+    n = _norm(val)
+    if n in nm:
+        return nm[n]
+    if col == "Head":
+        t = _DEPT_MAP.get(val.strip().upper())
+        if t and _norm(t) in nm:
+            return nm[_norm(t)]
+    close = difflib.get_close_matches(n, list(nm), n=1, cutoff=0.8)
+    return nm[close[0]] if close else val
+
+
+_TILL_RX = re.compile(r"\b(?:till|until|upto|up to|to)\s+(?:date|now|today)\b|\bso far\b|\bto the date\b")
+_ALL_RX = re.compile(
+    r"\bsince\s+(?:the\s+)?(?:beginning|start|starting|inception)\b"
+    r"|\bfrom\s+(?:the\s+)?(?:start|starting|beginning)\b"
+    r"|\boverall\b|\ball\s+time\b|\bever\b|\b(?:entire|whole|complete)\s+(?:data|database|record|records)\b"
+)
+
+
+def _enforce_alltime(plan, question):
+    """'till date', 'overall', 'from the start of the data' = the whole database (no date filter)."""
+    ql = _normalize_query_text(question)
+    till, allw = bool(_TILL_RX.search(ql)), bool(_ALL_RX.search(ql))
+    if not (till or allw):
+        return plan
+    plan = json.loads(json.dumps(plan))
+    rng = _rule_dates(_TILL_RX.sub(" ", ql))
+    keep = [
+        f for f in plan.get("filters") or []
+        if not (isinstance(f, dict) and str(f.get("column", "")).strip().lower() == "date of inspection")
+    ]
+    if rng is None and not re.search(r"\b20\d\d\b", ql):
+        plan["filters"] = keep
+    elif rng is not None and till:
+        plan["filters"] = keep + [{
+            "column": "Date of Inspection", "op": "between",
+            "value": [rng[0].isoformat(), dt.date.today().isoformat()],
+        }]
+    return plan
+
+
+def _enforce_metric(plan, question):
+    ql = _normalize_query_text(question)
+    plan = json.loads(json.dumps(plan))
+    if re.search(r"\bcompliance\b", ql) and plan.get("group_by") and not plan.get("metric"):
+        plan["metric"] = "compliance"
+    if str(plan.get("metric") or "").lower() == "compliance":
+        if re.search(r"\b(lowest|least|worst|weak|weakest|poor|poorest|minimum|min|bottom)\b", ql):
+            plan["ascending"] = True
+        elif re.search(r"\b(highest|best|top|maximum|max|strongest)\b", ql):
+            plan["ascending"] = False
+        elif plan.get("ascending") is None:
+            plan["ascending"] = True
+        plan["sort_by"] = None
+        plan["aggregations"] = []
+    return plan
+
+
+def _add_derived(df, names):
+    """Month (YYYY-MM) and Year columns on demand, from Date of Inspection."""
+    names = {str(n).strip().lower() for n in names}
+    if "Date of Inspection" not in df.columns or not _is_dt(df["Date of Inspection"]):
+        return df
+    if "month" in names and "Month" not in df.columns:
+        df = df.assign(Month=df["Date of Inspection"].dt.strftime("%Y-%m"))
+    if "year" in names and "Year" not in df.columns:
+        df = df.assign(Year=df["Date of Inspection"].dt.year.astype("Int64").astype(str))
+    return df
+
+
+def _safe_df(d):
+    """Dataframe that the browser can always render (no mixed types / duplicate names / huge cells)."""
+    d = d.loc[:, ~d.columns.duplicated()].head(MAX_ROWS_SHOWN).copy()
+    for c in d.columns:
+        if _is_dt(d[c]) or _is_num(d[c]):
+            continue
+        d[c] = d[c].astype(str).replace({"nan": "", "None": "", "NaT": ""}).str.slice(0, 600)
+    return d
+
+
+def _trim_turns(turns):
+    """Keep memory flat: only the last 2 answers keep tables / charts / downloads."""
+    if len(turns) > 12:
+        del turns[:len(turns) - 12]
+    for t in turns[:-2]:
+        for k in ("table", "insp_table", "specs", "docx", "insights", "analysis", "kpis", "xlsx"):
+            t.pop(k, None)
+    gc.collect()
+
 
 
 def _rule_plan(question, tables, prev=None):
@@ -1225,12 +1454,11 @@ def _rule_plan(question, tables, prev=None):
     if ocol in df.columns:
         offs = _find_officer(ql, df, ocol)
         if offs:
-            filters.append(
-                {"column": ocol, "op": "in", "value": offs}
-                if len(offs) > 1
-                else {"column": ocol, "op": "contains", "value": offs[0]}
+            filters.append(_officer_filter(df, ocol, offs))
+            parts.append(
+                f"{'Inspected by ' if ocol == 'Inspection By' else ''}{' / '.join(offs[:3])}"
+                + (f" +{len(offs) - 3} more" if len(offs) > 3 else "")
             )
-            parts.append(f"{'Inspected by ' if ocol == 'Inspection By' else ''}{' / '.join(offs)}")
         elif re.search(r"\bsafety\s*(?:team|branch)\b", ql) and "Inspection By" in df.columns:
             filters.append({"column": "Inspection By", "op": "contains", "value": "Safety"})
             parts.append("Inspected by Safety Team")
@@ -1289,9 +1517,11 @@ def _rule_plan(question, tables, prev=None):
         ("Location", r"\bstations?\b|\blocations?\b|\bgates?\b"),
         ("Action By", r"\bofficers?\b|\bofficials?\b"),
         ("Status", r"\bstatus\b"),
+        ("Month", r"month ?wise|monthly|per month|by month"),
+        ("Year", r"year ?wise|yearly|per year|by year"),
         ("Head", r"\bdept\b|\bdeptt\b|\bdpt\b|\bdepartments?\b|\bhead\b|\bbranch\b"),
     ]
-    dim = next((c for c, rx in dims if c in df.columns and re.search(rx, ql)), None)
+    dim = next((c for c, rx in dims if (c in df.columns or c in ("Month", "Year")) and re.search(rx, ql)), None)
 
     group_by = []
     if rank or wise:
@@ -1305,6 +1535,22 @@ def _rule_plan(question, tables, prev=None):
             group_by = ["Head"]
         elif wise and "Head" in df.columns:
             group_by = ["Head"] + (["Status"] if "Status" in df.columns and len(sts) != 1 else [])
+
+    extra = {}
+    mage = re.search(r"\b(?:older|more|greater|beyond|over|above)\s+(?:than\s+)?(\d+)\s*days?\b", ql)
+    if mage and "Status" in df.columns:
+        extra["min_age_days"] = int(mage.group(1))
+        if not any(f["column"] == "Status" for f in filters):
+            filters.append({"column": "Status", "op": "in", "value": ["Pending", "No Response"]})
+            parts.append("Pending")
+    if re.search(r"\boverdue\b|\bbeyond (?:the )?(?:tdc|target)\b|\btdc (?:crossed|over|expired)\b", ql):
+        extra["overdue_tdc"] = True
+    if re.search(r"\bcompliance\b", ql) and "Status" in df.columns:
+        if not group_by and "Head" in df.columns:
+            group_by = [dim if dim and dim != "Status" else "Head"]
+        if group_by:
+            extra["metric"] = "compliance"
+            extra["ascending"] = bool(re.search(r"\b(lowest|least|worst|weak|weakest|poor|minimum)\b", ql))
 
     if prev and _looks_like_followup(question) and (filters or group_by):
         base = json.loads(json.dumps(prev))
@@ -1325,7 +1571,7 @@ def _rule_plan(question, tables, prev=None):
             base.update(sort_by="Deficiencies", ascending=asc)
         return base
 
-    if not filters and not group_by:
+    if not filters and not group_by and not extra:
         return {"clarification": "I could not understand that. " + _BASIC_HELP}
 
     plan = {
@@ -1343,6 +1589,7 @@ def _rule_plan(question, tables, prev=None):
     }
     if group_by and rank:
         plan["sort_by"], plan["ascending"] = "Deficiencies", asc
+    plan.update(extra)
     return plan
 
 
@@ -1369,9 +1616,18 @@ def _explain_plan(plan):
         elif op == "ne":
             out.append(f"{col} is not {' or '.join(map(str, vals))}")
         elif op in ("eq", "in"):
-            out.append(f"{col} is {' or '.join(map(str, vals))}")
+            shown = " or ".join(map(str, vals[:4])) + (f" (+{len(vals) - 4} more)" if len(vals) > 4 else "")
+            out.append(f"{col} is {shown}")
         elif op in ("isnull", "notnull"):
             out.append(f"{col} is {'blank' if op == 'isnull' else 'filled'}")
+    if plan.get("min_age_days"):
+        out.append(f"still open for more than {int(plan['min_age_days'])} days")
+    if plan.get("overdue_tdc"):
+        out.append("open items whose target date (TDC) has already passed")
+    if str(plan.get("metric") or "").lower() == "compliance":
+        out.append("compliance % per group")
+    if plan.get("_ignored"):
+        out.append("ignored unknown filter: " + ", ".join(plan["_ignored"]))
     if plan.get("last_n_inspections"):
         n = int(plan["last_n_inspections"])
         out.append(f"only the latest {n} inspection{'s' if n > 1 else ''}")
@@ -1392,6 +1648,26 @@ def _local_summary(title, result, plan, raw_filtered, insp_count=None):
         if insp_count is not None
         else f"**{len(raw_filtered)} records**"
     )
+
+    if str(plan.get("metric") or "").lower() == "compliance" and "Compliance %" in result.columns:
+        g = [c for c in result.columns if c not in ("Total", "Resolved", "Open", "Compliance %")]
+        lines = [f"{insp_prefix} found: {title}."]
+        if g and len(result):
+            lo = result.sort_values(["Compliance %", "Total"], ascending=[True, False]).iloc[0]
+            hi = result.sort_values(["Compliance %", "Total"], ascending=[False, False]).iloc[0]
+            lines.append(
+                f"Lowest compliance: **{_nm(lo[g[0]])}** - {lo['Compliance %']}% "
+                f"({int(lo['Resolved'])} of {int(lo['Total'])} resolved, {int(lo['Open'])} open)."
+            )
+            if len(result) > 1:
+                lines.append(
+                    f"Highest compliance: **{_nm(hi[g[0]])}** - {hi['Compliance %']}% "
+                    f"({int(hi['Resolved'])} of {int(hi['Total'])} resolved)."
+                )
+        if "Resolved" in k:
+            lines.append(f"Overall: resolved **{k['Resolved']}**, open **{k['Pending'] + k['No Response']}**"
+                         + (f", compliance **{k['Compliance %']}%**." if "Compliance %" in k else "."))
+        return "\n\n".join(lines)
 
     if plan.get("group_by") and num:
         asc = bool(plan.get("ascending"))
@@ -1534,7 +1810,10 @@ def _analysis(df, insp_df=None):
     if "Action By" in df.columns and n_open:
         o = df.loc[openm, "Action By"].map(_officer_tokens).explode().dropna().astype(str)
         o = o[o.str.strip() != ""]
-        vc = o.value_counts()
+        un = o.str.lower().isin(["not assigned", "na", "n/a", "nil", "none"])
+        if int(un.sum()):
+            out.append(f"**Unassigned:** {int(un.sum())} open items have no action officer assigned")
+        vc = o[~un].value_counts()
         if len(vc):
             out.append(f"**Officer with most open items:** {vc.index[0]} ({int(vc.iloc[0])})")
 
@@ -1605,7 +1884,7 @@ def _charts_for(result, plan):
             return []
         if len(g) == 1:
             d = result[[g[0], val]].copy()
-            if _is_dt(d[g[0]]) or hint == "line":
+            if _is_dt(d[g[0]]) or hint == "line" or g[0] in ("Month", "Year"):
                 kind, d = "line", d.sort_values(g[0])
             elif g[0] == "Status" or (hint == "pie" and len(d) <= 8):
                 kind = "pie"
@@ -1870,6 +2149,8 @@ def _answer(question, tables, history, hint):
         if plan.get("clarification"):
             return {"q": question, "text": plan["clarification"], "note": note}
 
+        plan = _enforce_alltime(plan, question)
+        plan = _enforce_metric(plan, question)
         src_df = tables.get(plan.get("table")) if plan.get("table") in tables else next(iter(tables.values()))
         if mode == "ai":
             # Deterministic safety net: designations like AEE/OP/SUR are officers, not Locations.
@@ -1988,7 +2269,7 @@ def _show_turn(t, idx):
                     st.caption(f"📊 Chart could not be drawn: {e}")
 
             if t.get("insights"):
-                with st.expander("💡 Quick insights", expanded=False):
+                with st.expander("💡 Quick insights", expanded=True):
                     for s in t["insights"]:
                         st.markdown(f"- {s}")
 
@@ -1999,14 +2280,14 @@ def _show_turn(t, idx):
                     f"📝 All Deficiencies ({len(tbl)})",
                 ])
                 with tab_insp:
-                    st.dataframe(insp_tbl, use_container_width=True, hide_index=True)
+                    st.dataframe(_safe_df(insp_tbl), use_container_width=True, hide_index=True)
                 with tab_def:
-                    st.dataframe(tbl.head(MAX_ROWS_SHOWN), use_container_width=True, hide_index=True)
+                    st.dataframe(_safe_df(tbl), use_container_width=True, hide_index=True)
                     if len(tbl) > MAX_ROWS_SHOWN:
                         st.caption(f"Showing first {MAX_ROWS_SHOWN} rows. Download the Excel sheet for all rows.")
             else:
                 st.caption(f"{t.get('title', 'Result')}  •  {len(tbl)} records")
-                st.dataframe(tbl.head(MAX_ROWS_SHOWN), use_container_width=True, hide_index=True)
+                st.dataframe(_safe_df(tbl), use_container_width=True, hide_index=True)
                 if len(tbl) > MAX_ROWS_SHOWN:
                     st.caption(f"Showing first {MAX_ROWS_SHOWN} rows. Download the sheet to get all rows.")
 
@@ -2092,14 +2373,23 @@ def render_saral_chatbot(dataframes: dict, title: str = "Ask SARAL",
 
     if question:
         with st.spinner("Looking into SARAL data..."):
-            ss["saral_turns"].append(_answer(question, tables, ss["saral_hist"], domain_hint))
+            try:
+                ss["saral_turns"].append(_answer(question, tables, ss["saral_hist"], domain_hint))
+            except Exception as e:
+                ss["saral_turns"].append({"q": question, "text": "Sorry, I could not answer that. Please rephrase.",
+                                          "error": f"{type(e).__name__}: {str(e)[:200]}"})
+        ss["saral_hist"] = ss["saral_hist"][-6:]
+        _trim_turns(ss["saral_turns"])
 
     n = len(ss["saral_turns"])
     for i in range(n - 1, -1, -1):
-        if i >= n - 2:
-            _show_turn(ss["saral_turns"][i], i)
-        else:
-            _show_turn_compact(ss["saral_turns"][i], i)
+        try:
+            if i >= n - 2:
+                _show_turn(ss["saral_turns"][i], i)
+            else:
+                _show_turn_compact(ss["saral_turns"][i], i)
+        except Exception as e:   # one bad answer must never blank the whole page
+            st.warning(f"Could not display this answer ({type(e).__name__}). Please ask it again.")
 
     if n:
         st.button("🗑️ Clear chat", key="saral_clear", on_click=_clear_chat)
